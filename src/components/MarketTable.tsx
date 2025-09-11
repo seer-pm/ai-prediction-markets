@@ -60,10 +60,6 @@ export const MarketTable: React.FC<MarketTableProps> = ({ markets, isLoading, is
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {markets.map((market) => {
-              const opportunityType = market.difference > 0 ? "BUY" : "SELL";
-              const opportunityColor = market.difference > 0 ? "text-green-600" : "text-red-600";
-              const opportunityBg = market.difference > 0 ? "bg-green-50" : "bg-red-50";
-
               return (
                 <tr key={market.marketId}>
                   <td className="px-6 py-4 whitespace-nowrap">

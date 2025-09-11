@@ -17,7 +17,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   markets,
   onTrade,
   onClose,
-  isConnected,
 }) => {
   const {
     register,
