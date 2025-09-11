@@ -1,15 +1,14 @@
-import React, { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
-import { useAccount } from "wagmi";
-import { config } from "./config/wagmi";
+import React, { useState } from "react";
+import { useAccount, WagmiProvider } from "wagmi";
 import { CSVUpload } from "./components/CSVUpload";
 import { MarketTable } from "./components/MarketTable";
 import { TradingInterface } from "./components/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import { WalletPrompt } from "./components/WalletPrompt";
-import { PredictionRow, MarketData } from "./types";
+import { config } from "./config/wagmi";
 import { useProcessPredictions } from "./hooks/useMarkets";
+import { type PredictionRow } from "./types";
 
 const queryClient = new QueryClient();
 

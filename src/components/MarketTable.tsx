@@ -1,5 +1,5 @@
 import React from "react";
-import { MarketData } from "../types";
+import { type MarketData } from "../types";
 
 interface MarketTableProps {
   markets: MarketData[];
