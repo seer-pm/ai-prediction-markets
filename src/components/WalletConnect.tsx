@@ -1,4 +1,4 @@
-import { useWeb3Modal } from "@web3modal/wagmi/react";
+import { useAppKit } from "@reown/appkit/react";
 import React from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 
@@ -6,7 +6,7 @@ export const WalletConnect: React.FC = () => {
   const { address, isConnected, isConnecting } = useAccount();
   const { error } = useConnect();
   const { disconnect } = useDisconnect();
-  const { open } = useWeb3Modal();
+  const { open } = useAppKit();
 
   if (isConnecting) {
     return (
