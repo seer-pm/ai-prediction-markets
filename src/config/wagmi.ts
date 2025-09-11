@@ -11,7 +11,7 @@ const OPTIMISM_RPC = rpcEndpoint("optimism");
 const metadata = {
   name: "Ai Prediction Markets",
   description: "Ai Prediction Markets",
-  url: "https://web3modal.com",
+  url: "https://aipredictionmarkets.netlify.app",
   icons: ["https://avatars.githubusercontent.com/u/37784886"],
 };
 

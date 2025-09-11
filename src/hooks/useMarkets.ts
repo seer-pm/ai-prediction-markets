@@ -3,19 +3,24 @@ import { type MarketData, type PredictionRow } from "../types";
 import { getAppUrl } from "../utils/utils";
 
 const fetchMarketPrices = async (): Promise<Record<string, number>> => {
-  const response = await fetch(`${getAppUrl()}/.netlify/functions/get-markets-prices`);
-  return await response.json();
+  try {
+    const response = await fetch(`${getAppUrl()}/.netlify/functions/get-markets-prices`);
+    return await response.json();
+  } catch (e) {
+    return {};
+  }
 };
 
-export const useMarkets = () => {
+export const useMarkets = (enabled: boolean) => {
   return useQuery({
+    enabled,
     queryKey: ["useMarkets"],
     queryFn: fetchMarketPrices,
   });
 };
 
 export const useProcessPredictions = (predictions: PredictionRow[]) => {
-  const { data: marketPrices, isLoading, error } = useMarkets();
+  const { data: marketPrices, isLoading, error } = useMarkets(predictions.length > 0);
 
   const processedData: MarketData[] = predictions
     .map((pred) => {
