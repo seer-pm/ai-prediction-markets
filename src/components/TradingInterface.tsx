@@ -1,6 +1,6 @@
 import React from "react";
 import { useForm } from "react-hook-form";
-import { type MarketData } from "../types";
+import { MarketData } from "../types";
 
 interface TradingInterfaceProps {
   markets: MarketData[];

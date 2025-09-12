@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { type MarketData, type PredictionRow } from "../types";
+import { MarketData, type PredictionRow } from "../types";
 import { getAppUrl } from "../utils/utils";
 
 const fetchMarketPrices = async (): Promise<Record<string, number>> => {

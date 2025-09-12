@@ -1,4 +1,4 @@
-import { type PredictionRow } from "../types";
+import { PredictionRow } from "../types";
 
 export const parseCSV = (csvText: string): PredictionRow[] => {
   const lines = csvText.trim().split("\n");

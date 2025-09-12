@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { type PredictionRow } from "../types";
+import { PredictionRow } from "../types";
 import { parseCSV } from "../utils/csvParser";
 
 interface CSVUploadProps {
