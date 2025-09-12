@@ -2,14 +2,16 @@ import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 import { UniswapGraphQLClient } from "@/config/apollo";
 import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
-import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/utils";
+import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
+import { PoolInfo } from "@/types";
+import { AI_PREDICTION_MARKET_ID, COLLATERAL_TOKENS } from "@/utils/constants";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
-const AI_PREDICTION_MARKET_ID = "0xb88275fe4e2494e04cea8fb5e9d913aa48add581";
-const COLLATERAL = "0xb5b2dc7fd34c249f4be7fb1fcea07950784229e0";
+const CHAIN_ID = 10
 
 export default async () => {
   try {
+    const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address
     const { data, error } = await supabase
       .from("markets")
       .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
@@ -29,7 +31,7 @@ export default async () => {
       query: GetPoolsDocument,
       variables: {
         first: 1000,
-        where: { or: wrappedTokens.map((token) => getToken0Token1(token, COLLATERAL)) },
+        where: { or: wrappedTokens.map((token) => getToken0Token1(token, collateral)) },
       },
     });
 
@@ -49,21 +51,34 @@ export default async () => {
     }, {} as { [key: string]: GetPoolsQuery["pools"][0] });
     // return ticks data and current price
     const repoToPriceMapping = (outcomes as string[]).reduce((mapping, outcome, index) => {
-      const { token0, token1 } = getToken0Token1(wrappedTokens[index], COLLATERAL);
+      const { token0, token1 } = getToken0Token1(wrappedTokens[index], collateral);
       const tokenPairMappingKey = `${token0}-${token1}`;
       const pool = tokenPairToPoolMapping[tokenPairMappingKey];
       if (!pool) {
         return mapping;
       }
-      const { tick, ticks } = tokenPairToPoolMapping[tokenPairMappingKey];
+      const {
+        tick,
+        ticks,
+        liquidity,
+        token0: { id: poolToken0Id },
+        token1: { id: poolToken1Id },
+      } = tokenPairToPoolMapping[tokenPairMappingKey];
       const [price0, price1] = tickToTokenPrices(Number(tick));
       const price = isTwoStringsEqual(wrappedTokens[index], token0) ? price0 : price1;
       mapping[outcome] = {
+        id: wrappedTokens[index],
         price,
-        ticks,
+        pool: {
+          liquidity,
+          tick,
+          token0: poolToken0Id,
+          token1: poolToken1Id,
+          ticks,
+        },
       };
       return mapping;
-    }, {} as { [key: string]: { price: number; ticks: {} } });
+    }, {} as { [key: string]: { id: Address; price: number; pool: PoolInfo } });
     return new Response(JSON.stringify({ ...repoToPriceMapping }), {
       status: 200,
       headers: {

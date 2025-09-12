@@ -1,8 +1,8 @@
+import { TableData } from "@/types";
 import React from "react";
-import { MarketData } from "../types";
 
 interface MarketTableProps {
-  markets: MarketData[];
+  markets: TableData[];
   isLoading: boolean;
   isConnected: boolean;
 }

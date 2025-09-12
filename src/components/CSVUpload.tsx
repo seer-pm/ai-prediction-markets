@@ -1,7 +1,7 @@
+import { PredictionRow } from "@/types";
+import { parseCSV } from "@/utils/csvParser";
 import React, { useCallback } from "react";
 import { useForm } from "react-hook-form";
-import { PredictionRow } from "../types";
-import { parseCSV } from "../utils/csvParser";
 
 interface CSVUploadProps {
   onDataParsed: (data: PredictionRow[]) => void;

@@ -1,9 +1,10 @@
+import { useCheck7702Support } from "@/hooks/useCheck7702Support";
+import { TableData } from "@/types";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { MarketData } from "../types";
 
 interface TradingInterfaceProps {
-  markets: MarketData[];
+  markets: TableData[];
   onTrade: (amount: number) => void;
   onClose: () => void;
   isConnected: boolean;
@@ -29,6 +30,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   const watchAmount = watch("amount", 0);
   const mintingAmount = watchAmount * 0.5;
   const tradingAmount = watchAmount * 0.5;
+
+  const supports7702 = useCheck7702Support();
 
   const onSubmit = (data: TradeFormData) => {
     onTrade(data.amount);
@@ -150,8 +153,11 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <button
               type="submit"
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg"
+              disabled={!supports7702}
             >
-              🚀 Execute Strategy
+              {supports7702
+                ? "🚀 Execute Strategy"
+                : "wallet does not support batching transactions"}
             </button>
           </div>
 

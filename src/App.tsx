@@ -17,7 +17,7 @@ const AppContent: React.FC = () => {
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const { isConnected } = useAccount();
 
-  const { data: marketData, isLoading, error } = useProcessPredictions(predictions);
+  const { data: tableData, isLoading, error } = useProcessPredictions(predictions);
 
   // Show wallet prompt if not connected
   if (!isConnected) {
@@ -29,13 +29,8 @@ const AppContent: React.FC = () => {
   };
 
   const handleTrade = async (amount: number) => {
-    if (!marketData) return;
+    if (!tableData) return;
 
-    // Mock trading function - replace with real implementation
-    console.log(`Executing AI strategy with ${amount} sUSDS across ${marketData.length} markets`);
-    alert(`AI Strategy executed with ${amount} sUSDS across ${marketData.length} markets!`);
-
-    // Close the dialog after successful trade
     setIsTradeDialogOpen(false);
   };
 
@@ -112,7 +107,7 @@ const AppContent: React.FC = () => {
                   </button>
                   <button
                     onClick={handleStartTrading}
-                    disabled={!marketData || marketData.length === 0 || isLoading}
+                    disabled={!tableData || tableData.length === 0 || isLoading}
                     className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
                   >
                     🚀 Start Trading
@@ -121,7 +116,7 @@ const AppContent: React.FC = () => {
               </div>
 
               <MarketTable
-                markets={marketData || []}
+                markets={tableData || []}
                 isLoading={isLoading}
                 isConnected={isConnected}
               />
@@ -131,11 +126,11 @@ const AppContent: React.FC = () => {
       </main>
 
       {/* Trading Dialog */}
-      {isTradeDialogOpen && marketData && (
+      {isTradeDialogOpen && tableData && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
             <TradingInterface
-              markets={marketData}
+              markets={tableData}
               onTrade={handleTrade}
               onClose={() => setIsTradeDialogOpen(false)}
               isConnected={isConnected}

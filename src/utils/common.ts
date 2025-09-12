@@ -1,5 +1,5 @@
-import { Address, formatUnits } from "viem";
 import { TickMath } from "@uniswap/v3-sdk";
+import { Address, formatUnits } from "viem";
 
 export function getAppUrl() {
   return import.meta.env.VITE_WEBSITE_URL || "https://aipredictionmarkets.netlify.app";
