@@ -7,7 +7,7 @@ import { TradingInterface } from "./components/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import { WalletPrompt } from "./components/WalletPrompt";
 import { config } from "./config/wagmi";
-import { useProcessPredictions } from "./hooks/useMarkets";
+import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
 
 const queryClient = new QueryClient();
