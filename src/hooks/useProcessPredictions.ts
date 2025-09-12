@@ -6,16 +6,17 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
 
   const processedData: MarketData[] = predictions
     .map((pred) => {
-      const currentPrice = marketsPools?.[pred.repo]?.price || 0;
+      const repo = pred.repo.replace('https://github.com/', '')
+      const currentPrice = marketsPools?.[repo]?.price || 0;
       const difference = pred.weight - currentPrice;
 
       return {
-        repo: pred.repo,
+        repo,
         parent: pred.parent,
         currentPrice,
         predictedWeight: pred.weight,
         difference,
-        marketId: `market_${pred.repo}`,
+        marketId: `market_${repo}`,
       };
     })
     .sort((a, b) => b.currentPrice - a.currentPrice);

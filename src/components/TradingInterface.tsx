@@ -49,7 +49,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         </div>
         <button
           onClick={onClose}
-          className="text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+          className="cursor-pointer text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -87,11 +87,11 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               </div>
               <div className="flex items-center">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Buy undervalued markets (weighted by difference)
+                Buy undervalued markets up to the predicted price
               </div>
               <div className="flex items-center">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                Sell overvalued markets (at predicted prices)
+                Sell overvalued markets down to the predicted price
               </div>
             </div>
           </div>
@@ -143,13 +143,13 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium"
+              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg"
+              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg"
             >
               🚀 Execute Strategy
             </button>

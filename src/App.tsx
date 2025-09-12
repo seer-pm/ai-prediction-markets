@@ -106,14 +106,14 @@ const AppContent: React.FC = () => {
                       setPredictions([]);
                       setIsTradeDialogOpen(false);
                     }}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                    className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
                   >
                     Upload New CSV
                   </button>
                   <button
                     onClick={handleStartTrading}
                     disabled={!marketData || marketData.length === 0 || isLoading}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                    className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
                   >
                     🚀 Start Trading
                   </button>

@@ -28,7 +28,7 @@ export const WalletConnect: React.FC = () => {
         </div>
         <button
           onClick={() => disconnect()}
-          className="bg-red-500 text-white px-3 py-1.5 rounded-md hover:bg-red-600 transition-colors text-sm font-medium"
+          className="cursor-pointer bg-red-500 text-white px-3 py-1.5 rounded-md hover:bg-red-600 transition-colors text-sm font-medium"
         >
           Disconnect
         </button>
@@ -41,7 +41,7 @@ export const WalletConnect: React.FC = () => {
       {error && <p className="text-red-600 text-xs">Connection failed</p>}
       <button
         onClick={() => open({ view: "Connect" })}
-        className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+        className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
       >
         Connect Wallet
       </button>
