@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
-import { UniswapGraphQLClient } from "../../src/config/apollo";
-import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "../../src/gql/graphql";
-import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "../../src/utils/utils";
+import { UniswapGraphQLClient } from "@/config/apollo";
+import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
+import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/utils";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 const AI_PREDICTION_MARKET_ID = "0xb88275fe4e2494e04cea8fb5e9d913aa48add581";
