@@ -15,23 +15,17 @@ const queryClient = new QueryClient();
 const AppContent: React.FC = () => {
   const [predictions, setPredictions] = useState<PredictionRow[]>([]);
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
-  const { isConnected } = useAccount();
+  const { address: account, isConnected } = useAccount();
 
   const { data: tableData, isLoading, error } = useProcessPredictions(predictions);
 
   // Show wallet prompt if not connected
-  if (!isConnected) {
+  if (!isConnected || !account) {
     return <WalletPrompt />;
   }
 
   const handleDataParsed = (data: PredictionRow[]) => {
     setPredictions(data);
-  };
-
-  const handleTrade = async (amount: number) => {
-    if (!tableData) return;
-
-    setIsTradeDialogOpen(false);
   };
 
   const handleStartTrading = () => {
@@ -130,10 +124,9 @@ const AppContent: React.FC = () => {
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
             <TradingInterface
+              account={account}
               markets={tableData}
-              onTrade={handleTrade}
               onClose={() => setIsTradeDialogOpen(false)}
-              isConnected={isConnected}
             />
           </div>
         </div>

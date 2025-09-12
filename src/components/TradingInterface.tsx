@@ -1,13 +1,14 @@
 import { useCheck7702Support } from "@/hooks/useCheck7702Support";
+import { useExecuteTradeStrategy } from "@/hooks/useExecuteTradeStrategy";
 import { TableData } from "@/types";
 import React from "react";
 import { useForm } from "react-hook-form";
+import { Address } from "viem";
 
 interface TradingInterfaceProps {
   markets: TableData[];
-  onTrade: (amount: number) => void;
   onClose: () => void;
-  isConnected: boolean;
+  account: Address;
 }
 
 interface TradeFormData {
@@ -15,8 +16,8 @@ interface TradeFormData {
 }
 
 export const TradingInterface: React.FC<TradingInterfaceProps> = ({
+  account,
   markets,
-  onTrade,
   onClose,
 }) => {
   const {
@@ -33,9 +34,13 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const supports7702 = useCheck7702Support();
 
-  const onSubmit = (data: TradeFormData) => {
-    onTrade(data.amount);
+  const executeTradeMutation = useExecuteTradeStrategy(() => {
+    onClose();
     reset();
+  });
+
+  const onSubmit = ({ amount }: TradeFormData) => {
+    executeTradeMutation.mutate({ account, amount, tableData: markets });
   };
 
   // Strategy analysis
@@ -53,6 +58,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         <button
           onClick={onClose}
           className="cursor-pointer text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+          disabled={executeTradeMutation.isPending}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -66,6 +72,44 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       </div>
 
       <div className="p-6">
+        {/* Error Display */}
+        {executeTradeMutation.isError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h4 className="text-sm font-medium text-red-800">Trade Execution Failed</h4>
+                <p className="mt-1 text-sm text-red-700">
+                  {executeTradeMutation.error?.message || "An error occurred while executing the trade strategy. Please try again."}
+                </p>
+                <button
+                  onClick={() => executeTradeMutation.reset()}
+                  className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading Overlay */}
+        {executeTradeMutation.isPending && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+              <div>
+                <h4 className="text-sm font-medium text-blue-800">Executing Trade Strategy</h4>
+                <p className="mt-1 text-sm text-blue-700">
+                  Processing transactions across {markets.length} markets. This may take a few moments...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Strategy Summary */}
         <div className="mb-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -116,7 +160,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               type="number"
               step="0.01"
               placeholder="Enter total amount to invest"
-              className="w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              disabled={executeTradeMutation.isPending}
             />
             {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
           </div>
@@ -146,18 +191,26 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium"
+              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={executeTradeMutation.isPending}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg"
-              disabled={!supports7702}
+              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!supports7702 || executeTradeMutation.isPending}
             >
-              {supports7702
-                ? "🚀 Execute Strategy"
-                : "wallet does not support batching transactions"}
+              {executeTradeMutation.isPending ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Executing Strategy...
+                </div>
+              ) : supports7702 ? (
+                "🚀 Execute Strategy"
+              ) : (
+                "Wallet does not support batching transactions"
+              )}
             </button>
           </div>
 
@@ -171,80 +224,82 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
           </div>
         </form>
 
-        {/* Detailed Strategy Breakdown */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
-              Strategy Details ({markets.length} markets)
-              <svg
-                className="w-4 h-4 transform group-open:rotate-180 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </summary>
-            <div className="mt-4 space-y-4">
-              {buyMarkets.length > 0 && (
-                <div>
-                  <h5 className="text-sm font-medium text-green-700 mb-2">
-                    Buy Markets ({buyMarkets.length})
-                  </h5>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                    {buyMarkets.slice(0, 5).map((market) => (
-                      <div
-                        key={market.marketId}
-                        className="flex justify-between text-xs text-gray-600"
-                      >
-                        <span className="truncate">
-                          {market.repo.replace("https://github.com/", "")}
-                        </span>
-                        <span className="text-green-600">+{market.difference.toFixed(6)}</span>
-                      </div>
-                    ))}
-                    {buyMarkets.length > 5 && (
-                      <div className="text-xs text-gray-400">
-                        ... and {buyMarkets.length - 5} more
-                      </div>
-                    )}
+        {/* Detailed Strategy Breakdown - Hide during loading */}
+        {!executeTradeMutation.isPending && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <details className="group">
+              <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+                Strategy Details ({markets.length} markets)
+                <svg
+                  className="w-4 h-4 transform group-open:rotate-180 transition-transform"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </summary>
+              <div className="mt-4 space-y-4">
+                {buyMarkets.length > 0 && (
+                  <div>
+                    <h5 className="text-sm font-medium text-green-700 mb-2">
+                      Buy Markets ({buyMarkets.length})
+                    </h5>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {buyMarkets.slice(0, 5).map((market) => (
+                        <div
+                          key={market.marketId}
+                          className="flex justify-between text-xs text-gray-600"
+                        >
+                          <span className="truncate">
+                            {market.repo.replace("https://github.com/", "")}
+                          </span>
+                          <span className="text-green-600">+{market.difference.toFixed(6)}</span>
+                        </div>
+                      ))}
+                      {buyMarkets.length > 5 && (
+                        <div className="text-xs text-gray-400">
+                          ... and {buyMarkets.length - 5} more
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {sellMarkets.length > 0 && (
-                <div>
-                  <h5 className="text-sm font-medium text-red-700 mb-2">
-                    Sell Markets ({sellMarkets.length})
-                  </h5>
-                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                    {sellMarkets.slice(0, 5).map((market) => (
-                      <div
-                        key={market.marketId}
-                        className="flex justify-between text-xs text-gray-600"
-                      >
-                        <span className="truncate">
-                          {market.repo.replace("https://github.com/", "")}
-                        </span>
-                        <span className="text-red-600">{market.difference.toFixed(6)}</span>
-                      </div>
-                    ))}
-                    {sellMarkets.length > 5 && (
-                      <div className="text-xs text-gray-400">
-                        ... and {sellMarkets.length - 5} more
-                      </div>
-                    )}
+                {sellMarkets.length > 0 && (
+                  <div>
+                    <h5 className="text-sm font-medium text-red-700 mb-2">
+                      Sell Markets ({sellMarkets.length})
+                    </h5>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {sellMarkets.slice(0, 5).map((market) => (
+                        <div
+                          key={market.marketId}
+                          className="flex justify-between text-xs text-gray-600"
+                        >
+                          <span className="truncate">
+                            {market.repo.replace("https://github.com/", "")}
+                          </span>
+                          <span className="text-red-600">{market.difference.toFixed(6)}</span>
+                        </div>
+                      ))}
+                      {sellMarkets.length > 5 && (
+                        <div className="text-xs text-gray-400">
+                          ... and {sellMarkets.length - 5} more
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </details>
-        </div>
+                )}
+              </div>
+            </details>
+          </div>
+        )}
       </div>
     </div>
   );

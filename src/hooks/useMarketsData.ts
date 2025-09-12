@@ -15,7 +15,7 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
   try {
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-markets-data`);
     return await response.json();
-  } catch (e) {
+  } catch {
     return {};
   }
 };
