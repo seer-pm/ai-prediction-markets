@@ -5,13 +5,14 @@ import { useForm } from "react-hook-form";
 
 interface CSVUploadProps {
   onDataParsed: (data: PredictionRow[]) => void;
+  onClose: () => void;
 }
 
 interface FormData {
   csvFile: FileList;
 }
 
-export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed }) => {
+export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) => {
   const {
     register,
     handleSubmit,
@@ -33,6 +34,7 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed }) => {
         const text = await file.text();
         const parsedData = parseCSV(text);
         onDataParsed(parsedData);
+        onClose();
       } catch (error) {
         setError("csvFile", {
           message: error instanceof Error ? error.message : "Failed to parse CSV",
@@ -79,13 +81,21 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed }) => {
               </div>
             )}
           </div>
-
-          <button
-            type="submit"
-            className="cursor-pointer w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
-          >
-            Upload and Analyze
-          </button>
+          <div className="flex space-x-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Load Predictions
+            </button>
+          </div>
         </form>
       </div>
     </div>

@@ -8,6 +8,10 @@ export type SupportedChain = keyof typeof SUPPORTED_CHAINS;
 
 export const AI_PREDICTION_MARKET_ID = "0xb88275fe4e2494e04cea8fb5e9d913aa48add581";
 
+export const CHAIN_ID = 10 as SupportedChain;
+
+export const DECIMALS = 18
+
 
 type CollateralTokensMap = Record<
   SupportedChain,

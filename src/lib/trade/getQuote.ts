@@ -1,6 +1,6 @@
-import { QuoteTradeFn, UniswapQuoteTradeResult, Token, TradeProps } from "@/types";
+import { QuoteTradeFn, UniswapQuoteTradeResult, Token, TradeProps, TableData } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
-import { NATIVE_TOKEN } from "@/utils/constants";
+import { DECIMALS, NATIVE_TOKEN } from "@/utils/constants";
 import {
   Currency,
   CurrencyAmount,
@@ -10,7 +10,7 @@ import {
   TokenAmount,
   TradeType,
 } from "@swapr/sdk";
-import { Address, parseUnits, zeroAddress } from "viem";
+import { Address, formatUnits, parseUnits, zeroAddress } from "viem";
 
 function getCurrenciesFromTokens(
   chainId: number,
@@ -100,6 +100,7 @@ export const getUniswapQuote: QuoteTradeFn = async (
   const { currencyAmountIn, currencyOut, maximumSlippage, sellAmount, sellToken, buyToken } =
     await getTradeArgs(chainId, amount, outcomeToken, collateralToken, swapType);
 
+  console.log(currencyOut, currencyAmountIn, maximumSlippage, account, chainId);
   const trade = await UniswapTrade.getQuote({
     amount: currencyAmountIn,
     quoteCurrency: currencyOut,
@@ -132,37 +133,70 @@ export const getQuotes = async ({
   chainId,
   collateral,
 }: TradeProps) => {
-  const marketsWithData = tableData.filter((row) => row.hasMarketData);
-  const sumPositiveDifference = marketsWithData.reduce(
-    (acc, curr) => (curr.difference > 0 ? acc + curr.difference : acc),
-    0
-  );
-  //calculate volumeUntilPrice -> volume max based on input for each market -> get quotes
-  const quotePromises = tableData
-    .filter((row) => row.hasMarketData)
-    .reduce((promises, row) => {
-      let volume = row.volumeUntilPrice;
-      if (row.difference > 0) {
-        volume = Math.min(volume, ((row.difference / sumPositiveDifference) * amount) / 2);
-      } else {
-        volume = Math.min(volume, amount / 2);
-      }
-      if (volume < VOLUME_MIN) {
-        return promises;
-      }
-      // get quote
-      promises.push(
-        getUniswapQuote(
-          chainId,
-          account,
-          volume.toString(),
-          { address: row.marketId as Address, symbol: row.repo, decimals: 18 },
-          collateral,
-          row.difference > 0 ? "buy" : "sell"
-        )
-      );
-      return promises;
-    }, [] as Promise<UniswapQuoteTradeResult>[]);
+  const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
 
-  return await Promise.all(quotePromises);
+  const [buyMarkets, sellMarkets] = marketsWithData.reduce(
+    (acc, curr) => {
+      acc[curr.difference! > 0 ? 0 : 1].push(curr);
+      return acc;
+    },
+    [[], []] as [TableData[], TableData[]]
+  );
+
+  //get sell quotes first
+  const sellPromises = sellMarkets.reduce((promises, row) => {
+    const volume = Math.min(row.volumeUntilPrice, amount);
+    if (volume < VOLUME_MIN) {
+      return promises;
+    }
+    // get quote
+    promises.push(
+      getUniswapQuote(
+        chainId,
+        account,
+        volume.toString(),
+        { address: row.marketId as Address, symbol: row.repo, decimals: 18 },
+        collateral,
+        "sell"
+      )
+    );
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  const sellQuotes = await Promise.all(sellPromises);
+
+  // get total collateral from sell
+  const totalCollateral = Number(
+    formatUnits(
+      sellQuotes.reduce((acc, curr) => acc + BigInt(curr!.value), 0n),
+      DECIMALS
+    )
+  );
+
+  // get buy quotes
+  const sumBuyDifference = buyMarkets.reduce((acc, curr) => acc + curr.difference!, 0);
+  const buyPromises = buyMarkets.reduce((promises, row) => {
+    const volume = Math.min(
+      row.volumeUntilPrice,
+      (row.difference! / sumBuyDifference) * totalCollateral
+    );
+    if (volume < VOLUME_MIN) {
+      return promises;
+    }
+    // get quote
+    promises.push(
+      getUniswapQuote(
+        chainId,
+        account,
+        volume.toString(),
+        { address: row.marketId as Address, symbol: row.repo, decimals: 18 },
+        collateral,
+        row.difference! > 0 ? "buy" : "sell"
+      )
+    );
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+  const buyQuotes = await Promise.all(buyPromises);
+  // sell first, then buy
+  return [...sellQuotes, ...buyQuotes];
 };

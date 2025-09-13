@@ -1,27 +1,26 @@
 import { RouterAbi } from "@/abis/RouterAbi";
 import { config } from "@/config/wagmi";
 import { toastifyTx } from "@/lib/toastify";
+import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import {
   getApprovals7702,
   getMaximumAmountIn,
   getTradeApprovals7702,
 } from "@/lib/trade/getApprovals7702";
 import { getQuotes } from "@/lib/trade/getQuote";
-import { UniswapQuoteTradeResult, TableData, TradeProps } from "@/types";
+import { TableData, TradeProps, UniswapQuoteTradeResult } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   AI_PREDICTION_MARKET_ID,
+  CHAIN_ID,
   COLLATERAL_TOKENS,
   ROUTER_ADDRESSES,
-  SupportedChain,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { sendCalls } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 
-const CHAIN_ID = 10 as SupportedChain;
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
 export function splitFromRouter(router: Address, amount: bigint): Execution {
@@ -44,8 +43,9 @@ const executeTradeStrategy = async ({
   collateral,
 }: TradeProps) => {
   const quotes = await getQuotes({ account, amount, tableData, chainId, collateral });
-  // split half
-  const parsedSplitAmount = parseUnits((amount / 2).toString(), collateral.decimals);
+
+  // split first
+  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
   const router = ROUTER_ADDRESSES[CHAIN_ID];
 
   //get split approvals
@@ -124,7 +124,7 @@ export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
       amount: number;
       tableData: TableData[];
     }) => executeTradeStrategy({ account, amount, tableData, chainId: CHAIN_ID, collateral }),
-    onSuccess: () => {
+    onSuccess() {
       onSuccess?.();
     },
   });

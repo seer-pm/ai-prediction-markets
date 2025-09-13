@@ -45,6 +45,9 @@ export const MarketTable: React.FC<MarketTableProps> = ({ markets, isLoading, is
                 Repository
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Balance
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Parent
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -60,31 +63,40 @@ export const MarketTable: React.FC<MarketTableProps> = ({ markets, isLoading, is
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {markets.map((market) => {
+              const { marketId, repo, parent, currentPrice, predictedWeight, difference, balance } =
+                market;
               return (
-                <tr key={market.marketId}>
+                <tr key={marketId}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 max-w-xs truncate">{repo}</div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 max-w-xs truncate">
-                      {market.repo.replace("https://github.com/", "")}
+                      {balance?.toFixed(4) ?? "-"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {market.parent}
+                    {parent ?? "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                    {market.currentPrice.toFixed(8)}
+                    {currentPrice?.toFixed(8) ?? "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                    {market.predictedWeight.toFixed(8)}
+                    {predictedWeight?.toFixed(8) ?? "-"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`text-sm font-medium font-mono ${
-                        market.difference > 0 ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {market.difference > 0 ? "+" : ""}
-                      {market.difference.toFixed(8)}
-                    </span>
+                    {difference ? (
+                      <span
+                        className={`text-sm font-medium font-mono ${
+                          difference > 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {difference > 0 ? "+" : ""}
+                        {difference.toFixed(8)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-900 font-mono">-</span>
+                    )}
                   </td>
                 </tr>
               );

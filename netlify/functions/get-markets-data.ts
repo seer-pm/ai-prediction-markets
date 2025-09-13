@@ -4,14 +4,13 @@ import { UniswapGraphQLClient } from "@/config/apollo";
 import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { PoolInfo } from "@/types";
-import { AI_PREDICTION_MARKET_ID, COLLATERAL_TOKENS } from "@/utils/constants";
+import { AI_PREDICTION_MARKET_ID, CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
-const CHAIN_ID = 10
 
 export default async () => {
   try {
-    const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address
+    const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
     const { data, error } = await supabase
       .from("markets")
       .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
@@ -55,6 +54,11 @@ export default async () => {
       const tokenPairMappingKey = `${token0}-${token1}`;
       const pool = tokenPairToPoolMapping[tokenPairMappingKey];
       if (!pool) {
+        mapping[outcome] = {
+          id: wrappedTokens[index],
+          price: null,
+          pool: null,
+        };
         return mapping;
       }
       const {
@@ -78,7 +82,7 @@ export default async () => {
         },
       };
       return mapping;
-    }, {} as { [key: string]: { id: Address; price: number; pool: PoolInfo } });
+    }, {} as { [key: string]: { id: Address; price: number | null; pool: PoolInfo | null } });
     return new Response(JSON.stringify({ ...repoToPriceMapping }), {
       status: 200,
       headers: {

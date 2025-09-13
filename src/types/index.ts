@@ -10,13 +10,14 @@ export interface PredictionRow {
 
 export interface TableData {
   repo: string;
-  parent: string;
-  currentPrice: number;
-  predictedWeight: number;
-  difference: number;
+  parent: string | null;
+  currentPrice: number | null;
+  predictedWeight: number | null;
+  difference: number | null;
   marketId: string;
-  hasMarketData: boolean;
+  hasPrediction: boolean;
   volumeUntilPrice: number;
+  balance?: number
 }
 
 export interface TradeRequest {

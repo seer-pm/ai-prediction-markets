@@ -1,9 +1,11 @@
 import { useCheck7702Support } from "@/hooks/useCheck7702Support";
 import { useExecuteTradeStrategy } from "@/hooks/useExecuteTradeStrategy";
 import { TableData } from "@/types";
+import { CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { Address } from "viem";
+import { useBalance } from "wagmi";
 
 interface TradingInterfaceProps {
   markets: TableData[];
@@ -14,6 +16,8 @@ interface TradingInterfaceProps {
 interface TradeFormData {
   amount: number;
 }
+
+const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
 
 export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   account,
@@ -26,13 +30,20 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     formState: { errors },
     reset,
     watch,
-  } = useForm<TradeFormData>();
+    setValue,
+  } = useForm<TradeFormData>({ mode: "all" });
 
-  const watchAmount = watch("amount", 0);
-  const mintingAmount = watchAmount * 0.5;
-  const tradingAmount = watchAmount * 0.5;
+  const amount = watch("amount", 0);
 
   const supports7702 = useCheck7702Support();
+
+  // Get sUSDS balance
+  const { data: balanceData, isLoading: isBalanceLoading } = useBalance({
+    address: account,
+    token: collateral,
+  });
+
+  const balance = balanceData ? parseFloat(balanceData.formatted) : 0;
 
   const executeTradeMutation = useExecuteTradeStrategy(() => {
     onClose();
@@ -43,10 +54,15 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     executeTradeMutation.mutate({ account, amount, tableData: markets });
   };
 
-  // Strategy analysis
-  const buyMarkets = markets.filter((m) => m.difference > 0);
-  const sellMarkets = markets.filter((m) => m.difference < 0);
+  const handleMaxClick = () => {
+    if (balance > 0) {
+      setValue("amount", balance);
+    }
+  };
 
+  // Strategy analysis
+  const buyMarkets = markets.filter((m) => m.difference && m.difference > 0);
+  const sellMarkets = markets.filter((m) => m.difference && m.difference < 0);
   return (
     <div className="max-h-[90vh] overflow-y-auto">
       {/* Header with Close Button */}
@@ -76,17 +92,28 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         {executeTradeMutation.isError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               <div>
                 <h4 className="text-sm font-medium text-red-800">Trade Execution Failed</h4>
                 <p className="mt-1 text-sm text-red-700">
-                  {executeTradeMutation.error?.message || "An error occurred while executing the trade strategy. Please try again."}
+                  {executeTradeMutation.error?.message ||
+                    "An error occurred while executing the trade strategy. Please try again."}
                 </p>
                 <button
                   onClick={() => executeTradeMutation.reset()}
-                  className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                  className="cursor-pointer mt-2 text-sm text-red-600 hover:text-red-800 underline"
                 >
                   Dismiss
                 </button>
@@ -103,7 +130,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               <div>
                 <h4 className="text-sm font-medium text-blue-800">Executing Trade Strategy</h4>
                 <p className="mt-1 text-sm text-blue-700">
-                  Processing transactions across {markets.length} markets. This may take a few moments...
+                  Processing transactions across {markets.length} markets. This may take a few
+                  moments...
                 </p>
               </div>
             </div>
@@ -130,15 +158,16 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center">
                 <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                50% of input will be used for minting
-              </div>
-              <div className="flex items-center">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Buy undervalued markets up to the predicted price
+                Mint complete sets using all inputs with sUSDS.
               </div>
               <div className="flex items-center">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                Sell overvalued markets down to the predicted price
+                Sell overvalued markets until they reach the predicted price.
+              </div>
+              <div className="flex items-center">
+                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                Use the sUSDS obtained from selling to buy undervalued markets up to the predicted
+                price.
               </div>
             </div>
           </div>
@@ -150,11 +179,33 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Total Investment Amount (sUSDS)
             </label>
+
+            {/* Balance Display */}
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm text-gray-600">
+                Balance:{" "}
+                {isBalanceLoading ? (
+                  <span className="animate-pulse">Loading...</span>
+                ) : (
+                  <span className="font-mono text-gray-900">{balance.toFixed(2)} sUSDS</span>
+                )}
+              </span>
+              {!isBalanceLoading && balance > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMaxClick}
+                  className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  disabled={executeTradeMutation.isPending}
+                >
+                  Max
+                </button>
+              )}
+            </div>
+
             <input
               {...register("amount", {
                 required: "Amount is required",
-                min: { value: 1, message: "Minimum amount is 1 sUSDS" },
-                max: { value: 100000, message: "Maximum amount is 100,000 sUSDS" },
+                validate: (value) => value <= balance || "Not enough balance",
                 valueAsNumber: true,
               })}
               type="number"
@@ -165,27 +216,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             />
             {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
           </div>
-
-          {/* Investment Breakdown */}
-          {watchAmount > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">Investment Allocation</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-600">Minting (50%):</span>
-                  <span className="font-mono ml-2 font-semibold">
-                    {mintingAmount.toFixed(2)} sUSDS
-                  </span>
-                </div>
-                <div>
-                  <span className="text-blue-600">Trading (50%):</span>
-                  <span className="font-mono ml-2 font-semibold">
-                    {tradingAmount.toFixed(2)} sUSDS
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="flex space-x-4">
             <button
@@ -199,7 +229,9 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <button
               type="submit"
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={!supports7702 || executeTradeMutation.isPending}
+              disabled={
+                !supports7702 || executeTradeMutation.isPending || !!errors.amount || !amount
+              }
             >
               {executeTradeMutation.isPending ? (
                 <div className="flex items-center justify-center">
@@ -209,7 +241,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               ) : supports7702 ? (
                 "🚀 Execute Strategy"
               ) : (
-                "Wallet does not support batching transactions"
+                "Batching transactions not supported"
               )}
             </button>
           </div>
@@ -218,88 +250,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <p className="text-xs text-gray-500">
               This will execute trades across all {markets.length} markets automatically
             </p>
-            <p className="text-xs text-gray-400">
-              Strategy: Buy undervalued • Sell overvalued • Never exceed predicted prices
-            </p>
           </div>
         </form>
-
-        {/* Detailed Strategy Breakdown - Hide during loading */}
-        {!executeTradeMutation.isPending && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <details className="group">
-              <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
-                Strategy Details ({markets.length} markets)
-                <svg
-                  className="w-4 h-4 transform group-open:rotate-180 transition-transform"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </summary>
-              <div className="mt-4 space-y-4">
-                {buyMarkets.length > 0 && (
-                  <div>
-                    <h5 className="text-sm font-medium text-green-700 mb-2">
-                      Buy Markets ({buyMarkets.length})
-                    </h5>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {buyMarkets.slice(0, 5).map((market) => (
-                        <div
-                          key={market.marketId}
-                          className="flex justify-between text-xs text-gray-600"
-                        >
-                          <span className="truncate">
-                            {market.repo.replace("https://github.com/", "")}
-                          </span>
-                          <span className="text-green-600">+{market.difference.toFixed(6)}</span>
-                        </div>
-                      ))}
-                      {buyMarkets.length > 5 && (
-                        <div className="text-xs text-gray-400">
-                          ... and {buyMarkets.length - 5} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {sellMarkets.length > 0 && (
-                  <div>
-                    <h5 className="text-sm font-medium text-red-700 mb-2">
-                      Sell Markets ({sellMarkets.length})
-                    </h5>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {sellMarkets.slice(0, 5).map((market) => (
-                        <div
-                          key={market.marketId}
-                          className="flex justify-between text-xs text-gray-600"
-                        >
-                          <span className="truncate">
-                            {market.repo.replace("https://github.com/", "")}
-                          </span>
-                          <span className="text-red-600">{market.difference.toFixed(6)}</span>
-                        </div>
-                      ))}
-                      {sellMarkets.length > 5 && (
-                        <div className="text-xs text-gray-400">
-                          ... and {sellMarkets.length - 5} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </details>
-          </div>
-        )}
       </div>
     </div>
   );

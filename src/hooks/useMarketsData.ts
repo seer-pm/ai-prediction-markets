@@ -6,8 +6,8 @@ import { Address } from "viem";
 interface GetMarketsDataApiResult {
   [key: string]: {
     id: Address;
-    price: number;
-    pool: PoolInfo;
+    price: number | null;
+    pool: PoolInfo | null;
   };
 }
 
@@ -20,9 +20,8 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
   }
 };
 
-export const useMarketsData = (enabled: boolean) => {
+export const useMarketsData = () => {
   return useQuery({
-    enabled,
     queryKey: ["useMarketsData"],
     queryFn: fetchMarketsData,
   });
