@@ -7,14 +7,6 @@ const rpcEndpoint = (chain: string) =>
   `https://lb.drpc.org/${chain}/As_mVw7_50IPk85yNYubcezE_O23TT8R8JDnrqRhf0fE`;
 const OPTIMISM_RPC = rpcEndpoint("optimism");
 
-if (typeof window !== "undefined") {
-  import("@swapr/sdk").then(({ configureRpcProviders, ChainId }) => {
-    configureRpcProviders({
-      [ChainId.OPTIMISM_MAINNET]: OPTIMISM_RPC,
-    });
-  });
-}
-
 const projectId = import.meta.env.VITE_WC_PROJECT_ID;
 
 const wagmiAdapter = new WagmiAdapter({
