@@ -1,8 +1,7 @@
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
 import { CHAIN_ID, DECIMALS } from "@/utils/constants";
-import { ERC20_ABI } from "@swapr/sdk";
 import { useQuery } from "@tanstack/react-query";
-import { Address, formatUnits } from "viem";
+import { Address, erc20Abi, formatUnits } from "viem";
 
 interface GetBalancesResult {
   [key: string]: number;
@@ -16,7 +15,7 @@ const fetchTokensBalances = async (
     const balances: bigint[] = await readContractsInBatch(
       tokens.map((token) => ({
         address: token,
-        abi: ERC20_ABI,
+        abi: erc20Abi,
         functionName: "balanceOf",
         chainId: CHAIN_ID,
         args: [account],

@@ -7,7 +7,7 @@ import { TradingInterface } from "./components/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import { WalletPrompt } from "./components/WalletPrompt";
 import { config } from "./config/wagmi";
-import { useProcessMarkets } from "./hooks/useProcessPredictions";
+import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
 
 const queryClient = new QueryClient();
@@ -18,8 +18,7 @@ const AppContent: React.FC = () => {
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { address: account, isConnected } = useAccount();
 
-  const { data: tableData, isLoading, error } = useProcessMarkets(predictions);
-
+  const { data: tableData, isLoading, error } = useProcessPredictions(predictions);
   // Show wallet prompt if not connected
   if (!isConnected || !account) {
     return <WalletPrompt />;

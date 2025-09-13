@@ -6,7 +6,7 @@ import { useAccount } from "wagmi";
 
 const MIN_PRICE = 0.0001;
 
-export const useProcessMarkets = (predictions: PredictionRow[]) => {
+export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
   const { data: marketsData, isLoading, error } = useMarketsData();
   const { data: balanceMapping } = useTokensBalances(
