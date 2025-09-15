@@ -35,7 +35,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const amount = watch("amount", 0);
 
-  const supports7702 = useCheck7702Support();
+  const { supports7702, isLoading: isLoading7702 } = useCheck7702Support();
 
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useBalance({
@@ -130,8 +130,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               <div>
                 <h4 className="text-sm font-medium text-blue-800">Executing Trade Strategy</h4>
                 <p className="mt-1 text-sm text-blue-700">
-                  Processing transactions across {markets.length} markets. This may take a few
-                  moments...
+                  Processing transactions across {buyMarkets.length + sellMarkets.length} markets.
+                  This may take a few moments...
                 </p>
               </div>
             </div>
@@ -238,6 +238,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                   Executing Strategy...
                 </div>
+              ) : isLoading7702 ? (
+                "Checking 7702 support"
               ) : supports7702 ? (
                 "🚀 Execute Strategy"
               ) : (
@@ -248,7 +250,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
           <div className="text-center space-y-2">
             <p className="text-xs text-gray-500">
-              This will execute trades across all {markets.length} markets automatically
+              This will execute trades across all markets automatically
             </p>
           </div>
         </form>

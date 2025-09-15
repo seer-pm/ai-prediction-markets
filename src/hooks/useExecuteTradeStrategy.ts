@@ -1,23 +1,22 @@
+import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
+import { queryClient } from "@/App";
 import { config } from "@/config/wagmi";
-import { toastifyTx } from "@/lib/toastify";
+import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
+import { toastifySendCallsTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
-import {
-  getApprovals7702,
-  getMaximumAmountIn,
-  getTradeApprovals7702,
-} from "@/lib/trade/getApprovals7702";
+import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
 import { getQuotes } from "@/lib/trade/getQuote";
-import { TableData, TradeProps, UniswapQuoteTradeResult } from "@/types";
+import { ApprovalRequest, TableData, TradeProps, UniswapQuoteTradeResult } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   AI_PREDICTION_MARKET_ID,
   CHAIN_ID,
   COLLATERAL_TOKENS,
   ROUTER_ADDRESSES,
+  SupportedChain,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { sendCalls } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 
@@ -35,34 +34,44 @@ export function splitFromRouter(router: Address, amount: bigint): Execution {
   };
 }
 
-const executeTradeStrategy = async ({
+const fetchAllowances = async (
+  account: Address,
+  requesters: { address: Address; spender: Address }[]
+) => {
+  try {
+    const allowances: bigint[] = await readContractsInBatch(
+      requesters.map(({ address, spender }) => ({
+        abi: erc20Abi,
+        address,
+        functionName: "allowance",
+        args: [account, spender],
+        chainId: CHAIN_ID,
+      })),
+      CHAIN_ID,
+      50,
+      true
+    );
+    return allowances.reduce((acc, curr, index) => {
+      const { address, spender } = requesters[index];
+      const allowanceKey = `${address}-${spender}`;
+      acc[allowanceKey] = curr;
+      return acc;
+    }, {} as { [key: string]: bigint });
+  } catch {
+    return {};
+  }
+};
+
+const checkAndAddApproveCalls = async ({
   account,
   amount,
-  tableData,
-  chainId,
-  collateral,
-}: TradeProps) => {
-  const quotes = await getQuotes({ account, amount, tableData, chainId, collateral });
-
-  // split first
-  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
+  quotes,
+}: {
+  account: Address;
+  amount: number;
+  quotes: UniswapQuoteTradeResult[];
+}) => {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
-
-  //get split approvals
-
-  const calls: Execution[] = getApprovals7702({
-    tokensAddresses: [collateral.address],
-    account,
-    spender: router,
-    amounts: parsedSplitAmount,
-    chainId: CHAIN_ID,
-  });
-
-  // push split transaction
-  calls.push(splitFromRouter(router, parsedSplitAmount));
-
-  // get quotes approvals
-  // we can combine the buy quotes to get one approval for collateral
   const [buyQuotes, sellQuotes] = quotes.reduce(
     (acc, quote) => {
       acc[isTwoStringsEqual(quote.sellToken, collateral.address) ? 0 : 1].push(quote);
@@ -70,41 +79,81 @@ const executeTradeStrategy = async ({
     },
     [[], []] as [UniswapQuoteTradeResult[], UniswapQuoteTradeResult[]]
   );
-  const totalCollateralNeeded = buyQuotes.reduce(
-    (acc, curr) => acc + getMaximumAmountIn(curr.trade),
-    0n
+  // split + sell + buy approval requests
+  const approvalRequests: ApprovalRequest[] = [
+    {
+      tokensAddresses: [collateral.address],
+      account,
+      spender: router,
+      amounts: parseUnits(amount.toString(), collateral.decimals),
+      chainId: CHAIN_ID,
+    },
+    ...sellQuotes.map(({ trade }) => ({
+      tokensAddresses: [trade.executionPrice.baseCurrency.address as `0x${string}`],
+      account,
+      spender: trade.approveAddress as `0x${string}`,
+      amounts: getMaximumAmountIn(trade),
+      chainId: trade.chainId as SupportedChain,
+    })),
+    {
+      tokensAddresses: [buyQuotes[0].trade.executionPrice.baseCurrency.address as `0x${string}`],
+      account,
+      spender: buyQuotes[0].trade.approveAddress as `0x${string}`,
+      amounts: buyQuotes.reduce((acc, curr) => acc + getMaximumAmountIn(curr.trade), 0n),
+      chainId: CHAIN_ID,
+    },
+  ];
+  const allowanceMapping = await fetchAllowances(
+    account,
+    approvalRequests.map((request) => ({
+      address: request.tokensAddresses[0],
+      spender: request.spender,
+    }))
   );
 
-  const buyApprovalCalls = getApprovals7702({
-    tokensAddresses: [buyQuotes[0].trade.executionPrice.baseCurrency.address as `0x${string}`],
-    account,
-    spender: buyQuotes[0].trade.approveAddress as `0x${string}`,
-    amounts: totalCollateralNeeded,
-    chainId: CHAIN_ID,
+  const calls: Execution[] = [];
+  // only add approvals without enough allowance
+
+  approvalRequests.map((request) => {
+    const { tokensAddresses, spender } = request;
+    const amount = request.amounts as bigint;
+    const allowanceKey = `${tokensAddresses[0]}-${spender}`;
+    if (amount > allowanceMapping[allowanceKey]) {
+      calls.push(...getApprovals7702(request));
+    }
   });
 
-  calls.push(...buyApprovalCalls);
+  return calls;
+};
 
-  for (const { trade } of sellQuotes) {
-    calls.push(...getTradeApprovals7702(account, trade));
-  }
+const executeTradeStrategy = async ({
+  account,
+  amount,
+  tableData,
+  chainId,
+  collateral,
+}: TradeProps) => {
+  // get quotes
+  const quotes = await getQuotes({ account, amount, tableData, chainId, collateral });
+  // split first
+  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
 
-  // push trade transactions
+  // get all approvals
+  const calls = await checkAndAddApproveCalls({ account, amount, quotes });
+
+  // push split transaction
+  calls.push(splitFromRouter(router, parsedSplitAmount));
+
+  // // push trade transactions
   const tradeTransactions = await Promise.all(
     quotes.map(({ trade }) => getUniswapTradeExecution(trade, account))
   );
   calls.push(...tradeTransactions);
-
-  const result = await toastifyTx(
-    () =>
-      sendCalls(config, {
-        calls,
-      }),
-    {
-      txSent: { title: "Executing trade..." },
-      txSuccess: { title: "Trade executed!" },
-    }
-  );
+  const result = await toastifySendCallsTx(calls, config, {
+    txSent: { title: "Executing trade..." },
+    txSuccess: { title: "Trade executed!" },
+  });
 
   if (!result.status) {
     throw result.error;
@@ -126,6 +175,10 @@ export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
     }) => executeTradeStrategy({ account, amount, tableData, chainId: CHAIN_ID, collateral }),
     onSuccess() {
       onSuccess?.();
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["useMarketsData"] });
+        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
+      }, 3000);
     },
   });
 };

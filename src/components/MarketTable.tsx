@@ -4,10 +4,16 @@ import React from "react";
 interface MarketTableProps {
   markets: TableData[];
   isLoading: boolean;
+  isLoadingBalances: boolean;
   isConnected: boolean;
 }
 
-export const MarketTable: React.FC<MarketTableProps> = ({ markets, isLoading, isConnected }) => {
+export const MarketTable: React.FC<MarketTableProps> = ({
+  markets,
+  isLoading,
+  isLoadingBalances,
+  isConnected,
+}) => {
   if (isLoading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -71,9 +77,15 @@ export const MarketTable: React.FC<MarketTableProps> = ({ markets, isLoading, is
                     <div className="text-sm text-gray-900 max-w-xs truncate">{repo}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
-                      {balance?.toFixed(4) ?? "-"}
-                    </div>
+                    {isLoadingBalances ? (
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-gray-300 rounded w-20"></div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {balance?.toFixed(4) ?? "-"}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {parent ?? "-"}

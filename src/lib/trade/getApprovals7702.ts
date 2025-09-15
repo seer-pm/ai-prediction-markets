@@ -1,19 +1,12 @@
 import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
 import { Execution } from "@/hooks/useCheck7702Support";
+import { ApprovalRequest } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import { NATIVE_TOKEN, SupportedChain } from "@/utils/constants";
 import { Trade, TradeType, UniswapTrade } from "@swapr/sdk";
 import { Address, encodeFunctionData, decodeFunctionData, erc20Abi } from "viem";
 
-type UseMissingApprovalsProps = {
-  tokensAddresses: Address[];
-  account: Address | undefined;
-  spender: Address;
-  amounts: bigint | bigint[];
-  chainId: SupportedChain;
-};
-
-export function getApprovals7702({ tokensAddresses, spender, amounts }: UseMissingApprovalsProps) {
+export function getApprovals7702({ tokensAddresses, spender, amounts }: ApprovalRequest) {
   const calls: Execution[] = [];
 
   if (!tokensAddresses.length) {

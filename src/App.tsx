@@ -9,8 +9,10 @@ import { WalletPrompt } from "./components/WalletPrompt";
 import { config } from "./config/wagmi";
 import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-const queryClient = new QueryClient();
+export const queryClient = new QueryClient();
 
 const AppContent: React.FC = () => {
   const [predictions, setPredictions] = useState<PredictionRow[]>([]);
@@ -18,7 +20,12 @@ const AppContent: React.FC = () => {
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { address: account, isConnected } = useAccount();
 
-  const { data: tableData, isLoading, error } = useProcessPredictions(predictions);
+  const {
+    data: tableData,
+    isLoading,
+    isLoadingBalances,
+    error,
+  } = useProcessPredictions(predictions);
   // Show wallet prompt if not connected
   if (!isConnected || !account) {
     return <WalletPrompt />;
@@ -81,7 +88,12 @@ const AppContent: React.FC = () => {
             </div>
           </div>
 
-          <MarketTable markets={tableData || []} isLoading={isLoading} isConnected={isConnected} />
+          <MarketTable
+            markets={tableData || []}
+            isLoading={isLoading}
+            isConnected={isConnected}
+            isLoadingBalances={isLoadingBalances}
+          />
         </div>
       </main>
 
@@ -114,6 +126,7 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
+        <ToastContainer />
         <AppContent />
       </QueryClientProvider>
     </WagmiProvider>

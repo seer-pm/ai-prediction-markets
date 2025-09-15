@@ -9,7 +9,7 @@ const MIN_PRICE = 0.0001;
 export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
   const { data: marketsData, isLoading, error } = useMarketsData();
-  const { data: balanceMapping } = useTokensBalances(
+  const { data: balanceMapping, isLoading: isLoadingBalances } = useTokensBalances(
     account,
     marketsData ? Object.values(marketsData).map((data) => data.id) : undefined
   );
@@ -17,6 +17,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     return {
       data: undefined,
       isLoading,
+      isLoadingBalances,
       error,
     };
   }
@@ -73,5 +74,5 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
       return b.currentPrice - a.currentPrice;
     });
 
-  return { data: processedData, isLoading, error };
+  return { data: processedData, isLoading, isLoadingBalances, error };
 };

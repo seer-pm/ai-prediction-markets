@@ -100,7 +100,6 @@ export const getUniswapQuote: QuoteTradeFn = async (
   const { currencyAmountIn, currencyOut, maximumSlippage, sellAmount, sellToken, buyToken } =
     await getTradeArgs(chainId, amount, outcomeToken, collateralToken, swapType);
 
-  console.log(currencyOut, currencyAmountIn, maximumSlippage, account, chainId);
   const trade = await UniswapTrade.getQuote({
     amount: currencyAmountIn,
     quoteCurrency: currencyOut,
@@ -163,7 +162,17 @@ export const getQuotes = async ({
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
 
-  const sellQuotes = await Promise.all(sellPromises);
+  if (!sellPromises.length) {
+    throw new Error("Quote Error: No sell route found");
+  }
+
+  const sellQuoteResults = await Promise.allSettled(sellPromises);
+  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
 
   // get total collateral from sell
   const totalCollateral = Number(
@@ -172,6 +181,12 @@ export const getQuotes = async ({
       DECIMALS
     )
   );
+
+  console.log({ totalCollateral });
+
+  if (!totalCollateral) {
+    throw new Error(`Quote Error: Cannot sell to ${collateral.symbol}`);
+  }
 
   // get buy quotes
   const sumBuyDifference = buyMarkets.reduce((acc, curr) => acc + curr.difference!, 0);
@@ -196,7 +211,21 @@ export const getQuotes = async ({
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
-  const buyQuotes = await Promise.all(buyPromises);
+
+  if (!buyPromises.length) {
+    throw new Error("Quote Error: Amount too small");
+  }
+  const buyQuoteResult = await Promise.allSettled(buyPromises);
+  const buyQuotes = buyQuoteResult.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+
+  if (!buyQuotes) {
+    throw new Error(`Quote Error: Cannot buy from ${collateral.symbol}`);
+  }
   // sell first, then buy
   return [...sellQuotes, ...buyQuotes];
 };

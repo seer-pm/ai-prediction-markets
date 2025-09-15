@@ -67,3 +67,11 @@ export interface TradeProps {
   chainId: SupportedChain;
   collateral: Token;
 }
+
+export interface ApprovalRequest {
+  tokensAddresses: Address[];
+  account: Address | undefined;
+  spender: Address;
+  amounts: bigint | bigint[];
+  chainId: SupportedChain;
+};

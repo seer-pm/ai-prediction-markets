@@ -89,10 +89,10 @@ interface ToastContentType {
 
 function toastContent(title: string, subtitle: string) {
   return (
-    <>
+    <div>
       <div className="text-[16px] font-semibold">{title}</div>
       {subtitle && <div className="text-[14px] font-normal">{subtitle}</div>}
-    </>
+    </div>
   );
 }
 

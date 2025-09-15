@@ -8,18 +8,29 @@ export type Execution = {
   data: Hex;
 };
 
-export function useCheck7702Support(): boolean {
+export function useCheck7702Support(): { supports7702: boolean; isLoading: boolean } {
   const { chainId } = useAccount();
-  const { data: capabilities } = useCapabilities();
+  const { data: capabilities, isLoading } = useCapabilities();
 
   if (!chainId || !capabilities) {
-    return false;
+    return {
+      supports7702: false,
+      isLoading,
+    };
   }
 
   if (chainId === gnosis.id) {
     // metamask doesn't work on gnosis
-    return false;
+    return {
+      supports7702: false,
+      isLoading,
+    };
   }
 
-  return capabilities[chainId]?.atomic?.status === "ready" || capabilities[chainId]?.atomic?.status === "supported";
+  return {
+    supports7702:
+      capabilities[chainId]?.atomic?.status === "ready" ||
+      capabilities[chainId]?.atomic?.status === "supported",
+    isLoading,
+  };
 }

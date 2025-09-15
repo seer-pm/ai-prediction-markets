@@ -8,3 +8,21 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+.Toastify__toast{
+    width:422px;
+    background-image: linear-gradient(to right, #2563eb, #9333ea);
+    color: white;
+}
+.Toastify__toast-body {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+.Toastify__toast-icon {
+  width: 32px;
+  margin-left: 10px;
+  margin-right: 16px;
+}
+.Toastify__close-button{
+  color: white
+}
