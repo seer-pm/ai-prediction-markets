@@ -56,14 +56,15 @@ export function getMaximumAmountIn(trade: Trade) {
           abi: UniswapRouterAbi,
           data: decodedMulticall.args[1][0] as `0x${string}`,
         });
-
         const callDataAmountIn =
           trade.tradeType === TradeType.EXACT_INPUT
-            ? BigInt(decodedRouter.args![0][4].toString()) // amountIn
-            : BigInt(decodedRouter.args![0][5].toString()); // maximumAmountIn
+            ? BigInt(decodedRouter.args![0].amountIn)
+            : BigInt(decodedRouter.args![0].maximumAmountIn);
 
         maximumAmountIn = callDataAmountIn > maximumAmountIn ? callDataAmountIn : maximumAmountIn;
-      } catch {}
+      } catch (e) {
+        console.log(e);
+      }
     }
   }
 
