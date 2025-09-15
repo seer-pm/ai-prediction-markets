@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
@@ -7,11 +7,11 @@ import { CSVUpload } from "./components/CSVUpload";
 import { MarketTable } from "./components/MarketTable";
 import { TradingInterface } from "./components/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
+import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
 import { config } from "./config/wagmi";
+import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
-import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
-import { useLocalStorage } from "./hooks/useLocalStorage";
 
 export const queryClient = new QueryClient();
 
