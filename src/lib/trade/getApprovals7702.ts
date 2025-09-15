@@ -3,8 +3,14 @@ import { Execution } from "@/hooks/useCheck7702Support";
 import { ApprovalRequest } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import { NATIVE_TOKEN, SupportedChain } from "@/utils/constants";
-import { Trade, TradeType, UniswapTrade } from "@swapr/sdk";
-import { Address, encodeFunctionData, decodeFunctionData, erc20Abi } from "viem";
+import { Trade, UniswapTrade } from "@swapr/sdk";
+import {
+  Address,
+  decodeFunctionData,
+  DecodeFunctionDataReturnType,
+  encodeFunctionData,
+  erc20Abi,
+} from "viem";
 
 export function getApprovals7702({ tokensAddresses, spender, amounts }: ApprovalRequest) {
   const calls: Execution[] = [];
@@ -46,20 +52,24 @@ export function getMaximumAmountIn(trade: Trade) {
     if (callData) {
       try {
         // Decode the multicall function data
-        const decodedMulticall: any = decodeFunctionData({
+        const decodedMulticall = decodeFunctionData({
           abi: UniswapRouterAbi,
           data: callData as `0x${string}`,
-        });
+        }) as DecodeFunctionDataReturnType<typeof UniswapRouterAbi, "multicall">;
 
         // Decode the exactInputSingle/exactOutputSingle function data
-        const decodedRouter: any = decodeFunctionData({
+        const decodedRouter = decodeFunctionData({
           abi: UniswapRouterAbi,
-          data: decodedMulticall.args[1][0] as `0x${string}`,
+          data: decodedMulticall.args[1]?.[0] as `0x${string}`,
         });
-        const callDataAmountIn =
-          trade.tradeType === TradeType.EXACT_INPUT
-            ? BigInt(decodedRouter.args![0].amountIn)
-            : BigInt(decodedRouter.args![0].maximumAmountIn);
+        let callDataAmountIn: bigint;
+        if (decodedRouter.functionName === "exactInputSingle") {
+          callDataAmountIn = decodedRouter.args[0].amountIn;
+        } else if (decodedRouter.functionName === "exactOutputSingle") {
+          callDataAmountIn = decodedRouter.args[0].amountInMaximum;
+        } else {
+          throw new Error(`Unexpected router function: ${decodedRouter.functionName}`);
+        }
 
         maximumAmountIn = callDataAmountIn > maximumAmountIn ? callDataAmountIn : maximumAmountIn;
       } catch (e) {

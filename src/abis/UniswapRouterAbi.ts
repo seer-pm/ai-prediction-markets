@@ -453,4 +453,4 @@ export const UniswapRouterAbi = [
     type: "function",
   },
   { stateMutability: "payable", type: "receive" },
-];
+] as const;
