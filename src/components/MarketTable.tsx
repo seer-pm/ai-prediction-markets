@@ -5,14 +5,12 @@ interface MarketTableProps {
   markets: TableData[];
   isLoading: boolean;
   isLoadingBalances: boolean;
-  isConnected: boolean;
 }
 
 export const MarketTable: React.FC<MarketTableProps> = ({
   markets,
   isLoading,
   isLoadingBalances,
-  isConnected,
 }) => {
   if (isLoading) {
     return (
@@ -37,10 +35,7 @@ export const MarketTable: React.FC<MarketTableProps> = ({
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-6 border-b">
         <h2 className="text-2xl font-bold">Market Analysis</h2>
-        <p className="text-gray-600">
-          Markets ranked by current weight •
-          {!isConnected && <span className="text-blue-600 ml-2">Connect wallet to trade</span>}
-        </p>
+        <p className="text-gray-600">Markets ranked by current weight •</p>
       </div>
 
       <div className="overflow-x-auto">
