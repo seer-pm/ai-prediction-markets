@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useAccount } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 
@@ -10,16 +10,31 @@ const Web3ButtonWrapper: React.FC<Web3ButtonWrapperProps> = ({ children }) => {
   const { isConnected, isConnecting } = useAccount();
   const { open } = useAppKit();
 
-  // Override child's onClick
+  const pendingClickRef = useRef<((e: React.MouseEvent<HTMLButtonElement>) => void) | null>(null);
+
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
 
     if (isConnected) {
-      children.props.onClick?.(e); // call original button's onClick
+      children.props.onClick?.(e);
     } else if (!isConnecting) {
+      // Save original handler to run after connection
+      pendingClickRef.current = children.props.onClick
+        ? (event) => children.props.onClick?.(event)
+        : null;
+
       open(); // open wallet modal
     }
   };
+
+  // When connection succeeds, run pending click handler
+  useEffect(() => {
+    if (isConnected && pendingClickRef.current) {
+      // Fire original onClick without requiring another user click
+      pendingClickRef.current(new MouseEvent("click") as any);
+      pendingClickRef.current = null;
+    }
+  }, [isConnected]);
 
   return React.cloneElement(children, {
     onClick: handleClick,

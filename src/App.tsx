@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useAccount, WagmiProvider } from "wagmi";
+import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
 import { CSVUpload } from "./components/CSVUpload";
 import { MarketTable } from "./components/MarketTable";
 import { TradingInterface } from "./components/TradingInterface";
@@ -19,6 +19,13 @@ const AppContent: React.FC = () => {
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { address: account } = useAccount();
+  const { disconnect } = useDisconnect({
+    mutation: {
+      onSuccess() {
+        setPredictions([]);
+      },
+    },
+  });
 
   const {
     data: tableData,
@@ -38,7 +45,6 @@ const AppContent: React.FC = () => {
   const handleLoadPredictions = () => {
     setIsCsvDialogOpen(true);
   };
-
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
@@ -55,7 +61,7 @@ const AppContent: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900">AI Prediction Markets</h1>
-            <WalletConnect />
+            <WalletConnect disconnect={disconnect} />
           </div>
         </div>
       </header>
@@ -64,7 +70,12 @@ const AppContent: React.FC = () => {
         <div className="space-y-4">
           {/* Header with actions */}
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+            <h2 className="text-xl font-semibold">
+              Loaded {predictions.length} predictions •
+              {predictions.length === 0 && (
+                <span className="text-sm text-blue-600 ml-2">Upload your predictions to trade</span>
+              )}
+            </h2>
             <div className="flex space-x-4">
               <Web3ButtonWrapper>
                 <button
