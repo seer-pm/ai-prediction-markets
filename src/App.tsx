@@ -11,14 +11,18 @@ import { config } from "./config/wagmi";
 import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
 import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
+import { useLocalStorage } from "./hooks/useLocalStorage";
 
 export const queryClient = new QueryClient();
 
 const AppContent: React.FC = () => {
-  const [predictions, setPredictions] = useState<PredictionRow[]>([]);
+  const { address: account } = useAccount();
+  const [predictions, setPredictions] = useLocalStorage<PredictionRow[]>(
+    `predictions-${account}`,
+    []
+  );
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-  const { address: account } = useAccount();
   const { disconnect } = useDisconnect({
     mutation: {
       onSuccess() {
@@ -77,6 +81,14 @@ const AppContent: React.FC = () => {
               )}
             </h2>
             <div className="flex space-x-4">
+              {predictions.length > 0 && (
+                <button
+                  onClick={() => setPredictions([])}
+                  className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                >
+                  Clear Predictions
+                </button>
+              )}
               <Web3ButtonWrapper>
                 <button
                   onClick={handleLoadPredictions}
