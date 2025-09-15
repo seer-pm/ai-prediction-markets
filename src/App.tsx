@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
@@ -18,9 +18,10 @@ export const queryClient = new QueryClient();
 const AppContent: React.FC = () => {
   const { address: account } = useAccount();
   const [predictions, setPredictions] = useLocalStorage<PredictionRow[]>(
-    `predictions-${account}`,
+    account ? `predictions-${account}` : "predictions-default",
     []
   );
+
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const { disconnect } = useDisconnect({
