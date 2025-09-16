@@ -8,6 +8,8 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { Address } from "viem";
 import { useBalance } from "wagmi";
+import { ErrorPanel } from "./ErrorPanel";
+import { LoadingPanel } from "./LoadingPanel";
 
 interface TradingInterfaceProps {
   markets: TableData[];
@@ -39,7 +41,13 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const debouncedAmount = useDebounce(amount, 500);
 
-  const { data: quotes, isLoading: isLoadingQuotes } = useGetQuotes({
+  const {
+    data: quotes,
+    isLoading: isLoadingQuotes,
+    isError: isErrorGettingQuotes,
+    error: errorGettingQuotes,
+    progress,
+  } = useGetQuotes({
     account,
     amount: debouncedAmount,
     tableData: markets,
@@ -122,66 +130,32 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       <div className="p-6">
         {/* Error Display */}
         {executeTradeMutation.isError && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-start">
-              <svg
-                className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <div>
-                <h4 className="text-sm font-medium text-red-800">Trade Execution Failed</h4>
-                <p className="mt-1 text-sm text-red-700">
-                  {executeTradeMutation.error?.message ||
-                    "An error occurred while executing the trade strategy. Please try again."}
-                </p>
-                <button
-                  onClick={() => executeTradeMutation.reset()}
-                  className="cursor-pointer mt-2 text-sm text-red-600 hover:text-red-800 underline"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
+          <ErrorPanel
+            title="Trade Execution Failed"
+            description={executeTradeMutation.error?.message}
+            onDismiss={executeTradeMutation.reset}
+          />
+        )}
+        {isErrorGettingQuotes && (
+          <ErrorPanel title="Quote Failed" description={errorGettingQuotes?.message} />
         )}
 
         {/* Loading Overlay */}
         {executeTradeMutation.isPending && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
-              <div>
-                <h4 className="text-sm font-medium text-blue-800">Executing Trade Strategy</h4>
-                <p className="mt-1 text-sm text-blue-700">
-                  Processing transactions across {buyMarkets.length + sellMarkets.length} markets.
-                  This may take a few moments...
-                </p>
-              </div>
-            </div>
-          </div>
+          <LoadingPanel
+            title="Executing Trade Strategy"
+            description={`Processing transactions across ${
+              buyMarkets.length + sellMarkets.length
+            } markets.
+                  This may take a few moments...`}
+          />
         )}
 
         {isLoadingQuotes && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
-              <div>
-                <h4 className="text-sm font-medium text-blue-800">Getting quotes</h4>
-                <p className="mt-1 text-sm text-blue-700">
-                  Obtaining quotes to construct and execute trades. This may take a while...
-                </p>
-              </div>
-            </div>
-          </div>
+          <LoadingPanel
+            title={`Getting quotes: ${progress}/${buyMarkets.length + sellMarkets.length} markets`}
+            description="Obtaining quotes to construct and execute trades. This may take a while..."
+          />
         )}
 
         {/* Strategy Summary */}
@@ -281,7 +255,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
                 !!errors.amount ||
                 !amount ||
                 isLoadingQuotes ||
-                !quotes
+                !quotes ||
+                isErrorGettingQuotes
               }
             >
               {renderButtonText()}

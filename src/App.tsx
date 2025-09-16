@@ -5,7 +5,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
 import { CSVUpload } from "./components/CSVUpload";
 import { MarketTable } from "./components/MarketTable";
-import { TradingInterface } from "./components/TradingInterface";
+import { TradingInterface } from "./components/trade/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
 import { localStoragePersister, queryClient } from "./config/queryClient";

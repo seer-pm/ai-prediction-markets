@@ -124,9 +124,15 @@ export const getUniswapQuote: QuoteTradeFn = async (
 };
 
 const VOLUME_MIN = 0.01;
-
-export const getQuotes = async ({ account, amount, tableData }: QuoteProps) => {
+type ProgressCallback = (current: number) => void;
+export const getQuotes = async ({
+  account,
+  amount,
+  tableData,
+  onProgress,
+}: QuoteProps & { onProgress?: ProgressCallback }) => {
   const chainId = CHAIN_ID;
+  let currentProgress = 0;
   const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
 
   const [buyMarkets, sellMarkets] = marketsWithData.reduce(
@@ -136,7 +142,6 @@ export const getQuotes = async ({ account, amount, tableData }: QuoteProps) => {
     },
     [[], []] as [TableData[], TableData[]]
   );
-
   //get sell quotes first
   const sellPromises = sellMarkets.reduce((promises, row) => {
     const volume = Math.min(row.volumeUntilPrice, amount);
@@ -153,6 +158,16 @@ export const getQuotes = async ({ account, amount, tableData }: QuoteProps) => {
         collateral,
         "sell"
       )
+        .then((result) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          return result;
+        })
+        .catch((e) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          throw e;
+        })
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
@@ -176,8 +191,6 @@ export const getQuotes = async ({ account, amount, tableData }: QuoteProps) => {
       DECIMALS
     )
   );
-
-  console.log({ totalCollateral });
 
   if (!totalCollateral) {
     throw new Error(`Quote Error: Cannot sell to ${collateral.symbol}`);
@@ -203,6 +216,16 @@ export const getQuotes = async ({ account, amount, tableData }: QuoteProps) => {
         collateral,
         row.difference! > 0 ? "buy" : "sell"
       )
+        .then((result) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          return result;
+        })
+        .catch((e) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          throw e;
+        })
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
