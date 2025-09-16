@@ -17,7 +17,7 @@ export interface TableData {
   marketId: string;
   hasPrediction: boolean;
   volumeUntilPrice: number;
-  balance?: number
+  balance?: number;
 }
 
 export interface TradeRequest {
@@ -60,12 +60,16 @@ export interface UniswapQuoteTradeResult {
   trade: UniswapTrade;
 }
 
-export interface TradeProps {
+export interface QuoteProps {
   account: Address;
   amount: number;
   tableData: TableData[];
-  chainId: SupportedChain;
-  collateral: Token;
+}
+
+export interface TradeProps {
+  account: Address;
+  amount: number;
+  quotes: UniswapQuoteTradeResult[] | undefined;
 }
 
 export interface ApprovalRequest {
@@ -74,4 +78,4 @@ export interface ApprovalRequest {
   spender: Address;
   amounts: bigint | bigint[];
   chainId: SupportedChain;
-};
+}

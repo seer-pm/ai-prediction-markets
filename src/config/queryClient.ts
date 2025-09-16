@@ -16,4 +16,9 @@ export const localStoragePersister = createAsyncStoragePersister({
 persistQueryClient({
   queryClient,
   persister: localStoragePersister,
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query) => {
+      return query.queryKey[0] === "useMarketsData";
+    },
+  },
 });

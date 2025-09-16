@@ -1,5 +1,7 @@
 import { useCheck7702Support } from "@/hooks/useCheck7702Support";
+import useDebounce from "@/hooks/useDebounce";
 import { useExecuteTradeStrategy } from "@/hooks/useExecuteTradeStrategy";
+import { useGetQuotes } from "@/hooks/useGetQuotes";
 import { TableData } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
 import React from "react";
@@ -35,6 +37,14 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const amount = watch("amount", 0);
 
+  const debouncedAmount = useDebounce(amount, 500);
+
+  const { data: quotes, isLoading: isLoadingQuotes } = useGetQuotes({
+    account,
+    amount: debouncedAmount,
+    tableData: markets,
+  });
+
   const { supports7702, isLoading: isLoading7702 } = useCheck7702Support();
 
   // Get sUSDS balance
@@ -51,7 +61,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   });
 
   const onSubmit = ({ amount }: TradeFormData) => {
-    executeTradeMutation.mutate({ account, amount, tableData: markets });
+    executeTradeMutation.mutate({ account, amount, quotes });
   };
 
   const handleMaxClick = () => {
@@ -63,6 +73,28 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   // Strategy analysis
   const buyMarkets = markets.filter((m) => m.difference && m.difference > 0);
   const sellMarkets = markets.filter((m) => m.difference && m.difference < 0);
+
+  const renderButtonText = () => {
+    if (executeTradeMutation.isPending) {
+      return (
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+          Executing Strategy...
+        </div>
+      );
+    }
+    if (isLoading7702) {
+      return "Checking 7702 support";
+    }
+    if (!supports7702) {
+      return "Batching transactions not supported";
+    }
+    if (isLoadingQuotes) {
+      return "Getting quotes...";
+    }
+    return "🚀 Execute Strategy";
+  };
+
   return (
     <div className="max-h-[90vh] overflow-y-auto">
       {/* Header with Close Button */}
@@ -132,6 +164,20 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
                 <p className="mt-1 text-sm text-blue-700">
                   Processing transactions across {buyMarkets.length + sellMarkets.length} markets.
                   This may take a few moments...
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isLoadingQuotes && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+              <div>
+                <h4 className="text-sm font-medium text-blue-800">Getting quotes</h4>
+                <p className="mt-1 text-sm text-blue-700">
+                  Obtaining quotes to construct and execute trades. This may take a while...
                 </p>
               </div>
             </div>
@@ -230,21 +276,15 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               type="submit"
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={
-                !supports7702 || executeTradeMutation.isPending || !!errors.amount || !amount
+                !supports7702 ||
+                executeTradeMutation.isPending ||
+                !!errors.amount ||
+                !amount ||
+                isLoadingQuotes ||
+                !quotes
               }
             >
-              {executeTradeMutation.isPending ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Executing Strategy...
-                </div>
-              ) : isLoading7702 ? (
-                "Checking 7702 support"
-              ) : supports7702 ? (
-                "🚀 Execute Strategy"
-              ) : (
-                "Batching transactions not supported"
-              )}
+              {renderButtonText()}
             </button>
           </div>
 

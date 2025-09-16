@@ -1,6 +1,6 @@
-import { QuoteTradeFn, UniswapQuoteTradeResult, Token, TradeProps, TableData } from "@/types";
+import { QuoteTradeFn, UniswapQuoteTradeResult, Token, QuoteProps, TableData } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
-import { DECIMALS, NATIVE_TOKEN } from "@/utils/constants";
+import { CHAIN_ID, collateral, DECIMALS, NATIVE_TOKEN } from "@/utils/constants";
 import {
   Currency,
   CurrencyAmount,
@@ -125,13 +125,8 @@ export const getUniswapQuote: QuoteTradeFn = async (
 
 const VOLUME_MIN = 0.01;
 
-export const getQuotes = async ({
-  account,
-  amount,
-  tableData,
-  chainId,
-  collateral,
-}: TradeProps) => {
+export const getQuotes = async ({ account, amount, tableData }: QuoteProps) => {
+  const chainId = CHAIN_ID;
   const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
 
   const [buyMarkets, sellMarkets] = marketsWithData.reduce(

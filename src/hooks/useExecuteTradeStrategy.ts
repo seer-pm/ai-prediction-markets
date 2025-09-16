@@ -1,12 +1,12 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
+import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
 import { toastifySendCallsTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
-import { getQuotes } from "@/lib/trade/getQuote";
-import { ApprovalRequest, TableData, TradeProps, UniswapQuoteTradeResult } from "@/types";
+import { ApprovalRequest, TradeProps, UniswapQuoteTradeResult } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   AI_PREDICTION_MARKET_ID,
@@ -18,7 +18,6 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { queryClient } from "@/config/queryClient";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -126,15 +125,10 @@ const checkAndAddApproveCalls = async ({
   return calls;
 };
 
-const executeTradeStrategy = async ({
-  account,
-  amount,
-  tableData,
-  chainId,
-  collateral,
-}: TradeProps) => {
-  // get quotes
-  const quotes = await getQuotes({ account, amount, tableData, chainId, collateral });
+const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
+  if (!quotes || !quotes.length) {
+    throw new Error("No quote found");
+  }
   // split first
   const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
   const router = ROUTER_ADDRESSES[CHAIN_ID];
@@ -164,20 +158,14 @@ const executeTradeStrategy = async ({
 
 export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
   return useMutation({
-    mutationFn: ({
-      account,
-      amount,
-      tableData,
-    }: {
-      account: Address;
-      amount: number;
-      tableData: TableData[];
-    }) => executeTradeStrategy({ account, amount, tableData, chainId: CHAIN_ID, collateral }),
+    mutationFn: ({ account, amount, quotes }: TradeProps) =>
+      executeTradeStrategy({ account, amount, quotes }),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["useMarketsData"] });
         queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
+        queryClient.invalidateQueries({ queryKey: ["useGetQuotes"] });
       }, 3000);
     },
   });

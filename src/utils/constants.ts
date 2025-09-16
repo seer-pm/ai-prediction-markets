@@ -10,8 +10,7 @@ export const AI_PREDICTION_MARKET_ID = "0xb88275fe4e2494e04cea8fb5e9d913aa48add5
 
 export const CHAIN_ID = 10 as SupportedChain;
 
-export const DECIMALS = 18
-
+export const DECIMALS = 18;
 
 type CollateralTokensMap = Record<
   SupportedChain,
@@ -36,6 +35,8 @@ export const COLLATERAL_TOKENS: CollateralTokensMap = {
     ],
   },
 } as const;
+
+export const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
 export const ROUTER_ADDRESSES = {
   [optimism.id]: "0x179d8F8c811B8C759c33809dbc6c5ceDc62D05DD",
