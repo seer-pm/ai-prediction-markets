@@ -33,7 +33,7 @@ export function useLocalStorage<T>(
       console.warn(`Error reading localStorage key "${key}":`, error);
       setStoredValue(initialValue);
     }
-  }, [key, initialValue]); // Re-run when key changes
+  }, [key]);
 
   const setValue = useCallback(
     (value: SetValue<T>) => {

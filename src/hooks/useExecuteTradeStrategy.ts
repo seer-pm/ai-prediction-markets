@@ -1,6 +1,5 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
-import { queryClient } from "@/App";
 import { config } from "@/config/wagmi";
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
 import { toastifySendCallsTx } from "@/lib/toastify";
@@ -19,6 +18,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
+import { queryClient } from "@/config/queryClient";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 

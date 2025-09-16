@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import React, { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -8,12 +8,11 @@ import { MarketTable } from "./components/MarketTable";
 import { TradingInterface } from "./components/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
+import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
-
-export const queryClient = new QueryClient();
 
 const AppContent: React.FC = () => {
   const { address: account } = useAccount();
@@ -149,10 +148,13 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: localStoragePersister }}
+      >
         <ToastContainer />
         <AppContent />
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </WagmiProvider>
   );
 }
