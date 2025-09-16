@@ -9,6 +9,7 @@ export const useGetQuotes = ({ account, amount, tableData }: QuoteProps) => {
     enabled: !!account && amount > 0 && tableData.length > 0,
     queryKey: ["useGetQuotes", account, amount, tableData],
     queryFn: () => {
+      setProgress(0)
       return getQuotes({
         account,
         amount,
