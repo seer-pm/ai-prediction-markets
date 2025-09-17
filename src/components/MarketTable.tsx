@@ -78,7 +78,7 @@ export const MarketTable: React.FC<MarketTableProps> = ({
                       </div>
                     ) : (
                       <div className="text-sm text-gray-900 max-w-xs truncate">
-                        {balance?.toFixed(4) ?? "-"}
+                        {balance?.toFixed(2) ?? "-"}
                       </div>
                     )}
                   </td>

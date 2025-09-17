@@ -182,7 +182,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               </div>
               <div className="flex items-center">
                 <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                Sell overvalued markets until they reach the predicted price.
+                Sell overvalued markets down to the predicted price.
               </div>
               <div className="flex items-center">
                 <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
