@@ -1,6 +1,14 @@
-export const ErrorPanel = ({ title, description, onDismiss }: { title: string, description: string; onDismiss?: () => void }) => {
+export const ErrorPanel = ({
+  title,
+  description,
+  onDismiss,
+}: {
+  title: string;
+  description: string;
+  onDismiss?: () => void;
+}) => {
   return (
-    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
       <div className="flex items-start">
         <svg
           className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0"
@@ -17,15 +25,15 @@ export const ErrorPanel = ({ title, description, onDismiss }: { title: string, d
         </svg>
         <div>
           <h4 className="text-sm font-medium text-red-800">{title}</h4>
-          <p className="mt-1 text-sm text-red-700">
-            {description}
-          </p>
-          {onDismiss && <button
-            onClick={() => onDismiss()}
-            className="cursor-pointer mt-2 text-sm text-red-600 hover:text-red-800 underline"
-          >
-            Dismiss
-          </button>}
+          <p className="mt-1 text-sm text-red-700">{description}</p>
+          {onDismiss && (
+            <button
+              onClick={() => onDismiss()}
+              className="cursor-pointer mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Dismiss
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -148,7 +148,7 @@ const AppContent: React.FC = () => {
       {/* Trading Dialog */}
       {isTradeDialogOpen && tableData && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
             <TradingInterface
               account={account!}
               markets={tableData}

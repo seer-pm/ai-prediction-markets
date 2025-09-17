@@ -109,7 +109,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
         <div>
           <h3 className="text-xl font-bold text-white">Execute AI Strategy</h3>
-          <p className="text-blue-100 text-sm">Trade across all markets automatically</p>
         </div>
         <button
           onClick={onClose}
@@ -127,7 +126,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         </button>
       </div>
 
-      <div className="p-6">
+      <div className="px-6 py-4 space-y-4">
         {/* Error Display */}
         {executeTradeMutation.isError && (
           <ErrorPanel
@@ -159,43 +158,39 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         )}
 
         {/* Strategy Summary */}
-        <div className="mb-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-green-50 rounded-lg">
-              <h4 className="font-medium text-green-800 mb-1">Buy Markets</h4>
-              <p className="text-2xl font-bold text-green-600">{buyMarkets.length}</p>
-              <p className="text-sm text-green-600">Undervalued opportunities</p>
-            </div>
-            <div className="p-4 bg-red-50 rounded-lg">
-              <h4 className="font-medium text-red-800 mb-1">Sell Markets</h4>
-              <p className="text-2xl font-bold text-red-600">{sellMarkets.length}</p>
-              <p className="text-sm text-red-600">Overvalued positions</p>
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="px-4 py-2 bg-green-50 rounded-lg">
+            <h4 className="font-medium text-green-800 mb-1">Overvalued Markets</h4>
+            <p className="text-2xl font-bold text-green-600">{buyMarkets.length}</p>
           </div>
+          <div className="px-4 py-2 bg-red-50 rounded-lg">
+            <h4 className="font-medium text-red-800 mb-1">Undervalued Markets</h4>
+            <p className="text-2xl font-bold text-red-600">{sellMarkets.length}</p>
+          </div>
+        </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium text-gray-800 mb-3">Strategy Overview</h4>
-            <div className="space-y-2 text-sm text-gray-600">
-              <div className="flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                Mint complete sets using all inputs with sUSDS.
-              </div>
-              <div className="flex items-center">
-                <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                Sell overvalued markets down to the predicted price.
-              </div>
-              <div className="flex items-center">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Use the sUSDS obtained from selling to buy undervalued markets up to the predicted
-                price.
-              </div>
+        <div className="px-4 py-2 bg-gray-50 rounded-lg">
+          <h4 className="font-medium text-gray-800 mb-2">Strategy Overview</h4>
+          <div className="space-y-2 text-sm text-gray-600">
+            <div className="flex items-center">
+              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Mint complete sets using all inputs with sUSDS.
+            </div>
+            <div className="flex items-center">
+              <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+              Sell overvalued markets down to the predicted price.
+            </div>
+            <div className="flex items-center">
+              <span className="w-2 h-2 bg-green-500 rounded-full mr-2 whitespace-no-breaks"></span>
+              Use the sUSDS obtained from selling to buy undervalued markets up to the predicted
+              price.
             </div>
           </div>
         </div>
 
         {/* Trading Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div>
+          <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Total Investment Amount (sUSDS)
             </label>
@@ -237,7 +232,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
           </div>
 
-          <div className="flex space-x-4">
+          <div className="flex space-x-4 mb-2">
             <button
               type="button"
               onClick={onClose}
