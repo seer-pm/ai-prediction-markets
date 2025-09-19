@@ -3,7 +3,7 @@ import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
-import { toastifySendCallsTx } from "@/lib/toastify";
+import { toastifySendCallsTx, toastifyTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
 import { ApprovalRequest, TradeProps, UniswapQuoteTradeResult } from "@/types";
@@ -14,10 +14,13 @@ import {
   COLLATERAL_TOKENS,
   ROUTER_ADDRESSES,
   SupportedChain,
+  TRADE_EXECUTOR,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
+import { readContract, waitForTransactionReceipt, writeContract } from "@wagmi/core";
+import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -125,7 +128,7 @@ const checkAndAddApproveCalls = async ({
   return calls;
 };
 
-const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
+export const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
   if (!quotes || !quotes.length) {
     throw new Error("No quote found");
   }
@@ -144,6 +147,7 @@ const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => 
     quotes.map(({ trade }) => getUniswapTradeExecution(trade, account))
   );
   calls.push(...tradeTransactions);
+
   const result = await toastifySendCallsTx(calls, config, {
     txSent: { title: "Executing trade..." },
     txSuccess: { title: "Trade executed!" },
@@ -156,10 +160,65 @@ const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => 
   return result.receipt;
 };
 
+const executeTradeStrategyContract = async ({ account, amount, quotes }: TradeProps) => {
+  if (!quotes || !quotes.length) {
+    throw new Error("No quote found");
+  }
+  // split first
+  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
+
+  // get all approvals
+  const calls = await checkAndAddApproveCalls({ account: TRADE_EXECUTOR, amount, quotes });
+
+  // push split transaction
+  calls.push(splitFromRouter(router, parsedSplitAmount));
+
+  // push trade transactions
+  const tradeTransactions = await Promise.all(
+    quotes.map(({ trade }) => getUniswapTradeExecution(trade, TRADE_EXECUTOR))
+  );
+  calls.push(...tradeTransactions);
+
+  //allow trade executor to spend
+  const allowance = (await readContract(config, {
+    address: collateral.address,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [account, TRADE_EXECUTOR],
+    chainId: CHAIN_ID,
+  })) as bigint;
+
+  if (allowance < parsedSplitAmount) {
+    const approveHash = await writeContract(config, {
+      address: collateral.address,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [TRADE_EXECUTOR, parsedSplitAmount],
+      chainId: CHAIN_ID,
+    });
+
+    await waitForTransactionReceipt(config, { hash: approveHash });
+  }
+
+  const writePromise = writeContract(config, {
+    address: TRADE_EXECUTOR,
+    abi: TradeExecutorAbi,
+    functionName: "batchExecute",
+    args: [calls, AI_PREDICTION_MARKET_ID, collateral.address, parsedSplitAmount],
+    value: 0n,
+  });
+  const result = await toastifyTx(() => writePromise, {
+    txSent: { title: "Executing trade..." },
+    txSuccess: { title: "Trade executed!" },
+  });
+  return result;
+};
+
 export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
   return useMutation({
     mutationFn: ({ account, amount, quotes }: TradeProps) =>
-      executeTradeStrategy({ account, amount, quotes }),
+      executeTradeStrategyContract({ account, amount, quotes }),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

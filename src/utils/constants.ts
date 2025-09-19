@@ -38,6 +38,8 @@ export const COLLATERAL_TOKENS: CollateralTokensMap = {
 
 export const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
+export const TRADE_EXECUTOR = "0x8CfFE5787082f559869170fD5bb2B434dC42A618";
+
 export const ROUTER_ADDRESSES = {
   [optimism.id]: "0x179d8F8c811B8C759c33809dbc6c5ceDc62D05DD",
 } as const;
