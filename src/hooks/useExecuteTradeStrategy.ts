@@ -20,7 +20,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { readContract, writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
-import { Execution, useCheck7702Support } from "./useCheck7702Support";
+import { Execution } from "./useCheck7702Support";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
