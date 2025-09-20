@@ -2,6 +2,9 @@ import { TickMath } from "@uniswap/v3-sdk";
 import { Address, encodePacked, formatUnits, Hex, keccak256 } from "viem";
 
 export function getAppUrl() {
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.host}`;
+  }
   return import.meta.env.VITE_WEBSITE_URL || "https://aipredictionmarkets.netlify.app";
 }
 
