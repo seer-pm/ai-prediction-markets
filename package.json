@@ -15,6 +15,8 @@
     "@netlify/functions": "^4.2.5",
     "@reown/appkit": "^1.8.4",
     "@reown/appkit-adapter-wagmi": "^1.8.4",
+    "@safe-global/api-kit": "^4.0.0",
+    "@safe-global/protocol-kit": "^6.1.1",
     "@supabase/supabase-js": "^2.57.4",
     "@swapr/sdk": "https://github.com/seer-pm/swapr-sdk#4fc1e9ce71f76612aa6f468b5b381083d4c52b86",
     "@tailwindcss/vite": "^4.1.13",

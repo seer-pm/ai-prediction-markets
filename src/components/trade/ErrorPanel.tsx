@@ -25,7 +25,9 @@ export const ErrorPanel = ({
         </svg>
         <div>
           <h4 className="text-sm font-medium text-red-800">{title}</h4>
-          <p className="mt-1 text-sm text-red-700">{description}</p>
+          <p className="mt-1 text-sm text-red-700 whitespace-break-spaces break-all">
+            {description}
+          </p>
           {onDismiss && (
             <button
               onClick={() => onDismiss()}

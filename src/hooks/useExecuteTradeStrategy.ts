@@ -3,7 +3,7 @@ import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
-import { toastifySendCallsTx } from "@/lib/toastify";
+import { toastify, toastifySendCallsTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
 import { ApprovalRequest, TradeProps, UniswapQuoteTradeResult } from "@/types";
@@ -15,7 +15,16 @@ import {
   ROUTER_ADDRESSES,
   SupportedChain,
 } from "@/utils/constants";
+import SafeApiKit from "@safe-global/api-kit";
+import Safe, { PredictedSafeProps, SafeAccountConfig } from "@safe-global/protocol-kit";
 import { useMutation } from "@tanstack/react-query";
+import {
+  getWalletClient,
+  readContract,
+  sendTransaction,
+  waitForTransactionReceipt,
+  writeContract,
+} from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 
@@ -125,7 +134,7 @@ const checkAndAddApproveCalls = async ({
   return calls;
 };
 
-const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
+export const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
   if (!quotes || !quotes.length) {
     throw new Error("No quote found");
   }
@@ -156,10 +165,156 @@ const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => 
   return result.receipt;
 };
 
+const initSafe = async (account: Address) => {
+  const safeAccountConfig: SafeAccountConfig = {
+    owners: [account],
+    threshold: 1,
+  };
+
+  const predictedSafe: PredictedSafeProps = {
+    safeAccountConfig,
+    // More optional properties
+  };
+  const client = await getWalletClient(config);
+
+  const protocolKit = await Safe.init({
+    provider: client.transport,
+    signer: account,
+    predictedSafe,
+  });
+  const isDeployed = await protocolKit.isSafeDeployed();
+
+  console.log({ isDeployed });
+
+  if (!isDeployed) {
+    const deploymentTransaction = await protocolKit.createSafeDeploymentTransaction();
+    const transactionHash = await sendTransaction(config, {
+      to: deploymentTransaction.to,
+      value: BigInt(deploymentTransaction.value),
+      data: deploymentTransaction.data as `0x${string}`,
+      chainId: CHAIN_ID,
+    });
+
+    await waitForTransactionReceipt(config, {
+      hash: transactionHash,
+    });
+  }
+
+  const safeAddress = await protocolKit.getAddress();
+
+  return {
+    safe: await protocolKit.connect({
+      safeAddress,
+    }),
+    safeAddress,
+  };
+};
+
+const executeSafeCalls = async (safe: Safe, calls: Execution[]) => {
+  const safeTransaction = await safe.createTransaction({
+    transactions: calls.map((call) => ({ ...call, value: call.value.toString() })),
+  });
+
+  const safeTxHash = await safe.getTransactionHash(safeTransaction);
+
+  const signature = await safe.signHash(safeTxHash);
+
+  const apiKit = new SafeApiKit({
+    chainId: BigInt(CHAIN_ID),
+    apiKey: import.meta.env.VITE_SAFE_API_KEY,
+  });
+
+  await apiKit.confirmTransaction(safeTxHash, signature.data);
+  return await safe.executeTransaction(safeTransaction);
+};
+
+const executeTradeStrategyWithSafe = async ({ account, amount, quotes, tokens }: TradeProps) => {
+  if (!quotes || !quotes.length) {
+    throw new Error("No quote found");
+  }
+  //init safe
+  const { safe, safeAddress } = await initSafe(account);
+
+  // split first
+  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
+
+  // get all approvals
+  const calls = await checkAndAddApproveCalls({ account, amount, quotes });
+
+  // push split transaction
+  calls.push(splitFromRouter(router, parsedSplitAmount));
+
+  // push trade transactions
+  const tradeTransactions = await Promise.all(
+    quotes.map(({ trade }) => getUniswapTradeExecution(trade, safeAddress))
+  );
+  calls.push(...tradeTransactions);
+
+  //allow safe to spend
+  const allowance = (await readContract(config, {
+    address: collateral.address,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [account, safeAddress],
+    chainId: CHAIN_ID,
+  })) as bigint;
+  if (allowance < parsedSplitAmount) {
+    const approveHash = await writeContract(config, {
+      address: collateral.address,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [safeAddress, parsedSplitAmount],
+      chainId: CHAIN_ID,
+    });
+
+    await waitForTransactionReceipt(config, { hash: approveHash });
+  }
+
+  const result = await toastify(() => executeSafeCalls(safe, calls), {
+    txSent: { title: "Executing trade..." },
+    txSuccess: { title: "Trade executed!" },
+  });
+  if (!result.status) {
+    throw result.error;
+  }
+
+  const balances: bigint[] = await readContractsInBatch(
+    [collateral.address, ...tokens].map((token) => ({
+      address: token,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      chainId: CHAIN_ID,
+      args: [safeAddress],
+    })),
+    CHAIN_ID,
+    50,
+    true
+  );
+
+  //push transfer calls from safe back to wallet
+  const transferCalls = [collateral.address, ...tokens].map((token, index) => ({
+    to: token,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [account, balances[index]],
+    }),
+  }));
+
+  const transferResult = await toastify(() => executeSafeCalls(safe, transferCalls), {
+    txSent: { title: "Withdrawing tokens..." },
+    txSuccess: { title: "Tokens withdrawn!" },
+  });
+  if (!transferResult.status) {
+    throw transferResult.error;
+  }
+};
+
 export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
   return useMutation({
-    mutationFn: ({ account, amount, quotes }: TradeProps) =>
-      executeTradeStrategy({ account, amount, quotes }),
+    mutationFn: (tradeProps: TradeProps) => executeTradeStrategyWithSafe(tradeProps),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
