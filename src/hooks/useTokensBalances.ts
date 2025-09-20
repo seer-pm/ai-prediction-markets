@@ -29,13 +29,13 @@ const fetchTokensBalances = async (
       return acc;
     }, {} as GetBalancesResult);
   } catch {
-    return {};
+    return {} as GetBalancesResult;
   }
 };
 
 export const useTokensBalances = (account: Address | undefined, tokens: Address[] | undefined) => {
   return useQuery({
-    enabled: account && tokens && tokens.length > 0,
+    enabled: !!account && tokens && tokens.length > 0,
     queryKey: ["useTokensBalances", account, tokens],
     queryFn: () => fetchTokensBalances(account!, tokens!),
   });

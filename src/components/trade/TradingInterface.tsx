@@ -69,7 +69,12 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   });
 
   const onSubmit = ({ amount }: TradeFormData) => {
-    executeTradeMutation.mutate({ account, amount, quotes });
+    executeTradeMutation.mutate({
+      account,
+      amount,
+      quotes,
+      tokens: markets.map((market) => market.marketId),
+    });
   };
 
   const handleMaxClick = () => {
