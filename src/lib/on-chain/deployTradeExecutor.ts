@@ -1,5 +1,12 @@
 import { CreateCallAbi } from "@/abis/CreateCallAbi";
-import { Address, encodeAbiParameters, encodePacked, keccak256 } from "viem";
+import {
+  Address,
+  encodeAbiParameters,
+  encodeFunctionData,
+  encodePacked,
+  Hex,
+  keccak256,
+} from "viem";
 import { TradeExecutorBytecode } from "@/abis/TradeExecutorAbi";
 import { config } from "@/config/wagmi";
 import { formatBytecode } from "@/utils/common";
@@ -11,10 +18,12 @@ interface FactoryDeployParams {
   factoryAddress: Address;
   conditionalTokensAddress: Address;
   ownerAddress: Address;
-  bytecode: string;
+  bytecode: Hex;
+  supports7702: boolean;
+  constructorData: Hex;
 }
 
-function generateSalt(ownerAddress: Address): Address {
+function generateSalt(ownerAddress: Address): Hex {
   return keccak256(encodePacked(["string", "address"], ["TradeExecutor", ownerAddress]));
 }
 
@@ -25,7 +34,7 @@ function predictFactoryAddress({
 }: {
   factoryAddress: Address;
   salt: Address;
-  deploymentData: Address;
+  deploymentData: Hex;
 }): Address {
   const initCodeHash = keccak256(deploymentData);
 
@@ -40,21 +49,12 @@ function predictFactoryAddress({
 
 async function checkAndDeployWithFactory({
   factoryAddress,
-  conditionalTokensAddress,
   ownerAddress,
   bytecode,
+  supports7702,
+  constructorData,
 }: FactoryDeployParams) {
-  // Format bytecode and prepare deployment data
-  const formattedBytecode = bytecode.startsWith("0x")
-    ? (bytecode as Address)
-    : (`0x${bytecode}` as Address);
-
-  const constructorData = encodeAbiParameters(
-    [{ type: "address" }, { type: "address" }],
-    [conditionalTokensAddress, ownerAddress]
-  );
-
-  const deploymentData = `${formattedBytecode}${constructorData.slice(2)}` as Address;
+  const deploymentData = `${bytecode}${constructorData.slice(2)}` as Hex;
   const salt = generateSalt(ownerAddress);
 
   // Predict contract address
@@ -70,9 +70,22 @@ async function checkAndDeployWithFactory({
   });
 
   if (code && code !== "0x") {
-    return predictedAddress;
+    return { predictedAddress };
   }
-
+  if (supports7702) {
+    return {
+      call: {
+        to: factoryAddress,
+        value: 0n,
+        data: encodeFunctionData({
+          abi: CreateCallAbi,
+          functionName: "performCreate2",
+          args: [0n, deploymentData, salt],
+        }),
+      },
+      predictedAddress,
+    };
+  }
   const result = await toastifyTx(
     () =>
       writeContract(config, {
@@ -91,14 +104,17 @@ async function checkAndDeployWithFactory({
     throw result.error;
   }
 
-  return predictedAddress;
+  return { predictedAddress };
 }
 
-export async function initTradeExecutor(account: Address) {
+export async function initTradeExecutor(account: Address, supports7702: boolean) {
+  const constructorData = encodeAbiParameters([{ type: "address" }], [account]);
   return await checkAndDeployWithFactory({
     factoryAddress: CREATE_FACTORIES[CHAIN_ID],
     conditionalTokensAddress: CONDITIONAL_TOKENS[CHAIN_ID],
     ownerAddress: account,
     bytecode: formatBytecode(TradeExecutorBytecode),
+    supports7702,
+    constructorData,
   });
 }

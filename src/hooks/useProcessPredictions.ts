@@ -1,8 +1,8 @@
 import { PredictionRow, TableData } from "@/types";
-import { useMarketsData } from "./useMarketsData";
-import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
-import { useTokensBalances } from "./useTokensBalances";
 import { useAccount } from "wagmi";
+import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
+import { useMarketsData } from "./useMarketsData";
+import { useTokensBalances } from "./useTokensBalances";
 
 const MIN_PRICE = 0.0001;
 
@@ -13,7 +13,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     account,
     data?.marketsData ? Object.values(data.marketsData).map((data) => data.id) : undefined
   );
-  if (!data) {
+  if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
       isLoading,

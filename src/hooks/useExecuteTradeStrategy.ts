@@ -20,7 +20,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { readContract, writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
-import { Execution } from "./useCheck7702Support";
+import { Execution, useCheck7702Support } from "./useCheck7702Support";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -128,27 +128,91 @@ const checkAndAddApproveCalls = async ({
   return calls;
 };
 
-export const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
+const executeTradeStrategyContract7702 = async ({
+  account,
+  amount,
+  quotes,
+  tokens,
+}: TradeProps) => {
   if (!quotes || !quotes.length) {
     throw new Error("No quote found");
   }
+  if (!tokens.length) {
+    throw new Error("No token found");
+  }
+  const { predictedAddress: tradeExecutor, call: tradeExecutorCreationCall } =
+    await initTradeExecutor(account, true);
   // split first
   const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
   const router = ROUTER_ADDRESSES[CHAIN_ID];
-
+  const calls7702: Execution[] = [];
+  if (tradeExecutorCreationCall) {
+    calls7702.push(tradeExecutorCreationCall);
+  }
   // get all approvals
-  const calls = await checkAndAddApproveCalls({ account, amount, quotes });
+  const tradeExecutorCalls = await checkAndAddApproveCalls({
+    account: tradeExecutor,
+    amount,
+    quotes,
+  });
 
   // push split transaction
-  calls.push(splitFromRouter(router, parsedSplitAmount));
+  tradeExecutorCalls.push(splitFromRouter(router, parsedSplitAmount));
 
-  // // push trade transactions
+  // push trade transactions
   const tradeTransactions = await Promise.all(
-    quotes.map(({ trade }) => getUniswapTradeExecution(trade, account))
+    quotes.map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
   );
-  calls.push(...tradeTransactions);
+  tradeExecutorCalls.push(...tradeTransactions);
 
-  const result = await toastifySendCallsTx(calls, config, {
+  //allow trade executor to spend
+  const allowance = (await readContract(config, {
+    address: collateral.address,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [account, tradeExecutor],
+    chainId: CHAIN_ID,
+  })) as bigint;
+
+  if (allowance < parsedSplitAmount) {
+    calls7702.push({
+      to: collateral.address,
+      value: 0n,
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [tradeExecutor, parsedSplitAmount],
+      }),
+    });
+  }
+
+  //pull sUSDS to executor
+  tradeExecutorCalls.unshift({
+    to: collateral.address,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transferFrom",
+      args: [account, tradeExecutor, parsedSplitAmount],
+    }),
+  });
+
+  //list of tokens to withdraw from contract
+  const tokensToWithdraw = [collateral.address, ...tokens];
+
+  calls7702.push({
+    to: tradeExecutor,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [
+        tradeExecutorCalls.map((call) => ({ data: call.data, to: call.to })),
+        tokensToWithdraw,
+      ],
+    }),
+  });
+  const result = await toastifySendCallsTx(calls7702, config, {
     txSent: { title: "Executing trade..." },
     txSuccess: { title: "Trade executed!" },
   });
@@ -156,8 +220,7 @@ export const executeTradeStrategy = async ({ account, amount, quotes }: TradePro
   if (!result.status) {
     throw result.error;
   }
-
-  return result.receipt;
+  return result;
 };
 
 const executeTradeStrategyContract = async ({ account, amount, quotes, tokens }: TradeProps) => {
@@ -167,7 +230,7 @@ const executeTradeStrategyContract = async ({ account, amount, quotes, tokens }:
   if (!tokens.length) {
     throw new Error("No token found");
   }
-  const tradeExecutor = await initTradeExecutor(account);
+  const { predictedAddress: tradeExecutor } = await initTradeExecutor(account, false);
   // split first
   const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
   const router = ROUTER_ADDRESSES[CHAIN_ID];
@@ -226,7 +289,6 @@ const executeTradeStrategyContract = async ({ account, amount, quotes, tokens }:
 
   //list of tokens to withdraw from contract
   const tokensToWithdraw = [collateral.address, ...tokens];
-
   const writePromise = writeContract(config, {
     address: tradeExecutor,
     abi: TradeExecutorAbi,
@@ -246,9 +308,12 @@ const executeTradeStrategyContract = async ({ account, amount, quotes, tokens }:
   return result;
 };
 
-export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
+export const useExecuteTradeStrategy = (isUse7702: boolean, onSuccess?: () => unknown) => {
   return useMutation({
-    mutationFn: (tradeProps: TradeProps) => executeTradeStrategyContract(tradeProps),
+    mutationFn: (tradeProps: TradeProps) =>
+      isUse7702
+        ? executeTradeStrategyContract7702(tradeProps)
+        : executeTradeStrategyContract(tradeProps),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

@@ -30,16 +30,16 @@ contract TradeExecutor is ReentrancyGuard {
     
     /// @dev Execute calls in a single transaction, sending any remaining tokens back to owner. Only callable by owner.
     /// @param calls Array of calls to execute
-    function batchExecute(Call[] calldata calls, IERC20[] calldata tokens) external onlyOwner nonReentrant {
+    function batchExecute(Call[] calldata calls, address[] calldata tokens) external onlyOwner nonReentrant {
         for (uint i = 0; i < calls.length; i++) {
             (bool success,) = calls[i].to.call(calls[i].data);
-             require(success, "Call failed");
+            require(success, "Call failed");
         }
 
         for (uint i = 0; i < tokens.length; i++) {
-            uint256 balance = tokens[i].balanceOf(address(this));
+            uint256 balance = IERC20(tokens[i]).balanceOf(address(this));
             if (balance > 0) {
-                require(tokens[i].transfer(msg.sender, balance), "Token withdrawn failed");
+                require(IERC20(tokens[i]).transfer(msg.sender, balance), "Token withdrawn failed");
             }
         }
     }

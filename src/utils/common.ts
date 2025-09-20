@@ -5,7 +5,7 @@ export function getAppUrl() {
   if (typeof window !== "undefined" && !window.location.host.includes("localhost")) {
     return `${window.location.protocol}//${window.location.host}`;
   }
-  return import.meta.env.VITE_WEBSITE_URL || "https://aipredictionmarkets.netlify.app";
+  return import.meta.env.VITE_WEBSITE_URL || "https://deep-pm.netlify.app";
 }
 
 export type Token0Token1 = { token1: Address; token0: Address };
