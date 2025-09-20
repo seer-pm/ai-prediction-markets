@@ -1,5 +1,5 @@
 import { TickMath } from "@uniswap/v3-sdk";
-import { Address, formatUnits } from "viem";
+import { Address, encodePacked, formatUnits, Hex, keccak256 } from "viem";
 
 export function getAppUrl() {
   return import.meta.env.VITE_WEBSITE_URL || "https://aipredictionmarkets.netlify.app";
@@ -55,4 +55,25 @@ export function decimalToFraction(x: number): [string, string] {
   const numerator = Math.round(x * 10 ** decimals);
   const denominator = 10 ** decimals;
   return [String(numerator), String(denominator)];
+}
+
+export function generateSalt(ownerAddress: Hex): Hex {
+  return keccak256(
+    encodePacked(
+      ['string', 'address'],
+      ['TradeExecutor_v1', ownerAddress]
+    )
+  )
+}
+
+export function formatBytecode(bytecode: string): Hex {
+  // Remove any whitespace
+  const cleaned = bytecode.trim()
+  
+  // Add 0x prefix if not present
+  if (!cleaned.startsWith('0x')) {
+    return `0x${cleaned}` as Hex
+  }
+  
+  return cleaned as Hex
 }

@@ -1,7 +1,9 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
+import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
+import { initTradeExecutor } from "@/lib/on-chain/deployTradeExecutor";
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
 import { toastifySendCallsTx, toastifyTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
@@ -14,13 +16,11 @@ import {
   COLLATERAL_TOKENS,
   ROUTER_ADDRESSES,
   SupportedChain,
-  TRADE_EXECUTOR,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
+import { readContract, writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { readContract, waitForTransactionReceipt, writeContract } from "@wagmi/core";
-import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -164,19 +164,20 @@ const executeTradeStrategyContract = async ({ account, amount, quotes }: TradePr
   if (!quotes || !quotes.length) {
     throw new Error("No quote found");
   }
+  const tradeExecutor = await initTradeExecutor(account);
   // split first
   const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
   const router = ROUTER_ADDRESSES[CHAIN_ID];
 
   // get all approvals
-  const calls = await checkAndAddApproveCalls({ account: TRADE_EXECUTOR, amount, quotes });
+  const calls = await checkAndAddApproveCalls({ account: tradeExecutor, amount, quotes });
 
   // push split transaction
   calls.push(splitFromRouter(router, parsedSplitAmount));
 
   // push trade transactions
   const tradeTransactions = await Promise.all(
-    quotes.map(({ trade }) => getUniswapTradeExecution(trade, TRADE_EXECUTOR))
+    quotes.map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
   );
   calls.push(...tradeTransactions);
 
@@ -185,29 +186,38 @@ const executeTradeStrategyContract = async ({ account, amount, quotes }: TradePr
     address: collateral.address,
     abi: erc20Abi,
     functionName: "allowance",
-    args: [account, TRADE_EXECUTOR],
+    args: [account, tradeExecutor],
     chainId: CHAIN_ID,
   })) as bigint;
 
   if (allowance < parsedSplitAmount) {
-    const approveHash = await writeContract(config, {
-      address: collateral.address,
-      abi: erc20Abi,
-      functionName: "approve",
-      args: [TRADE_EXECUTOR, parsedSplitAmount],
-      chainId: CHAIN_ID,
-    });
-
-    await waitForTransactionReceipt(config, { hash: approveHash });
+    const result = await toastifyTx(
+      () =>
+        writeContract(config, {
+          address: collateral.address,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [tradeExecutor, parsedSplitAmount],
+          chainId: CHAIN_ID,
+        }),
+      {
+        txSent: { title: "Approving Trade Executor..." },
+        txSuccess: { title: "Trade Executor approved!" },
+      }
+    );
+    if (!result.status) {
+      throw result.error;
+    }
   }
 
   const writePromise = writeContract(config, {
-    address: TRADE_EXECUTOR,
+    address: tradeExecutor,
     abi: TradeExecutorAbi,
-    functionName: "batchExecute",
+    functionName: "tradeExecute",
     args: [calls, AI_PREDICTION_MARKET_ID, collateral.address, parsedSplitAmount],
     value: 0n,
   });
+
   const result = await toastifyTx(() => writePromise, {
     txSent: { title: "Executing trade..." },
     txSuccess: { title: "Trade executed!" },
