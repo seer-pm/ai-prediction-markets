@@ -2,12 +2,9 @@
 pragma solidity 0.8.24;
 
 import "./Interfaces.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract TradeExecutor is ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     struct Call {
         address to;
         bytes data;
@@ -58,39 +55,17 @@ contract TradeExecutor is ReentrancyGuard {
     /// @param calls Array of calls to execute
     function batchExecute(Call[] calldata calls) external onlyOwner nonReentrant {
         for (uint i = 0; i < calls.length; i++) {
-            (bool success, bytes memory returndata) = calls[i].to.call(calls[i].data);
-            if (!success) {
-                // bubble revert reason
-                if (returndata.length > 0) {
-                    assembly {
-                        let returndata_size := mload(returndata)
-                        revert(add(returndata, 32), returndata_size)
-                    }
-                } else {
-                    revert("TradeExecutor: call failed");
-                }
-            }
+            (bool success,) = calls[i].to.call(calls[i].data);
+             require(success, "TradeExecutor: call failed");
         }
     }
 
     /// @dev Execute trade calls in a single transaction, sending any remaining tokens back to owner. Only callable by owner.
     /// @param calls Array of calls to execute
-    function tradeExecute(Call[] calldata calls, address market, IERC20 collateralToken, uint amount) external onlyOwner nonReentrant {
-        // pull collateral (uses SafeERC20 to be robust vs non-standard tokens)
-        collateralToken.safeTransferFrom(msg.sender, address(this), amount);
-
+    function tradeExecute(Call[] calldata calls, address market, IERC20 collateralToken) external onlyOwner nonReentrant {
         for (uint i = 0; i < calls.length; i++) {
-            (bool success, bytes memory returndata) = calls[i].to.call(calls[i].data);
-            if (!success) {
-                if (returndata.length > 0) {
-                    assembly {
-                        let returndata_size := mload(returndata)
-                        revert(add(returndata, 32), returndata_size)
-                    }
-                } else {
-                    revert("TradeExecutor: call failed");
-                }
-            }
+            (bool success,) = calls[i].to.call(calls[i].data);
+             require(success, "TradeExecutor: call failed");
         }
 
         // return any outcome tokens produced to msg.sender (owner)
@@ -99,14 +74,14 @@ contract TradeExecutor is ReentrancyGuard {
             address token = outcomeTokens[i];
             uint256 balance = IERC20(token).balanceOf(address(this));
             if (balance > 0) {
-                IERC20(token).safeTransfer(msg.sender, balance);
+                require(IERC20(token).transfer(msg.sender, balance), "Outcome token transfer failed");
             }
         }
 
         // return remaining collateral
         uint256 remainingBalance = collateralToken.balanceOf(address(this));
         if (remainingBalance > 0) {
-            collateralToken.safeTransfer(msg.sender, remainingBalance);
+            require(collateralToken.transfer(msg.sender, remainingBalance), "Collateral transfer failed");
         }
     }
 }

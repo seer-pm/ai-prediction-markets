@@ -1,4 +1,3 @@
-import { useCheck7702Support } from "@/hooks/useCheck7702Support";
 import useDebounce from "@/hooks/useDebounce";
 import { useExecuteTradeStrategy } from "@/hooks/useExecuteTradeStrategy";
 import { useGetQuotes } from "@/hooks/useGetQuotes";
@@ -53,8 +52,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     tableData: markets,
   });
 
-  const { supports7702, isLoading: isLoading7702 } = useCheck7702Support();
-
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useBalance({
     address: account,
@@ -90,12 +87,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
           Executing Strategy...
         </div>
       );
-    }
-    if (isLoading7702) {
-      return "Checking 7702 support";
-    }
-    if (!supports7702) {
-      return "Batching transactions not supported";
     }
     if (isLoadingQuotes) {
       return "Getting quotes...";
@@ -245,7 +236,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               type="submit"
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={
-                !supports7702 ||
                 executeTradeMutation.isPending ||
                 !!errors.amount ||
                 !amount ||

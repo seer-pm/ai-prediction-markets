@@ -210,18 +210,37 @@ const executeTradeStrategyContract = async ({ account, amount, quotes }: TradePr
     }
   }
 
+  //pull sUSDS to executor
+  calls.unshift({
+    to: collateral.address,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transferFrom",
+      args: [account, tradeExecutor, parsedSplitAmount],
+    }),
+  });
+
   const writePromise = writeContract(config, {
     address: tradeExecutor,
     abi: TradeExecutorAbi,
     functionName: "tradeExecute",
-    args: [calls, AI_PREDICTION_MARKET_ID, collateral.address, parsedSplitAmount],
+    args: [
+      calls.map((call) => ({ data: call.data, to: call.to })),
+      AI_PREDICTION_MARKET_ID,
+      collateral.address,
+    ],
     value: 0n,
+    chainId: CHAIN_ID,
   });
 
   const result = await toastifyTx(() => writePromise, {
     txSent: { title: "Executing trade..." },
     txSuccess: { title: "Trade executed!" },
   });
+  if (!result.status) {
+    throw result.error;
+  }
   return result;
 };
 

@@ -15,7 +15,7 @@ interface FactoryDeployParams {
 }
 
 function generateSalt(ownerAddress: Address): Address {
-  return keccak256(encodePacked(["string", "address"], ["TradeExecutor_v1", ownerAddress]));
+  return keccak256(encodePacked(["string", "address"], ["TradeExecutor", ownerAddress]));
 }
 
 function predictFactoryAddress({
@@ -80,14 +80,15 @@ async function checkAndDeployWithFactory({
         abi: CreateCallAbi,
         functionName: "performCreate2",
         args: [0n, deploymentData, salt],
+        chainId: CHAIN_ID,
       }),
     {
       txSent: { title: "Deploying Trade Executor..." },
       txSuccess: { title: "Trade Executor deployed!" },
     }
   );
-  if(!result.status){
-    throw result.error
+  if (!result.status) {
+    throw result.error;
   }
 
   return predictedAddress;

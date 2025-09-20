@@ -2,7 +2,7 @@ import { TickMath } from "@uniswap/v3-sdk";
 import { Address, encodePacked, formatUnits, Hex, keccak256 } from "viem";
 
 export function getAppUrl() {
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !window.location.host.includes("localhost")) {
     return `${window.location.protocol}//${window.location.host}`;
   }
   return import.meta.env.VITE_WEBSITE_URL || "https://aipredictionmarkets.netlify.app";
@@ -61,22 +61,17 @@ export function decimalToFraction(x: number): [string, string] {
 }
 
 export function generateSalt(ownerAddress: Hex): Hex {
-  return keccak256(
-    encodePacked(
-      ['string', 'address'],
-      ['TradeExecutor_v1', ownerAddress]
-    )
-  )
+  return keccak256(encodePacked(["string", "address"], ["TradeExecutor_v1", ownerAddress]));
 }
 
 export function formatBytecode(bytecode: string): Hex {
   // Remove any whitespace
-  const cleaned = bytecode.trim()
-  
+  const cleaned = bytecode.trim();
+
   // Add 0x prefix if not present
-  if (!cleaned.startsWith('0x')) {
-    return `0x${cleaned}` as Hex
+  if (!cleaned.startsWith("0x")) {
+    return `0x${cleaned}` as Hex;
   }
-  
-  return cleaned as Hex
+
+  return cleaned as Hex;
 }
