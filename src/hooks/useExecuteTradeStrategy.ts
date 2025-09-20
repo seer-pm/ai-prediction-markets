@@ -24,7 +24,7 @@ import { Execution } from "./useCheck7702Support";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
-export function splitFromRouter(router: Address, amount: bigint): Execution {
+function splitFromRouter(router: Address, amount: bigint): Execution {
   return {
     to: router,
     value: 0n,
@@ -160,9 +160,12 @@ export const executeTradeStrategy = async ({ account, amount, quotes }: TradePro
   return result.receipt;
 };
 
-const executeTradeStrategyContract = async ({ account, amount, quotes }: TradeProps) => {
+const executeTradeStrategyContract = async ({ account, amount, quotes, tokens }: TradeProps) => {
   if (!quotes || !quotes.length) {
     throw new Error("No quote found");
+  }
+  if (!tokens.length) {
+    throw new Error("No token found");
   }
   const tradeExecutor = await initTradeExecutor(account);
   // split first
@@ -221,15 +224,14 @@ const executeTradeStrategyContract = async ({ account, amount, quotes }: TradePr
     }),
   });
 
+  //list of tokens to withdraw from contract
+  const tokensToWithdraw = [collateral.address, ...tokens];
+
   const writePromise = writeContract(config, {
     address: tradeExecutor,
     abi: TradeExecutorAbi,
-    functionName: "tradeExecute",
-    args: [
-      calls.map((call) => ({ data: call.data, to: call.to })),
-      AI_PREDICTION_MARKET_ID,
-      collateral.address,
-    ],
+    functionName: "batchExecute",
+    args: [calls.map((call) => ({ data: call.data, to: call.to })), tokensToWithdraw],
     value: 0n,
     chainId: CHAIN_ID,
   });
@@ -246,8 +248,7 @@ const executeTradeStrategyContract = async ({ account, amount, quotes }: TradePr
 
 export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
   return useMutation({
-    mutationFn: ({ account, amount, quotes }: TradeProps) =>
-      executeTradeStrategyContract({ account, amount, quotes }),
+    mutationFn: (tradeProps: TradeProps) => executeTradeStrategyContract(tradeProps),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

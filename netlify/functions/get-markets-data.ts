@@ -86,7 +86,7 @@ export default async () => {
       };
       return mapping;
     }, {} as { [key: string]: { id: Address; price: number | null; pool: PoolInfo | null } });
-    return new Response(JSON.stringify({ ...repoToPriceMapping }), {
+    return new Response(JSON.stringify({ marketsData: repoToPriceMapping, wrappedTokens }), {
       status: 200,
       headers: {
         "Access-Control-Allow-Origin": "http://localhost:5173",

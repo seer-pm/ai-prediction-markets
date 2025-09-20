@@ -9,6 +9,7 @@ import { Address } from "viem";
 import { useBalance } from "wagmi";
 import { ErrorPanel } from "./ErrorPanel";
 import { LoadingPanel } from "./LoadingPanel";
+import { useMarketsData } from "@/hooks/useMarketsData";
 
 interface TradingInterfaceProps {
   markets: TableData[];
@@ -39,7 +40,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   const amount = watch("amount", 0);
 
   const debouncedAmount = useDebounce(amount, 500);
-
+  const { data } = useMarketsData();
   const {
     data: quotes,
     isLoading: isLoadingQuotes,
@@ -66,7 +67,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   });
 
   const onSubmit = ({ amount }: TradeFormData) => {
-    executeTradeMutation.mutate({ account, amount, quotes });
+    executeTradeMutation.mutate({ account, amount, quotes, tokens: data?.wrappedTokens ?? [] });
   };
 
   const handleMaxClick = () => {

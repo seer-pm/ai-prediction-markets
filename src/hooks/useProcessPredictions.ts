@@ -8,12 +8,12 @@ const MIN_PRICE = 0.0001;
 
 export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
-  const { data: marketsData, isLoading, error } = useMarketsData();
+  const { data, isLoading, error } = useMarketsData();
   const { data: balanceMapping, isLoading: isLoadingBalances } = useTokensBalances(
     account,
-    marketsData ? Object.values(marketsData).map((data) => data.id) : undefined
+    data?.marketsData ? Object.values(data.marketsData).map((data) => data.id) : undefined
   );
-  if (!marketsData) {
+  if (!data) {
     return {
       data: undefined,
       isLoading,
@@ -27,7 +27,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     return acc;
   }, {} as { [key: string]: PredictionRow });
 
-  const processedData: TableData[] = Object.entries(marketsData)
+  const processedData: TableData[] = Object.entries(data.marketsData)
     .map(([marketRepo, market]) => {
       const prediction = repoToPredictionMapping[marketRepo];
       const { id: marketId, pool, price: currentPrice } = market;

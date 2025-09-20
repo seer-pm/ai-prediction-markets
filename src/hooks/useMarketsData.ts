@@ -4,11 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 
 interface GetMarketsDataApiResult {
-  [key: string]: {
-    id: Address;
-    price: number | null;
-    pool: PoolInfo | null;
+  marketsData: {
+    [key: string]: {
+      id: Address;
+      price: number | null;
+      pool: PoolInfo | null;
+    };
   };
+  wrappedTokens: Address[];
 }
 
 const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
@@ -16,7 +19,7 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-markets-data`);
     return await response.json();
   } catch {
-    return {};
+    return { marketsData: {}, wrappedTokens: [] };
   }
 };
 
