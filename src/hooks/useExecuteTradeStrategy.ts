@@ -1,9 +1,11 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
+import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
+import { initTradeExecutor } from "@/lib/on-chain/deployTradeExecutor";
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
-import { toastifySendCallsTx } from "@/lib/toastify";
+import { toastifySendCallsTx, toastifyTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
 import { ApprovalRequest, TradeProps, UniswapQuoteTradeResult } from "@/types";
@@ -16,6 +18,7 @@ import {
   SupportedChain,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
+import { readContract, writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 
@@ -125,7 +128,7 @@ const checkAndAddApproveCalls = async ({
   return calls;
 };
 
-const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
+export const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => {
   if (!quotes || !quotes.length) {
     throw new Error("No quote found");
   }
@@ -144,6 +147,7 @@ const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => 
     quotes.map(({ trade }) => getUniswapTradeExecution(trade, account))
   );
   calls.push(...tradeTransactions);
+
   const result = await toastifySendCallsTx(calls, config, {
     txSent: { title: "Executing trade..." },
     txSuccess: { title: "Trade executed!" },
@@ -156,10 +160,75 @@ const executeTradeStrategy = async ({ account, amount, quotes }: TradeProps) => 
   return result.receipt;
 };
 
+const executeTradeStrategyContract = async ({ account, amount, quotes }: TradeProps) => {
+  if (!quotes || !quotes.length) {
+    throw new Error("No quote found");
+  }
+  const tradeExecutor = await initTradeExecutor(account);
+  // split first
+  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
+
+  // get all approvals
+  const calls = await checkAndAddApproveCalls({ account: tradeExecutor, amount, quotes });
+
+  // push split transaction
+  calls.push(splitFromRouter(router, parsedSplitAmount));
+
+  // push trade transactions
+  const tradeTransactions = await Promise.all(
+    quotes.map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
+  );
+  calls.push(...tradeTransactions);
+
+  //allow trade executor to spend
+  const allowance = (await readContract(config, {
+    address: collateral.address,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [account, tradeExecutor],
+    chainId: CHAIN_ID,
+  })) as bigint;
+
+  if (allowance < parsedSplitAmount) {
+    const result = await toastifyTx(
+      () =>
+        writeContract(config, {
+          address: collateral.address,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [tradeExecutor, parsedSplitAmount],
+          chainId: CHAIN_ID,
+        }),
+      {
+        txSent: { title: "Approving Trade Executor..." },
+        txSuccess: { title: "Trade Executor approved!" },
+      }
+    );
+    if (!result.status) {
+      throw result.error;
+    }
+  }
+
+  const writePromise = writeContract(config, {
+    address: tradeExecutor,
+    abi: TradeExecutorAbi,
+    functionName: "tradeExecute",
+    args: [calls, AI_PREDICTION_MARKET_ID, collateral.address, parsedSplitAmount],
+    value: 0n,
+  });
+
+  const result = await toastifyTx(() => writePromise, {
+    txSent: { title: "Executing trade..." },
+    txSuccess: { title: "Trade executed!" },
+  });
+  return result;
+};
+
 export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
   return useMutation({
     mutationFn: ({ account, amount, quotes }: TradeProps) =>
-      executeTradeStrategy({ account, amount, quotes }),
+      executeTradeStrategyContract({ account, amount, quotes }),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
