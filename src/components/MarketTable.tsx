@@ -66,6 +66,9 @@ export const MarketTable: React.FC<MarketTableProps> = ({
             {markets.map((market) => {
               const { marketId, repo, parent, currentPrice, predictedWeight, difference, balance } =
                 market;
+              if (repo === "Invalid result") {
+                return null;
+              }
               return (
                 <tr key={marketId}>
                   <td className="px-6 py-4 whitespace-nowrap">

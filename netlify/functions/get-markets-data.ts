@@ -50,9 +50,6 @@ export default async () => {
     }, {} as { [key: string]: GetPoolsQuery["pools"][0] });
     // return ticks data and current price
     const repoToPriceMapping = (outcomes as string[]).reduce((mapping, outcome, index) => {
-      if (outcome === "Invalid result") {
-        return mapping;
-      }
       const { token0, token1 } = getToken0Token1(wrappedTokens[index], collateral);
       const tokenPairMappingKey = `${token0}-${token1}`;
       const pool = tokenPairToPoolMapping[tokenPairMappingKey];
