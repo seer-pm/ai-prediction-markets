@@ -1,16 +1,12 @@
 import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
-import { CHAIN_ID, DECIMALS } from "@/utils/constants";
+import { CHAIN_ID } from "@/utils/constants";
 import { useQuery } from "@tanstack/react-query";
-import { Address, erc20Abi, formatUnits } from "viem";
-
-interface GetBalancesResult {
-  [key: string]: number;
-}
+import { Address, erc20Abi } from "viem";
 
 const fetchTokensBalances = async (
   account: Address,
   tokens: Address[]
-): Promise<GetBalancesResult> => {
+): Promise<bigint[]> => {
   try {
     const balances: bigint[] = await readContractsInBatch(
       tokens.map((token) => ({
@@ -24,12 +20,9 @@ const fetchTokensBalances = async (
       50,
       true
     );
-    return balances.reduce((acc, curr, index) => {
-      acc[tokens[index]] = Number(formatUnits(curr, DECIMALS));
-      return acc;
-    }, {} as GetBalancesResult);
+    return balances
   } catch {
-    return {} as GetBalancesResult;
+    return []
   }
 };
 

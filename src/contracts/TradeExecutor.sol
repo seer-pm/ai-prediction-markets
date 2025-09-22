@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.30;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-contract TradeExecutor is ReentrancyGuard {
+contract TradeExecutor {
     struct Call {
         address to;
+        bytes data;
+    }
+
+    struct ValueCall {
+        address to;
+        uint256 value;
         bytes data;
     }
     
@@ -24,23 +27,27 @@ contract TradeExecutor is ReentrancyGuard {
     constructor(
         address _owner
     ) {
-        require(_owner != address(0), "Owner cannot be zero address");
         owner = _owner;
     }
     
-    /// @dev Execute calls in a single transaction, sending any remaining tokens back to owner. Only callable by owner.
+    /// @dev Execute calls in a single transaction. Only callable by owner.
     /// @param calls Array of calls to execute
-    function batchExecute(Call[] calldata calls, address[] calldata tokens) external onlyOwner nonReentrant {
+    function batchExecute(Call[] calldata calls) external onlyOwner {
         for (uint i = 0; i < calls.length; i++) {
             (bool success,) = calls[i].to.call(calls[i].data);
             require(success, "Call failed");
         }
+    }
 
-        for (uint i = 0; i < tokens.length; i++) {
-            uint256 balance = IERC20(tokens[i]).balanceOf(address(this));
-            if (balance > 0) {
-                require(IERC20(tokens[i]).transfer(msg.sender, balance), "Token withdrawn failed");
-            }
+    /// @dev Execute calls with value in a single transaction. Only callable by owner.
+    /// @param calls Array of calls to execute
+    function batchValueExecute(ValueCall[] calldata calls) external payable  onlyOwner {
+        for (uint i = 0; i < calls.length; i++) {
+            (bool success,) = calls[i].to.call{value: calls[i].value}(calls[i].data);
+            require(success, "Call failed");
         }
     }
+
+    /// @dev Receive ETH.
+    receive() external payable { }
 }

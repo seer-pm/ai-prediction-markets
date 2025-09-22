@@ -12,6 +12,8 @@ export const CHAIN_ID = 10 as SupportedChain;
 
 export const DECIMALS = 18;
 
+export const SALT_KEY = "TradeExecutorV1";
+
 type CollateralTokensMap = Record<
   SupportedChain,
   { primary: Token; secondary: Token | undefined; swap?: Token[] }

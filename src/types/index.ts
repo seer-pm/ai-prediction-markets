@@ -67,10 +67,9 @@ export interface QuoteProps {
 }
 
 export interface TradeProps {
-  account: Address;
+  tradeExecutor: Address;
   amount: number;
   quotes: UniswapQuoteTradeResult[] | undefined;
-  tokens: Address[]
 }
 
 export interface ApprovalRequest {

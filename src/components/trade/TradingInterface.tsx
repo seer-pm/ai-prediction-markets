@@ -1,32 +1,27 @@
 import useDebounce from "@/hooks/useDebounce";
 import { useExecuteTradeStrategy } from "@/hooks/useExecuteTradeStrategy";
 import { useGetQuotes } from "@/hooks/useGetQuotes";
+import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { TableData } from "@/types";
-import { CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
+import { collateral } from "@/utils/constants";
 import React from "react";
-import { Controller, useForm } from "react-hook-form";
-import { Address } from "viem";
-import { useBalance } from "wagmi";
+import { useForm } from "react-hook-form";
+import { Address, formatUnits } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
 import { LoadingPanel } from "./LoadingPanel";
-import { useMarketsData } from "@/hooks/useMarketsData";
-import { useCheck7702Support } from "@/hooks/useCheck7702Support";
 
 interface TradingInterfaceProps {
   markets: TableData[];
   onClose: () => void;
-  account: Address;
+  tradeExecutor: Address;
 }
 
 interface TradeFormData {
   amount: number;
-  isUse7702: boolean;
 }
 
-const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
-
 export const TradingInterface: React.FC<TradingInterfaceProps> = ({
-  account,
+  tradeExecutor,
   markets,
   onClose,
 }) => {
@@ -37,15 +32,11 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     reset,
     watch,
     setValue,
-    control,
   } = useForm<TradeFormData>({ mode: "all" });
 
   const amount = watch("amount", 0);
-  const isUse7702 = watch("isUse7702", false);
 
   const debouncedAmount = useDebounce(amount, 500);
-  const { data } = useMarketsData();
-  const { supports7702 } = useCheck7702Support();
   const {
     data: quotes,
     isLoading: isLoadingQuotes,
@@ -53,26 +44,26 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     error: errorGettingQuotes,
     progress,
   } = useGetQuotes({
-    account,
+    account: tradeExecutor,
     amount: debouncedAmount,
     tableData: markets,
   });
 
   // Get sUSDS balance
-  const { data: balanceData, isLoading: isBalanceLoading } = useBalance({
-    address: account,
-    token: collateral,
+  const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
+    address: tradeExecutor,
+    token: collateral.address,
   });
 
-  const balance = balanceData ? parseFloat(balanceData.formatted) : 0;
+  const balance = balanceData ? Number(formatUnits(balanceData.value, balanceData.decimals)) : 0;
 
-  const executeTradeMutation = useExecuteTradeStrategy(isUse7702, () => {
+  const executeTradeMutation = useExecuteTradeStrategy(() => {
     onClose();
     reset();
   });
 
   const onSubmit = ({ amount }: TradeFormData) => {
-    executeTradeMutation.mutate({ account, amount, quotes, tokens: data?.wrappedTokens ?? [] });
+    executeTradeMutation.mutate({ amount, quotes, tradeExecutor });
   };
 
   const handleMaxClick = () => {
@@ -220,29 +211,12 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
                 valueAsNumber: true,
               })}
               type="number"
-              step="0.01"
+              step="any"
               placeholder="Enter total amount to invest"
               className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={executeTradeMutation.isPending}
             />
             {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
-
-            <Controller
-              name="isUse7702"
-              control={control}
-              render={({ field }) => (
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={field.value}
-                    onChange={(e) => field.onChange(e.target.checked)}
-                    className="h-4 w-4"
-                    disabled={!supports7702}
-                  />
-                  <span>Use Batch Transactions{supports7702 ? "" : " (not supported)"}</span>
-                </label>
-              )}
-            />
           </div>
 
           <div className="flex space-x-4 mb-2">

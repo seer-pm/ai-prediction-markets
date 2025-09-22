@@ -4,16 +4,18 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
 import { CSVUpload } from "./components/CSVUpload";
+import Footer from "./components/Footer";
 import { MarketTable } from "./components/MarketTable";
+import { TradeWallet } from "./components/trade/TradeWallet";
 import { TradingInterface } from "./components/trade/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
 import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
+import { useCheckTradeExecutorCreated } from "./hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useProcessPredictions } from "./hooks/useProcessPredictions";
 import { PredictionRow } from "./types";
-import Footer from "./components/Footer";
 
 const AppContent: React.FC = () => {
   const { address: account } = useAccount();
@@ -21,6 +23,8 @@ const AppContent: React.FC = () => {
     account ? `predictions-${account}` : "predictions-default",
     []
   );
+
+  const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
@@ -73,45 +77,51 @@ const AppContent: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-4 mb-20">
+          <TradeWallet />
           {/* Header with actions */}
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">
-              Loaded {predictions.length} predictions •
-              {predictions.length === 0 && (
-                <span className="text-sm text-blue-600 ml-2">Upload your predictions to trade</span>
-              )}
-            </h2>
-            <div className="flex space-x-4">
-              {predictions.length > 0 && (
+          {checkTradeExecutorResult?.isCreated && (
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">
+                Loaded {predictions.length} predictions •
+                {predictions.length === 0 && (
+                  <span className="text-sm text-blue-600 ml-2">
+                    Upload your predictions to trade
+                  </span>
+                )}
+              </h2>
+              <div className="flex space-x-4">
+                {predictions.length > 0 && (
+                  <button
+                    onClick={() => setPredictions([])}
+                    className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                  >
+                    Clear Predictions
+                  </button>
+                )}
+                <Web3ButtonWrapper>
+                  <button
+                    onClick={handleLoadPredictions}
+                    className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
+                  </button>
+                </Web3ButtonWrapper>
                 <button
-                  onClick={() => setPredictions([])}
-                  className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                  onClick={handleStartTrading}
+                  disabled={
+                    !tableData ||
+                    tableData.filter((x) => x.difference).length === 0 ||
+                    isLoading ||
+                    !account ||
+                    !checkTradeExecutorResult?.isCreated
+                  }
+                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
                 >
-                  Clear Predictions
+                  🚀 Start Trading
                 </button>
-              )}
-              <Web3ButtonWrapper>
-                <button
-                  onClick={handleLoadPredictions}
-                  className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
-                >
-                  {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
-                </button>
-              </Web3ButtonWrapper>
-              <button
-                onClick={handleStartTrading}
-                disabled={
-                  !tableData ||
-                  tableData.filter((x) => x.difference).length === 0 ||
-                  isLoading ||
-                  !account
-                }
-                className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-              >
-                🚀 Start Trading
-              </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <MarketTable
             markets={tableData || []}
@@ -150,7 +160,7 @@ const AppContent: React.FC = () => {
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
             <TradingInterface
-              account={account!}
+              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               markets={tableData}
               onClose={() => setIsTradeDialogOpen(false)}
             />

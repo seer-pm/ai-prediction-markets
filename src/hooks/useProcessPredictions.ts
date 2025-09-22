@@ -3,16 +3,28 @@ import { useAccount } from "wagmi";
 import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useMarketsData } from "./useMarketsData";
 import { useTokensBalances } from "./useTokensBalances";
+import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
+import { formatUnits } from "viem";
+import { DECIMALS } from "@/utils/constants";
 
 const MIN_PRICE = 0.0001;
 
 export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
+  const { data: checkResult } = useCheckTradeExecutorCreated(account);
   const { data, isLoading, error } = useMarketsData();
-  const { data: balanceMapping, isLoading: isLoadingBalances } = useTokensBalances(
-    account,
-    data?.marketsData ? Object.values(data.marketsData).map((data) => data.id) : undefined
+  const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
+    checkResult?.predictedAddress,
+    data?.wrappedTokens
   );
+  const balanceMapping = balances?.reduce((acc, curr, index) => {
+    const token = data?.wrappedTokens?.[index];
+    if (!token) {
+      return acc;
+    }
+    acc[token] = Number(formatUnits(curr, DECIMALS));
+    return acc;
+  }, {} as { [key: string]: number });
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
