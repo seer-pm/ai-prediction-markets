@@ -1,6 +1,6 @@
 import { useDepositToTradeExecutor } from "@/hooks/useDepositToTradeExecutor";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
-import { collateral } from "@/utils/constants";
+import { collateral, DECIMALS } from "@/utils/constants";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { Address, formatUnits, parseUnits } from "viem";
@@ -13,7 +13,7 @@ interface DepositInterfaceProps {
 }
 
 interface DepositFormData {
-  amount: number;
+  amount: string;
 }
 
 export const DepositInterface: React.FC<DepositInterfaceProps> = ({
@@ -28,17 +28,21 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
     reset,
     watch,
     setValue,
-  } = useForm<DepositFormData>({ mode: "all" });
+  } = useForm<DepositFormData>({
+    mode: "all",
+    defaultValues: {
+      amount: "",
+    },
+  });
 
-  const amount = watch("amount", 0);
+  const amount = watch("amount");
 
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: account,
     token: collateral.address,
   });
-
-  const balance = balanceData ? Number(formatUnits(balanceData.value, balanceData.decimals)) : 0;
+  const balance = balanceData && formatUnits(balanceData.value, balanceData.decimals);
 
   const depositToTradeExecutor = useDepositToTradeExecutor(() => {
     onClose();
@@ -48,14 +52,14 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
   const onSubmit = ({ amount }: DepositFormData) => {
     depositToTradeExecutor.mutate({
       tokens: [collateral.address],
-      amounts: [parseUnits(amount.toString(), collateral.decimals)],
+      amounts: [parseUnits(amount, collateral.decimals)],
       use7702: false,
       tradeExecutor,
     });
   };
 
   const handleMaxClick = () => {
-    if (balance > 0) {
+    if (balance) {
       setValue("amount", balance, { shouldValidate: true });
     }
   };
@@ -102,10 +106,12 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
                 {isBalanceLoading ? (
                   <span className="animate-pulse">Loading...</span>
                 ) : (
-                  <span className="font-mono text-gray-900">{balance.toFixed(2)} sUSDS</span>
+                  <span className="font-mono text-gray-900">
+                    {balance ? Number(balance).toFixed(2) : 0} sUSDS
+                  </span>
                 )}
               </span>
-              {!isBalanceLoading && balance > 0 && (
+              {!isBalanceLoading && (
                 <button
                   type="button"
                   onClick={handleMaxClick}
@@ -120,8 +126,8 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
             <input
               {...register("amount", {
                 required: "Amount is required",
-                validate: (value) => value <= balance || "Not enough balance",
-                valueAsNumber: true,
+                validate: (value) =>
+                  parseUnits(value, DECIMALS) <= (balanceData?.value ?? 0n) || "Not enough balance",
               })}
               type="number"
               step="any"

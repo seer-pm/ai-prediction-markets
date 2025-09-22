@@ -69,7 +69,7 @@ const checkAndAddApproveCalls = async ({
   quotes,
 }: {
   account: Address;
-  amount: number;
+  amount: string;
   quotes: UniswapQuoteTradeResult[];
 }) => {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
@@ -86,7 +86,7 @@ const checkAndAddApproveCalls = async ({
       tokensAddresses: [collateral.address],
       account,
       spender: router,
-      amounts: parseUnits(amount.toString(), collateral.decimals),
+      amounts: parseUnits(amount, collateral.decimals),
       chainId: CHAIN_ID,
     },
     ...sellQuotes.map(({ trade }) => ({
@@ -132,12 +132,12 @@ const getTradeExecutorCalls = async ({
   quotes,
   tradeExecutor,
 }: {
-  amount: number;
+  amount: string;
   quotes: UniswapQuoteTradeResult[];
   tradeExecutor: Address;
 }) => {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
-  const parsedSplitAmount = parseUnits(amount.toString(), collateral.decimals);
+  const parsedSplitAmount = parseUnits(amount, collateral.decimals);
   const calls: Execution[] = [];
   const approveCalls = await checkAndAddApproveCalls({
     account: tradeExecutor,

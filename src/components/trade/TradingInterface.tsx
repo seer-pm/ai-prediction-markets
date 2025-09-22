@@ -3,10 +3,10 @@ import { useExecuteTradeStrategy } from "@/hooks/useExecuteTradeStrategy";
 import { useGetQuotes } from "@/hooks/useGetQuotes";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { TableData } from "@/types";
-import { collateral } from "@/utils/constants";
+import { collateral, DECIMALS } from "@/utils/constants";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { Address, formatUnits } from "viem";
+import { Address, formatUnits, parseUnits } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
 import { LoadingPanel } from "./LoadingPanel";
 
@@ -17,7 +17,7 @@ interface TradingInterfaceProps {
 }
 
 interface TradeFormData {
-  amount: number;
+  amount: string;
 }
 
 export const TradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -32,9 +32,14 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     reset,
     watch,
     setValue,
-  } = useForm<TradeFormData>({ mode: "all" });
+  } = useForm<TradeFormData>({
+    mode: "all",
+    defaultValues: {
+      amount: "",
+    },
+  });
 
-  const amount = watch("amount", 0);
+  const amount = watch("amount");
 
   const debouncedAmount = useDebounce(amount, 500);
   const {
@@ -55,7 +60,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     token: collateral.address,
   });
 
-  const balance = balanceData ? Number(formatUnits(balanceData.value, balanceData.decimals)) : 0;
+  const balance = balanceData && formatUnits(balanceData.value, balanceData.decimals);
 
   const executeTradeMutation = useExecuteTradeStrategy(() => {
     onClose();
@@ -67,7 +72,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   };
 
   const handleMaxClick = () => {
-    if (balance > 0) {
+    if (balance) {
       setValue("amount", balance, { shouldValidate: true });
     }
   };
@@ -192,10 +197,12 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
                 {isBalanceLoading ? (
                   <span className="animate-pulse">Loading...</span>
                 ) : (
-                  <span className="font-mono text-gray-900">{balance.toFixed(2)} sUSDS</span>
+                  <span className="font-mono text-gray-900">
+                    {balance ? Number(balance).toFixed(2) : 0} sUSDS
+                  </span>
                 )}
               </span>
-              {!isBalanceLoading && balance > 0 && (
+              {!isBalanceLoading && (
                 <button
                   type="button"
                   onClick={handleMaxClick}
@@ -210,8 +217,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             <input
               {...register("amount", {
                 required: "Amount is required",
-                validate: (value) => value <= balance || "Not enough balance",
-                valueAsNumber: true,
+                validate: (value) =>
+                  parseUnits(value, DECIMALS) <= (balanceData?.value ?? 0n) || "Not enough balance",
               })}
               type="number"
               step="any"

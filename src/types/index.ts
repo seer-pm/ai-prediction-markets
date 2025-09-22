@@ -62,13 +62,13 @@ export interface UniswapQuoteTradeResult {
 
 export interface QuoteProps {
   account: Address;
-  amount: number;
+  amount: string;
   tableData: TableData[];
 }
 
 export interface TradeProps {
   tradeExecutor: Address;
-  amount: number;
+  amount: string;
   quotes: UniswapQuoteTradeResult[] | undefined;
 }
 

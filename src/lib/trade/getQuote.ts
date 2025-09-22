@@ -144,8 +144,11 @@ export const getQuotes = async ({
   );
   //get sell quotes first
   const sellPromises = sellMarkets.reduce((promises, row) => {
-    const volume = Math.min(row.volumeUntilPrice, amount);
-    if (volume < VOLUME_MIN) {
+    const volume =
+      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > parseUnits(amount, DECIMALS)
+        ? amount
+        : row.volumeUntilPrice.toString();
+    if (Number(volume) < VOLUME_MIN) {
       return promises;
     }
     // get quote
@@ -153,7 +156,7 @@ export const getQuotes = async ({
       getUniswapQuote(
         chainId,
         account,
-        volume.toString(),
+        volume,
         { address: row.marketId as Address, symbol: row.repo, decimals: 18 },
         collateral,
         "sell"
@@ -187,7 +190,7 @@ export const getQuotes = async ({
   // get total collateral from sell
   const totalCollateral = Number(
     formatUnits(
-      sellQuotes.reduce((acc, curr) => acc + BigInt(curr!.value), 0n),
+      sellQuotes.reduce((acc, curr) => acc + curr.value, 0n),
       DECIMALS
     )
   );
