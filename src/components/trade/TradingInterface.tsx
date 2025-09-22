@@ -84,7 +84,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   // Strategy analysis
   const buyMarkets = markets.filter((m) => m.difference && m.difference > 0);
   const sellMarkets = markets.filter((m) => m.difference && m.difference < 0);
-
   const renderButtonText = () => {
     if (executeTradeMutation.isPending) {
       return (
@@ -228,23 +227,22 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             />
             {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
 
-            {supports7702 && (
-              <Controller
-                name="isUse7702"
-                control={control}
-                render={({ field }) => (
-                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={field.value}
-                      onChange={(e) => field.onChange(e.target.checked)}
-                      className="h-4 w-4"
-                    />
-                    <span>Use Batch Transactions</span>
-                  </label>
-                )}
-              />
-            )}
+            <Controller
+              name="isUse7702"
+              control={control}
+              render={({ field }) => (
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    className="h-4 w-4"
+                    disabled={!supports7702}
+                  />
+                  <span>Use Batch Transactions{supports7702 ? "" : " (not supported)"}</span>
+                </label>
+              )}
+            />
           </div>
 
           <div className="flex space-x-4 mb-2">
