@@ -28,7 +28,7 @@ export const WithdrawInterface: React.FC<WithdrawInterfaceProps> = ({
     reset,
     watch,
     setValue,
-  } = useForm<WithdrawFormData>({ mode: "all" });
+  } = useForm<WithdrawFormData>({ mode: "onSubmit" });
 
   const amount = watch("amount", 0);
 
@@ -56,7 +56,7 @@ export const WithdrawInterface: React.FC<WithdrawInterfaceProps> = ({
 
   const handleMaxClick = () => {
     if (balance > 0) {
-      setValue("amount", balance);
+      setValue("amount", balance, { shouldValidate: true });
     }
   };
 
@@ -129,7 +129,6 @@ export const WithdrawInterface: React.FC<WithdrawInterfaceProps> = ({
               className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={withdrawFromTradeExecutor.isPending}
             />
-            {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
           </div>
 
           <div className="flex space-x-4 mb-2">
@@ -146,7 +145,7 @@ export const WithdrawInterface: React.FC<WithdrawInterfaceProps> = ({
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={withdrawFromTradeExecutor.isPending || !!errors.amount || !amount}
             >
-              Withdraw
+              {errors.amount ? errors.amount.message : "Withdraw"}
             </button>
           </div>
         </form>

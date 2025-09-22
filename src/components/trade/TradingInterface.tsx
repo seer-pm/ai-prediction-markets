@@ -68,7 +68,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const handleMaxClick = () => {
     if (balance > 0) {
-      setValue("amount", balance);
+      setValue("amount", balance, { shouldValidate: true });
     }
   };
 
@@ -83,6 +83,9 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
           Executing Strategy...
         </div>
       );
+    }
+    if (errors.amount) {
+      return errors.amount.message;
     }
     if (isLoadingQuotes) {
       return "Getting quotes...";
@@ -216,7 +219,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={executeTradeMutation.isPending}
             />
-            {errors.amount && <p className="mt-1 text-red-600 text-sm">{errors.amount.message}</p>}
           </div>
 
           <div className="flex space-x-4 mb-2">
