@@ -80,32 +80,35 @@ const AppContent: React.FC = () => {
           <TradeWallet />
           {/* Header with actions */}
           {checkTradeExecutorResult?.isCreated && (
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
               <h2 className="text-xl font-semibold">
-                Loaded {predictions.length} predictions •
+                Loaded {predictions.length} predictions
                 {predictions.length === 0 && (
-                  <span className="text-sm text-blue-600 ml-2">
-                    Upload your predictions to trade
+                  <span className="text-sm text-blue-600 ml-2 block md:inline">
+                    • Upload your predictions to trade
                   </span>
                 )}
               </h2>
-              <div className="flex space-x-4">
+
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                 {predictions.length > 0 && (
                   <button
                     onClick={() => setPredictions([])}
-                    className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                    className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
                   >
                     Clear Predictions
                   </button>
                 )}
+
                 <Web3ButtonWrapper>
                   <button
                     onClick={handleLoadPredictions}
-                    className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+                    className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors w-full sm:w-auto text-center"
                   >
                     {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
                   </button>
                 </Web3ButtonWrapper>
+
                 <button
                   onClick={handleStartTrading}
                   disabled={
@@ -115,7 +118,7 @@ const AppContent: React.FC = () => {
                     !account ||
                     !checkTradeExecutorResult?.isCreated
                   }
-                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium w-full sm:w-auto text-center"
                 >
                   🚀 Start Trading
                 </button>

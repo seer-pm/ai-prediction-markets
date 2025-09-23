@@ -78,9 +78,10 @@ export const TradeWallet = () => {
       )}
       {account && checkTradeExecutorResult?.isCreated && (
         <div className="mx-auto bg-slate-800 rounded-2xl shadow-lg text-white">
-          <div className="flex items-center justify-between">
-            <div className="space-y-3 p-6">
-              <div className="flex items-center gap-2">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            {/* Left side: title + buttons */}
+            <div className="space-y-3 p-6 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-xl font-semibold">Trade Wallet</h3>
                 <a
                   href={
@@ -89,33 +90,36 @@ export const TradeWallet = () => {
                   }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block text-sm leading-relaxed text-slate-200hover:opacity-80"
+                  className="inline-block text-sm leading-relaxed text-slate-200 hover:opacity-80 break-all"
                 >
                   {checkTradeExecutorResult?.predictedAddress}
                 </a>
               </div>
-              <div className="flex items-center gap-4">
+
+              <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => setIsDepositDialogOpen(true)}
-                  className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200"
+                  className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                 >
                   Deposit sUSDS
                 </button>
                 <button
                   onClick={() => setIsWithdrawDialogOpen(true)}
-                  className="cursor-pointer px-5 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200"
+                  className="cursor-pointer px-5 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                 >
                   Withdraw sUSDS
                 </button>
                 <button
                   onClick={() => setIsWithdrawTokensDialogOpen(true)}
-                  className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200"
+                  className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                 >
                   Withdraw tokens
                 </button>
               </div>
             </div>
-            <div className="p-6 flex flex-col items-center gap-2 border-l border-white">
+
+            {/* Right side: balance */}
+            <div className="p-6 flex flex-col items-center gap-2 border-t md:border-t-0 md:border-l border-white">
               <h3 className="text-xl font-semibold">sUSDS Balance</h3>
               <h4 className="font-semibold">
                 {isBalanceLoading ? (

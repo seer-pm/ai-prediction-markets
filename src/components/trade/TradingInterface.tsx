@@ -228,18 +228,19 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
             />
           </div>
 
-          <div className="flex space-x-4 mb-2">
+          <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0 mb-2">
             <button
               type="button"
               onClick={onClose}
-              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-3 sm:py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={executeTradeMutation.isPending}
             >
               Cancel
             </button>
+
             <button
               type="submit"
-              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 sm:py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={
                 executeTradeMutation.isPending ||
                 !!errors.amount ||

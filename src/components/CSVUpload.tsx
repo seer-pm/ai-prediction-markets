@@ -57,8 +57,10 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
           <h3 className="font-medium text-gray-900 mb-2">Required CSV Format</h3>
           <div className="bg-white p-3 rounded border font-mono text-sm">
             <div className="text-gray-600">repo,parent,weight</div>
-            <div>https://github.com/a16z/helios,ethereum,0.01363775945</div>
-            <div>https://github.com/ethereum/go-ethereum,ethereum,0.02100000</div>
+            <div className="break-all">https://github.com/a16z/helios,ethereum,0.01363775945</div>
+            <div className="break-all">
+              https://github.com/ethereum/go-ethereum,ethereum,0.02100000
+            </div>
             <div className="text-gray-400">...</div>
           </div>
           <p className="text-xs text-gray-600 mt-2">

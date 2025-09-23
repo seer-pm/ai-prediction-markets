@@ -39,65 +39,64 @@ export const MarketTable: React.FC<MarketTableProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[700px]">
+          {/* min-width keeps structure for scroll */}
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Repository
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Balance
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Parent
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Current Weight
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Predicted Weight
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Difference
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-gray-200 text-sm">
             {markets.map((market) => {
               const { marketId, repo, parent, currentPrice, predictedWeight, difference, balance } =
                 market;
-              if (repo === "Invalid result") {
-                return null;
-              }
+
+              if (repo === "Invalid result") return null;
+
               return (
-                <tr key={marketId}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">{repo}</div>
+                <tr key={marketId} className="hover:bg-gray-50">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                    <div className="text-gray-900 max-w-[120px] sm:max-w-xs truncate" title={repo}>
+                      {repo}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     {isLoadingBalances ? (
                       <div className="animate-pulse">
-                        <div className="h-4 bg-gray-300 rounded w-20"></div>
+                        <div className="h-4 bg-gray-300 rounded w-16 sm:w-20"></div>
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-900 max-w-xs truncate">
-                        {balance?.toFixed(2) ?? "-"}
-                      </div>
+                      <div className="text-gray-900">{balance?.toFixed(2) ?? "-"}</div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {parent ?? "-"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">{parent ?? "-"}</td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
                     {currentPrice?.toFixed(8) ?? "-"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
                     {predictedWeight?.toFixed(8) ?? "-"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     {difference ? (
                       <span
-                        className={`text-sm font-medium font-mono ${
+                        className={`font-medium font-mono ${
                           difference > 0 ? "text-green-600" : "text-red-600"
                         }`}
                       >
@@ -105,7 +104,7 @@ export const MarketTable: React.FC<MarketTableProps> = ({
                         {difference.toFixed(8)}
                       </span>
                     ) : (
-                      <span className="text-sm text-gray-900 font-mono">-</span>
+                      <span className="text-gray-900 font-mono">-</span>
                     )}
                   </td>
                 </tr>
