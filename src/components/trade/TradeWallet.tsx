@@ -62,10 +62,9 @@ export const TradeWallet = () => {
       )}
       {account && !checkTradeExecutorResult?.isCreated && (
         <div className="mx-auto p-6 bg-slate-800 rounded-2xl shadow-lg text-white">
-          <h3 className="text-xl font-semibold mb-3">Trade Wallet Not Created</h3>
+          <h3 className="text-xl font-semibold mb-3">Trade Wallet</h3>
           <p className="text-sm leading-relaxed text-slate-200 mb-6">
-            You need to create a trade wallet to execute trades, manage positions, and redeem tokens
-            when the market resolves.
+            Create a trade wallet to make multiple trades and redeem tokens in a single transaction.
           </p>
           <button
             onClick={() => createTradeExecutorMutate.mutate({ account })}
