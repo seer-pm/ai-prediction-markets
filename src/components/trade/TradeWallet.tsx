@@ -113,7 +113,7 @@ export const TradeWallet = () => {
                   onClick={() => setIsWithdrawTokensDialogOpen(true)}
                   className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                 >
-                  Withdraw tokens
+                  Withdraw outcome tokens
                 </button>
               </div>
             </div>

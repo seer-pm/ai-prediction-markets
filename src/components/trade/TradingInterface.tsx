@@ -103,7 +103,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       {/* Header with Close Button */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
         <div>
-          <h3 className="text-xl font-bold text-white">Execute AI Strategy</h3>
+          <h3 className="text-xl font-bold text-white">Execute Strategy</h3>
         </div>
         <button
           onClick={onClose}
@@ -166,28 +166,21 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
         <div className="px-4 py-2 bg-gray-50 rounded-lg">
           <h4 className="font-medium text-gray-800 mb-2">Strategy Overview</h4>
-          <div className="space-y-2 text-sm text-gray-600">
-            <div className="flex items-center">
-              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-              Mint complete sets using all inputs with sUSDS.
-            </div>
-            <div className="flex items-center">
-              <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-              Sell overvalued markets down to the predicted price.
-            </div>
-            <div className="flex items-center">
-              <span className="w-2 h-2 bg-green-500 rounded-full mr-2 whitespace-no-breaks"></span>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 marker:font-semibold">
+            <li>Mint complete sets using all sUSDS inputs.</li>
+            <li>Sell overvalued markets down to the predicted price.</li>
+            <li>
               Use the sUSDS obtained from selling to buy undervalued markets up to the predicted
               price.
-            </div>
-          </div>
+            </li>
+          </ol>
         </div>
 
         {/* Trading Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Investment Amount (sUSDS)
+              Total Amount (sUSDS)
             </label>
 
             {/* Balance Display */}

@@ -1,6 +1,7 @@
 import { useMarketsData } from "@/hooks/useMarketsData";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useWithdrawFromTradeExecutor } from "@/hooks/useWithdrawFromTradeExecutor";
+import { ExclamationCircleIcon } from "@/lib/icons";
 import React from "react";
 import { Address } from "viem";
 
@@ -42,7 +43,7 @@ export const WithdrawTokensInterface: React.FC<WithdrawTokensInterfaceProps> = (
       {/* Header with Close Button */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
         <div>
-          <h3 className="text-xl font-bold text-white">Withdraw tokens</h3>
+          <h3 className="text-xl font-bold text-white">Withdraw outcome tokens</h3>
           <p className="text-sm text-white">
             Withdraw all positions from trade wallet to your account
           </p>
@@ -63,6 +64,19 @@ export const WithdrawTokensInterface: React.FC<WithdrawTokensInterfaceProps> = (
       </div>
 
       <div className="px-6 py-4 space-y-4">
+        {sumBalances > 0n && (
+          <div className="flex items-start space-x-3 rounded border border-yellow-400 bg-yellow-50 p-4">
+            <ExclamationCircleIcon fill="#CA8A04" />
+            <div className="flex-1 text-sm text-yellow-800">
+              <p className="font-medium">Be careful</p>
+              <p className="mt-1">
+                If you withdraw your outcome tokens, you will need to trade/redeem them one by one
+                which will take a lot of transactions. Only do this if you know what you are doing
+                (or if you don&apos;t mind a lot of clicking).
+              </p>
+            </div>
+          </div>
+        )}
         {isLoadingBalances ? (
           <p>Checking balances...</p>
         ) : sumBalances === 0n ? (

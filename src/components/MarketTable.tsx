@@ -34,8 +34,8 @@ export const MarketTable: React.FC<MarketTableProps> = ({
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-6 border-b">
-        <h2 className="text-2xl font-bold">Market Analysis</h2>
-        <p className="text-gray-600">Markets ranked by current weight</p>
+        <h2 className="text-2xl font-bold">Repository Contribution to Ethereum</h2>
+        <p className="text-gray-600">Repositories ranked by current weight</p>
       </div>
 
       <div className="overflow-x-auto">
