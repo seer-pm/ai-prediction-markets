@@ -9,7 +9,6 @@ import { MarketTable } from "./components/MarketTable";
 import { TradeWallet } from "./components/trade/TradeWallet";
 import { TradingInterface } from "./components/trade/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
-import Web3ButtonWrapper from "./components/Web3ButtonWrapper";
 import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { useCheckTradeExecutorCreated } from "./hooks/useCheckTradeExecutorCreated";
@@ -19,22 +18,13 @@ import { PredictionRow } from "./types";
 
 const AppContent: React.FC = () => {
   const { address: account } = useAccount();
-  const [predictions, setPredictions] = useLocalStorage<PredictionRow[]>(
-    account ? `predictions-${account}` : "predictions-default",
-    []
-  );
+  const [predictions, setPredictions] = useLocalStorage<PredictionRow[]>("predictions-default", []);
 
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-  const { disconnect } = useDisconnect({
-    mutation: {
-      onSuccess() {
-        setPredictions([]);
-      },
-    },
-  });
+  const { disconnect } = useDisconnect();
 
   const {
     data: tableData,
@@ -79,36 +69,28 @@ const AppContent: React.FC = () => {
         <div className="space-y-4 mb-20">
           <TradeWallet />
           {/* Header with actions */}
-          {checkTradeExecutorResult?.isCreated && (
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-              <h2 className="text-xl font-semibold">
-                Loaded {predictions.length} predictions
-                {predictions.length === 0 && (
-                  <span className="text-sm text-blue-600 ml-2 block md:inline">
-                    • Upload your predictions to trade
-                  </span>
-                )}
-              </h2>
 
-              <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                {predictions.length > 0 && (
-                  <button
-                    onClick={() => setPredictions([])}
-                    className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
-                  >
-                    Clear Predictions
-                  </button>
-                )}
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
 
-                <Web3ButtonWrapper>
-                  <button
-                    onClick={handleLoadPredictions}
-                    className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors w-full sm:w-auto text-center"
-                  >
-                    {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
-                  </button>
-                </Web3ButtonWrapper>
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+              {predictions.length > 0 && (
+                <button
+                  onClick={() => setPredictions([])}
+                  className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
+                >
+                  Clear Predictions
+                </button>
+              )}
 
+              <button
+                onClick={handleLoadPredictions}
+                className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors w-full sm:w-auto text-center"
+              >
+                {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
+              </button>
+
+              {checkTradeExecutorResult?.isCreated && (
                 <button
                   onClick={handleStartTrading}
                   disabled={
@@ -122,9 +104,9 @@ const AppContent: React.FC = () => {
                 >
                   🚀 Start Trading
                 </button>
-              </div>
+              )}
             </div>
-          )}
+          </div>
 
           <MarketTable
             markets={tableData || []}
