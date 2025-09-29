@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { Address, formatUnits, parseUnits } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
 import { LoadingPanel } from "./LoadingPanel";
+import { useMarketsData } from "@/hooks/useMarketsData";
 
 interface TradingInterfaceProps {
   markets: TableData[];
@@ -43,7 +44,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const debouncedAmount = useDebounce(amount, 500);
   const {
-    data: quotes,
+    data: getQuotesResult,
     isLoading: isLoadingQuotes,
     isError: isErrorGettingQuotes,
     error: errorGettingQuotes,
@@ -53,6 +54,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     amount: debouncedAmount,
     tableData: markets,
   });
+  const { data } = useMarketsData();
 
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
@@ -68,7 +70,12 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   });
 
   const onSubmit = ({ amount }: TradeFormData) => {
-    executeTradeMutation.mutate({ amount, quotes, tradeExecutor });
+    executeTradeMutation.mutate({
+      amount,
+      getQuotesResult,
+      tradeExecutor,
+      wrappedTokens: data?.wrappedTokens ?? [],
+    });
   };
 
   const handleMaxClick = () => {
@@ -239,7 +246,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
                 !!errors.amount ||
                 !amount ||
                 isLoadingQuotes ||
-                !quotes ||
+                !getQuotesResult ||
                 isErrorGettingQuotes
               }
             >

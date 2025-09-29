@@ -1,13 +1,11 @@
-import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
-import { readContractsInBatch } from "@/lib/on-chain/readContractsInBatch";
 import { toastifyTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
-import { ApprovalRequest, TradeProps, UniswapQuoteTradeResult } from "@/types";
+import { TradeProps, UniswapQuoteTradeResult } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   AI_PREDICTION_MARKET_ID,
@@ -35,43 +33,25 @@ function splitFromRouter(router: Address, amount: bigint): Execution {
   };
 }
 
-const fetchAllowances = async (
-  account: Address,
-  requesters: { address: Address; spender: Address }[]
-) => {
-  try {
-    const allowances: bigint[] = await readContractsInBatch(
-      requesters.map(({ address, spender }) => ({
-        abi: erc20Abi,
-        address,
-        functionName: "allowance",
-        args: [account, spender],
-        chainId: CHAIN_ID,
-      })),
-      CHAIN_ID,
-      50,
-      true
-    );
-    return allowances.reduce((acc, curr, index) => {
-      const { address, spender } = requesters[index];
-      const allowanceKey = `${address}-${spender}`;
-      acc[allowanceKey] = curr;
-      return acc;
-    }, {} as { [key: string]: bigint });
-  } catch {
-    return {};
-  }
-};
+function mergeFromRouter(router: Address, amount: bigint): Execution {
+  return {
+    to: router,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: RouterAbi,
+      functionName: "mergePositions",
+      args: [collateral.address, AI_PREDICTION_MARKET_ID, amount],
+    }),
+  };
+}
 
 const checkAndAddApproveCalls = async ({
-  account,
+  tradeExecutor,
   amount,
-  quotes,
-}: {
-  account: Address;
-  amount: string;
-  quotes: UniswapQuoteTradeResult[];
-}) => {
+  getQuotesResult,
+  wrappedTokens,
+}: TradeProps) => {
+  const { quotes, mergeAmount } = getQuotesResult!;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const [buyQuotes, sellQuotes] = quotes.reduce(
     (acc, quote) => {
@@ -80,88 +60,103 @@ const checkAndAddApproveCalls = async ({
     },
     [[], []] as [UniswapQuoteTradeResult[], UniswapQuoteTradeResult[]]
   );
-  // split + sell + buy approval requests
-  const approvalRequests: ApprovalRequest[] = [
+  // split + sell + merge + buy approval calls
+  const calls: Execution[] = [
     {
       tokensAddresses: [collateral.address],
-      account,
+      account: tradeExecutor,
       spender: router,
       amounts: parseUnits(amount, collateral.decimals),
       chainId: CHAIN_ID,
     },
     ...sellQuotes.map(({ trade }) => ({
       tokensAddresses: [trade.executionPrice.baseCurrency.address as `0x${string}`],
-      account,
+      account: tradeExecutor,
       spender: trade.approveAddress as `0x${string}`,
       amounts: getMaximumAmountIn(trade),
       chainId: trade.chainId as SupportedChain,
     })),
+    ...(mergeAmount > 0n
+      ? wrappedTokens.map((token) => ({
+          tokensAddresses: [token],
+          account: tradeExecutor,
+          spender: router,
+          amounts: mergeAmount,
+          chainId: CHAIN_ID,
+        }))
+      : []),
     {
       tokensAddresses: [buyQuotes[0].trade.executionPrice.baseCurrency.address as `0x${string}`],
-      account,
+      account: tradeExecutor,
       spender: buyQuotes[0].trade.approveAddress as `0x${string}`,
       amounts: buyQuotes.reduce((acc, curr) => acc + getMaximumAmountIn(curr.trade), 0n),
       chainId: CHAIN_ID,
     },
-  ];
-  const allowanceMapping = await fetchAllowances(
-    account,
-    approvalRequests.map((request) => ({
-      address: request.tokensAddresses[0],
-      spender: request.spender,
-    }))
-  );
-
-  const calls: Execution[] = [];
-  // only add approvals without enough allowance
-
-  approvalRequests.map((request) => {
-    const { tokensAddresses, spender } = request;
-    const amount = request.amounts as bigint;
-    const allowanceKey = `${tokensAddresses[0]}-${spender}`;
-    if (amount > allowanceMapping[allowanceKey]) {
-      calls.push(...getApprovals7702(request));
-    }
-  });
+  ]
+    .map((request) => getApprovals7702(request))
+    .flat();
 
   return calls;
 };
 
 const getTradeExecutorCalls = async ({
   amount,
-  quotes,
+  getQuotesResult,
   tradeExecutor,
-}: {
-  amount: string;
-  quotes: UniswapQuoteTradeResult[];
-  tradeExecutor: Address;
-}) => {
+  wrappedTokens,
+}: TradeProps) => {
+  const { mergeAmount } = getQuotesResult!;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
   const calls: Execution[] = [];
   const approveCalls = await checkAndAddApproveCalls({
-    account: tradeExecutor,
     amount,
-    quotes,
+    getQuotesResult,
+    tradeExecutor,
+    wrappedTokens,
   });
   calls.push(...approveCalls);
   calls.push(splitFromRouter(router, parsedSplitAmount));
-  // push trade transactions
-  const tradeTransactions = await Promise.all(
-    quotes.map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
+  // push sell trade transactions
+  const sellTradeTransactions = await Promise.all(
+    getQuotesResult!.quotes
+      .filter((quote) => quote.swapType === "sell")
+      .map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
   );
-  calls.push(...tradeTransactions);
+  calls.push(...sellTradeTransactions);
+
+  // push merge
+  if (mergeAmount > 0n) {
+    calls.push(mergeFromRouter(router, mergeAmount));
+  }
+
+  // push buy trade transactions
+  const buyTradeTransactions = await Promise.all(
+    getQuotesResult!.quotes
+      .filter((quote) => quote.swapType === "buy")
+      .map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
+  );
+  calls.push(...buyTradeTransactions);
   return calls;
 };
 
-const executeTradeStrategyContract = async ({ amount, quotes, tradeExecutor }: TradeProps) => {
-  if (!quotes || !quotes.length) {
+const executeTradeStrategyContract = async ({
+  amount,
+  getQuotesResult,
+  tradeExecutor,
+  wrappedTokens,
+}: TradeProps) => {
+  if (!getQuotesResult?.quotes || !getQuotesResult.quotes.length) {
     throw new Error("No quote found");
+  }
+  if (!wrappedTokens.length) {
+    throw new Error("No token found");
   }
   const tradeExecutorCalls = await getTradeExecutorCalls({
     amount,
-    quotes,
+    getQuotesResult,
     tradeExecutor,
+    wrappedTokens,
   });
 
   const writePromise = writeContract(config, {

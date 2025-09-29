@@ -7,7 +7,13 @@ export const useGetQuotes = ({ account, amount, tableData }: QuoteProps) => {
   const [progress, setProgress] = useState(0);
   const query = useQuery({
     enabled: !!account && Number(amount) > 0 && tableData.length > 0,
-    queryKey: ["useGetQuotes", account, amount, tableData],
+    retry: false,
+    queryKey: [
+      "useGetQuotes",
+      account,
+      amount,
+      tableData.map((data) => ({ ...data, balance: data.balance?.toString() })),
+    ],
     queryFn: () => {
       setProgress(0);
       return getQuotes({

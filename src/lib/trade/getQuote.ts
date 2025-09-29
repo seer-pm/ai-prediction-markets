@@ -1,5 +1,5 @@
 import { QuoteTradeFn, UniswapQuoteTradeResult, Token, QuoteProps, TableData } from "@/types";
-import { isTwoStringsEqual } from "@/utils/common";
+import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
 import { CHAIN_ID, collateral, DECIMALS, NATIVE_TOKEN } from "@/utils/constants";
 import {
   Currency,
@@ -144,9 +144,10 @@ export const getQuotes = async ({
   );
   //get sell quotes first
   const sellPromises = sellMarkets.reduce((promises, row) => {
+    const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > parseUnits(amount, DECIMALS)
-        ? amount
+      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
+        ? formatUnits(availableSellVolume, DECIMALS)
         : row.volumeUntilPrice.toString();
     if (Number(volume) < VOLUME_MIN) {
       return promises;
@@ -178,22 +179,27 @@ export const getQuotes = async ({
   if (!sellPromises.length) {
     throw new Error("Quote Error: No sell route found");
   }
-
+  const sellTokenMapping: { [key: string]: bigint } = {};
   const sellQuoteResults = await Promise.allSettled(sellPromises);
   const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
     if (result.status === "fulfilled") {
       quotes.push(result.value);
+      sellTokenMapping[result.value.sellToken.toLowerCase()] = BigInt(result.value.sellAmount);
     }
     return quotes;
   }, [] as UniswapQuoteTradeResult[]);
 
-  // get total collateral from sell
-  const totalCollateral = Number(
-    formatUnits(
-      sellQuotes.reduce((acc, curr) => acc + curr.value, 0n),
-      DECIMALS
-    )
+  const collateralFromSell = sellQuotes.reduce((acc, curr) => acc + BigInt(curr!.value), 0n);
+
+  //get new balances
+  const newBalances = tableData.map(
+    (row) =>
+      (row.balance ?? 0n) + parseUnits(amount, DECIMALS) - (sellTokenMapping[row.marketId] ?? 0n)
   );
+  //get collateral from merge
+  const collateralFromMerge = minBigIntArray(newBalances);
+
+  const totalCollateral = collateralFromSell + collateralFromMerge;
 
   if (!totalCollateral) {
     throw new Error(`Quote Error: Cannot sell to ${collateral.symbol}`);
@@ -202,11 +208,14 @@ export const getQuotes = async ({
   // get buy quotes
   const sumBuyDifference = buyMarkets.reduce((acc, curr) => acc + curr.difference!, 0);
   const buyPromises = buyMarkets.reduce((promises, row) => {
-    const volume = Math.min(
-      row.volumeUntilPrice,
-      (row.difference! / sumBuyDifference) * totalCollateral
-    );
-    if (volume < VOLUME_MIN) {
+    const availableBuyVolume =
+      (parseUnits(row.difference!.toString(), DECIMALS) * totalCollateral) /
+      parseUnits(sumBuyDifference!.toString(), DECIMALS);
+    const volume =
+      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableBuyVolume
+        ? formatUnits(availableBuyVolume, DECIMALS)
+        : row.volumeUntilPrice.toString();
+    if (Number(volume) < VOLUME_MIN) {
       return promises;
     }
     // get quote
@@ -248,5 +257,5 @@ export const getQuotes = async ({
     throw new Error(`Quote Error: Cannot buy from ${collateral.symbol}`);
   }
   // sell first, then buy
-  return [...sellQuotes, ...buyQuotes];
+  return { quotes: [...sellQuotes, ...buyQuotes], mergeAmount: collateralFromMerge };
 };

@@ -1,5 +1,7 @@
 import { TableData } from "@/types";
+import { DECIMALS } from "@/utils/constants";
 import React from "react";
+import { formatUnits } from "viem";
 
 interface MarketTableProps {
   markets: TableData[];
@@ -83,7 +85,11 @@ export const MarketTable: React.FC<MarketTableProps> = ({
                         <div className="h-4 bg-gray-300 rounded w-16 sm:w-20"></div>
                       </div>
                     ) : (
-                      <div className="text-gray-900">{balance?.toFixed(2) ?? "-"}</div>
+                      <div className="text-gray-900">
+                        {typeof balance === "bigint"
+                          ? Number(formatUnits(balance, DECIMALS)).toFixed(2)
+                          : "-"}
+                      </div>
                     )}
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">{parent ?? "-"}</td>
