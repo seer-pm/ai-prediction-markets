@@ -62,13 +62,17 @@ const checkAndAddApproveCalls = async ({
   );
   // split + sell + merge + buy approval calls
   const calls: Execution[] = [
-    {
-      tokensAddresses: [collateral.address],
-      account: tradeExecutor,
-      spender: router,
-      amounts: parseUnits(amount, collateral.decimals),
-      chainId: CHAIN_ID,
-    },
+    ...(Number(amount) > 0
+      ? [
+          {
+            tokensAddresses: [collateral.address],
+            account: tradeExecutor,
+            spender: router,
+            amounts: parseUnits(amount, collateral.decimals),
+            chainId: CHAIN_ID,
+          },
+        ]
+      : []),
     ...sellQuotes.map(({ trade }) => ({
       tokensAddresses: [trade.executionPrice.baseCurrency.address as `0x${string}`],
       account: tradeExecutor,
@@ -116,7 +120,9 @@ const getTradeExecutorCalls = async ({
     wrappedTokens,
   });
   calls.push(...approveCalls);
-  calls.push(splitFromRouter(router, parsedSplitAmount));
+  if (Number(amount) > 0) {
+    calls.push(splitFromRouter(router, parsedSplitAmount));
+  }
   // push sell trade transactions
   const sellTradeTransactions = await Promise.all(
     getQuotesResult!.quotes

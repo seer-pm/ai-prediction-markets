@@ -110,7 +110,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       {/* Header with Close Button */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
         <div>
-          <h3 className="text-xl font-bold text-white">Execute Strategy</h3>
+          <h3 className="text-xl font-bold text-white">Execute Advanced Strategy</h3>
         </div>
         <button
           onClick={onClose}
@@ -174,12 +174,13 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         <div className="px-4 py-2 bg-gray-50 rounded-lg">
           <h4 className="font-medium text-gray-800 mb-2">Strategy Overview</h4>
           <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 marker:font-semibold">
-            <li>Mint complete sets using all sUSDS inputs.</li>
-            <li>Sell overvalued markets down to the predicted price.</li>
+            <li>Mint complete sets using all sUSDS inputs (optional).</li>
             <li>
-              Use the sUSDS obtained from selling to buy undervalued markets up to the predicted
+              Use both minted and existing tokens, sell overvalued markets down to the predicted
               price.
             </li>
+            <li>Merge complete sets to sUSDS (if possible).</li>
+            <li>Use the available sUSDS to buy undervalued markets up to the predicted price.</li>
           </ol>
         </div>
 
@@ -187,7 +188,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Amount (sUSDS)
+              Amount to mint (sUSDS)
             </label>
 
             {/* Balance Display */}
@@ -216,16 +217,19 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
             <input
               {...register("amount", {
-                required: "Amount is required",
                 validate: (value) =>
                   parseUnits(value, DECIMALS) <= (balanceData?.value ?? 0n) || "Not enough balance",
               })}
               type="number"
               step="any"
-              placeholder="Enter total amount to invest"
+              placeholder="Enter amount to mint"
               className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={executeTradeMutation.isPending}
             />
+            <p className="text-sm text-gray-600">
+              Note: You can execute this strategy without minting, as long as you already hold {">"}{" "}
+              0.01 overvalued tokens.
+            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0 mb-2">
@@ -244,7 +248,6 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
               disabled={
                 executeTradeMutation.isPending ||
                 !!errors.amount ||
-                !amount ||
                 isLoadingQuotes ||
                 !getQuotesResult ||
                 isErrorGettingQuotes

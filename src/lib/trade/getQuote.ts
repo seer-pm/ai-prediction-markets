@@ -1,6 +1,6 @@
 import { QuoteTradeFn, UniswapQuoteTradeResult, Token, QuoteProps, TableData } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
-import { CHAIN_ID, collateral, DECIMALS, NATIVE_TOKEN } from "@/utils/constants";
+import { CHAIN_ID, collateral, DECIMALS, NATIVE_TOKEN, VOLUME_MIN } from "@/utils/constants";
 import {
   Currency,
   CurrencyAmount,
@@ -123,7 +123,6 @@ export const getUniswapQuote: QuoteTradeFn = async (
   };
 };
 
-const VOLUME_MIN = 0.01;
 type ProgressCallback = (current: number) => void;
 export const getQuotes = async ({
   account,
