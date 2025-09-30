@@ -17,7 +17,7 @@ export interface TableData {
   marketId: string;
   hasPrediction: boolean;
   volumeUntilPrice: number;
-  balance?: number;
+  balance?: bigint;
 }
 
 export interface TradeRequest {
@@ -69,7 +69,8 @@ export interface QuoteProps {
 export interface TradeProps {
   tradeExecutor: Address;
   amount: string;
-  quotes: UniswapQuoteTradeResult[] | undefined;
+  getQuotesResult: { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint } | undefined;
+  wrappedTokens: Address[]
 }
 
 export interface ApprovalRequest {

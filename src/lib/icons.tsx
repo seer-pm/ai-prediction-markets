@@ -123,8 +123,19 @@ export const CheckIcon = () => (
   </svg>
 );
 
-export const CheckCircleIcon = ({ width = 14, height = 14, ...props }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+export const CheckCircleIcon = ({
+  width = 14,
+  height = 14,
+  ...props
+}: SVGAttributes<SVGElement>) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
     <path
       fillRule="evenodd"
       clipRule="evenodd"
@@ -185,8 +196,18 @@ export const ArrowPath = () => (
   </svg>
 );
 
-export const DownArrow = ({ width = 16, height = 16, fill = "#fff" }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const DownArrow = ({
+  width = 16,
+  height = 16,
+  fill = "#fff",
+}: SVGAttributes<SVGElement>) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 16 16"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <g clipPath="url(#a)">
       <path
         d="m7.378 12.305-7.12-7.01a.856.856 0 0 1 0-1.224l.83-.817a.89.89 0 0 1 1.242-.002L8 8.807l5.67-5.555a.89.89 0 0 1 1.242.002l.83.817a.856.856 0 0 1 0 1.224l-7.12 7.01a.89.89 0 0 1-1.244 0Z"
@@ -307,7 +328,13 @@ export const SecuredByKleros = () => (
 );
 
 export const EtherscanIcon = ({ width = 17, height = 16 }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 17 16"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <g clipPath="url(#clip0_7838_1787)">
       <path
         fillRule="evenodd"
@@ -391,7 +418,13 @@ export const LoadingIcon = () => (
 );
 
 export const CloseCircleIcon = ({ width = 32, height = 32 }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 32 32"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <g clipPath="url(#clip0_18785_48393)">
       <path
         d="M16 0C7.16429 0 0 7.16429 0 16C0 24.8357 7.16429 32 16 32C24.8357 32 32 24.8357 32 16C32 7.16429 24.8357 0 16 0ZM21.9071 22.0786L19.55 22.0679L16 17.8357L12.4536 22.0643L10.0929 22.075C9.93571 22.075 9.80714 21.95 9.80714 21.7893C9.80714 21.7214 9.83214 21.6571 9.875 21.6036L14.5214 16.0679L9.875 10.5357C9.83184 10.4834 9.8079 10.4178 9.80714 10.35C9.80714 10.1929 9.93571 10.0643 10.0929 10.0643L12.4536 10.075L16 14.3071L19.5464 10.0786L21.9036 10.0679C22.0607 10.0679 22.1893 10.1929 22.1893 10.3536C22.1893 10.4214 22.1643 10.4857 22.1214 10.5393L17.4821 16.0714L22.125 21.6071C22.1679 21.6607 22.1929 21.725 22.1929 21.7929C22.1929 21.95 22.0643 22.0786 21.9071 22.0786Z"
@@ -407,7 +440,13 @@ export const CloseCircleIcon = ({ width = 32, height = 32 }: SVGAttributes<SVGEl
 );
 
 export const ClockIcon = ({ width = 14, height = 14 }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 14 14"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <path
       d="M7 0C3.133 0 0 3.133 0 7s3.133 7 7 7 7-3.133 7-7-3.133-7-7-7Zm0 12.645A5.644 5.644 0 0 1 1.355 7 5.644 5.644 0 0 1 7 1.355 5.644 5.644 0 0 1 12.645 7 5.644 5.644 0 0 1 7 12.645Zm1.744-2.947L6.348 7.957a.34.34 0 0 1-.138-.274V3.048a.34.34 0 0 1 .338-.338h.904a.34.34 0 0 1 .338.338v4L9.676 8.42c.152.11.183.322.073.474l-.53.731a.341.341 0 0 1-.475.073Z"
       fill="#24CDFE"
@@ -415,8 +454,18 @@ export const ClockIcon = ({ width = 14, height = 14 }: SVGAttributes<SVGElement>
   </svg>
 );
 
-export const CloseCircleOutlineIcon = ({ width = 24, height = 24, fill = "#F60C36" }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const CloseCircleOutlineIcon = ({
+  width = 24,
+  height = 24,
+  fill = "#F60C36",
+}: SVGAttributes<SVGElement>) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <g clipPath="url(#clip0_18785_48426)">
       <path
         fillRule="evenodd"
@@ -434,7 +483,13 @@ export const CloseCircleOutlineIcon = ({ width = 24, height = 24, fill = "#F60C3
 );
 
 export const InfoCircleIcon = ({ width, height }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <path
       fillRule="evenodd"
       clipRule="evenodd"
@@ -444,8 +499,18 @@ export const InfoCircleIcon = ({ width, height }: SVGAttributes<SVGElement>) => 
   </svg>
 );
 
-export const ExclamationCircleIcon = ({ width = 24, height = 24, fill="currentColor" }: SVGAttributes<SVGElement>) => (
-  <svg width={width} height={height} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const ExclamationCircleIcon = ({
+  width = 24,
+  height = 24,
+  fill = "currentColor",
+}: SVGAttributes<SVGElement>) => (
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <path
       fillRule="evenodd"
       clipRule="evenodd"
@@ -456,7 +521,7 @@ export const ExclamationCircleIcon = ({ width = 24, height = 24, fill="currentCo
 );
 
 export const PlusIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20px" fill="#000">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20px" fill="#fff">
     <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
   </svg>
 );
@@ -516,7 +581,14 @@ export const EyeIcon = () => (
 );
 
 export const UploadIcon = ({ className }: SVGAttributes<SVGElement>) => (
-  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+  <svg
+    width={24}
+    height={24}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
     <g clipPath="url(#clip0_22333_5836)">
       <path
         d="M8.40642 5.37797H10.7775V16.9098C10.7775 17.0598 10.893 17.1825 11.0342 17.1825H12.9594C13.1005 17.1825 13.216 17.0598 13.216 16.9098V5.37797H15.5936C15.8086 5.37797 15.9273 5.1155 15.7957 4.93824L12.2021 0.104631C12.1781 0.0720376 12.1474 0.0456777 12.1124 0.0275495C12.0774 0.00942119 12.039 0 12 0C11.961 0 11.9226 0.00942119 11.8876 0.0275495C11.8525 0.0456777 11.8219 0.0720376 11.7979 0.104631L8.20428 4.93484C8.07273 5.1155 8.19144 5.37797 8.40642 5.37797ZM23.7433 15.8872H21.8182C21.677 15.8872 21.5615 16.0099 21.5615 16.1599V21.4093H2.4385V16.1599C2.4385 16.0099 2.32299 15.8872 2.18182 15.8872H0.256684C0.115508 15.8872 0 16.0099 0 16.1599V22.9092C0 23.5125 0.458824 24 1.02674 24H22.9733C23.5412 24 24 23.5125 24 22.9092V16.1599C24 16.0099 23.8845 15.8872 23.7433 15.8872Z"
@@ -540,7 +612,14 @@ export const PolicyIcon = () => (
   </svg>
 );
 export const ExternalLinkIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width={17} height={16} viewBox="0,0,256,256">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    x="0px"
+    y="0px"
+    width={17}
+    height={16}
+    viewBox="0,0,256,256"
+  >
     <g
       fill="#3992dd"
       fillRule="nonzero"
@@ -641,13 +720,25 @@ export const Union = ({ fill = "white" }) => (
 );
 
 export const ArrowDropUp = ({ fill = "#5f6368" }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" height="24px" width="24px" viewBox="0 -960 960 960" fill={fill}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    height="24px"
+    width="24px"
+    viewBox="0 -960 960 960"
+    fill={fill}
+  >
     <path d="m280-400 200-200 200 200H280Z" />
   </svg>
 );
 
 export const ArrowDropDown = ({ fill = "#5f6368" }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill={fill}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    height="24px"
+    viewBox="0 -960 960 960"
+    width="24px"
+    fill={fill}
+  >
     <path d="M480-360 280-560h400L480-360Z" />
   </svg>
 );
@@ -688,7 +779,13 @@ export const MyMarket = ({ fill = "#9747FF" }) => (
 );
 
 export const Menu = ({ fill = "white" }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill={fill}>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    height="24px"
+    viewBox="0 -960 960 960"
+    width="24px"
+    fill={fill}
+  >
     <path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z" />
   </svg>
 );
@@ -710,7 +807,13 @@ export const Filter = ({ fill = "#9747FF" }) => (
 );
 
 export const Parameter = ({ fill = "#9747FF", width = "16px", height = "16px" }) => (
-  <svg width={width} height={height} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={width}
+    height={height}
+    viewBox="0 0 16 16"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <path
       d="M0 13.5C0 14.0531 0.446875 14.5 1 14.5H2.70937C3.09375 15.3844 3.975 16 5 16C6.025 16 6.90625 15.3844 7.29063 14.5H15C15.5531 14.5 16 14.0531 16 13.5C16 12.9469 15.5531 12.5 15 12.5H7.29063C6.90625 11.6156 6.025 11 5 11C3.975 11 3.09375 11.6156 2.70937 12.5H1C0.446875 12.5 0 12.9469 0 13.5ZM4 13.5C4 13.2348 4.10536 12.9804 4.29289 12.7929C4.48043 12.6054 4.73478 12.5 5 12.5C5.26522 12.5 5.51957 12.6054 5.70711 12.7929C5.89464 12.9804 6 13.2348 6 13.5C6 13.7652 5.89464 14.0196 5.70711 14.2071C5.51957 14.3946 5.26522 14.5 5 14.5C4.73478 14.5 4.48043 14.3946 4.29289 14.2071C4.10536 14.0196 4 13.7652 4 13.5ZM10 8.5C10 8.23478 10.1054 7.98043 10.2929 7.79289C10.4804 7.60536 10.7348 7.5 11 7.5C11.2652 7.5 11.5196 7.60536 11.7071 7.79289C11.8946 7.98043 12 8.23478 12 8.5C12 8.76522 11.8946 9.01957 11.7071 9.20711C11.5196 9.39464 11.2652 9.5 11 9.5C10.7348 9.5 10.4804 9.39464 10.2929 9.20711C10.1054 9.01957 10 8.76522 10 8.5ZM11 6C9.975 6 9.09375 6.61562 8.70938 7.5H1C0.446875 7.5 0 7.94688 0 8.5C0 9.05313 0.446875 9.5 1 9.5H8.70938C9.09375 10.3844 9.975 11 11 11C12.025 11 12.9062 10.3844 13.2906 9.5H15C15.5531 9.5 16 9.05313 16 8.5C16 7.94688 15.5531 7.5 15 7.5H13.2906C12.9062 6.61562 12.025 6 11 6ZM6 4.5C5.73478 4.5 5.48043 4.39464 5.29289 4.20711C5.10536 4.01957 5 3.76522 5 3.5C5 3.23478 5.10536 2.98043 5.29289 2.79289C5.48043 2.60536 5.73478 2.5 6 2.5C6.26522 2.5 6.51957 2.60536 6.70711 2.79289C6.89464 2.98043 7 3.23478 7 3.5C7 3.76522 6.89464 4.01957 6.70711 4.20711C6.51957 4.39464 6.26522 4.5 6 4.5ZM8.29062 2.5C7.90625 1.61563 7.025 1 6 1C4.975 1 4.09375 1.61563 3.70937 2.5H1C0.446875 2.5 0 2.94687 0 3.5C0 4.05312 0.446875 4.5 1 4.5H3.70937C4.09375 5.38438 4.975 6 6 6C7.025 6 7.90625 5.38438 8.29062 4.5H15C15.5531 4.5 16 4.05312 16 3.5C16 2.94687 15.5531 2.5 15 2.5H8.29062Z"
       fill={fill}
@@ -773,13 +876,25 @@ export const CloseIcon = ({ fill = "white", width = "24px" }) => (
 );
 
 export const SwapIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    height="24px"
+    viewBox="0 -960 960 960"
+    width="24px"
+    fill="#5f6368"
+  >
     <path d="M280-160 80-360l200-200 56 57-103 103h287v80H233l103 103-56 57Zm400-240-56-57 103-103H440v-80h287L624-743l56-57 200 200-200 200Z" />
   </svg>
 );
 
 export const USDIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#9747ff">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    height="20px"
+    viewBox="0 -960 960 960"
+    width="20px"
+    fill="#9747ff"
+  >
     <path d="M441-120v-86q-53-12-91.5-46T293-348l74-30q15 48 44.5 73t77.5 25q41 0 69.5-18.5T587-356q0-35-22-55.5T463-458q-86-27-118-64.5T313-614q0-65 42-101t86-41v-84h80v84q50 8 82.5 36.5T651-650l-74 32q-12-32-34-48t-60-16q-44 0-67 19.5T393-614q0 33 30 52t104 40q69 20 104.5 63.5T667-358q0 71-42 108t-104 46v84h-80Z" />
   </svg>
 );

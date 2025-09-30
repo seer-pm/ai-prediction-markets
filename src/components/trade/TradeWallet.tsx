@@ -119,7 +119,17 @@ export const TradeWallet = () => {
 
             {/* Right side: balance */}
             <div className="p-6 flex flex-col items-center gap-2 border-t md:border-t-0 md:border-l border-white">
-              <h3 className="text-xl font-semibold">sUSDS Balance</h3>
+              <h3 className="text-xl font-semibold">
+                <a
+                  href="https://app.sky.money/?network=OP&widget=savings&flow=supply&source_token=USDC"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:opacity-80"
+                >
+                  sUSDS
+                </a>{" "}
+                Balance
+              </h3>
               <h4 className="font-semibold">
                 {isBalanceLoading ? (
                   <span className="animate-pulse">Loading...</span>

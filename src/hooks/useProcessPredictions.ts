@@ -1,11 +1,9 @@
 import { PredictionRow, TableData } from "@/types";
 import { useAccount } from "wagmi";
 import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
+import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useMarketsData } from "./useMarketsData";
 import { useTokensBalances } from "./useTokensBalances";
-import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
-import { formatUnits } from "viem";
-import { DECIMALS } from "@/utils/constants";
 
 const MIN_PRICE = 0.0001;
 
@@ -22,9 +20,9 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     if (!token) {
       return acc;
     }
-    acc[token] = Number(formatUnits(curr, DECIMALS));
+    acc[token] = curr
     return acc;
-  }, {} as { [key: string]: number });
+  }, {} as { [key: string]: bigint });
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
