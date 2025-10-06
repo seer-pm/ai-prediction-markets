@@ -3,7 +3,7 @@ import { CHAIN_ID } from "@/utils/constants";
 import { useQuery } from "@tanstack/react-query";
 import { Address, erc20Abi } from "viem";
 
-const fetchTokensBalances = async (
+export const fetchTokensBalances = async (
   account: Address,
   tokens: Address[]
 ): Promise<bigint[]> => {
