@@ -1,6 +1,6 @@
 import { SupportedChain } from "@/utils/constants";
 import { UniswapTrade } from "@swapr/sdk";
-import { Address, Or } from "viem";
+import { Address } from "viem";
 
 export interface PredictionRow {
   repo: string;
