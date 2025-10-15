@@ -3,22 +3,22 @@ import React, { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
-import { CSVUpload } from "./components/CSVUpload";
 import Footer from "./components/Footer";
-import { MarketTable } from "./components/MarketTable";
+import { OriginalityCSVUpload } from "./components/OriginalityCSVUpload";
+import { OriginalityMarketTable } from "./components/OriginalityMarketTable";
+import { OriginalityTradingInterface } from "./components/trade/OriginalityTradingInterface";
 import { TradeWallet } from "./components/trade/TradeWallet";
-import { TradingInterface } from "./components/trade/TradingInterface";
 import { WalletConnect } from "./components/WalletConnect";
 import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { useCheckTradeExecutorCreated } from "./hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "./hooks/useLocalStorage";
-import { useProcessPredictions } from "./hooks/useProcessPredictions";
-import { PredictionRow } from "./types";
+import { useProcessOriginalityPredictions } from "./hooks/useProcessOriginalityPredictions";
+import { OriginalityRow } from "./types";
 
 const AppContent: React.FC = () => {
   const { address: account } = useAccount();
-  const [predictions, setPredictions] = useLocalStorage<PredictionRow[]>("predictions-default", []);
+  const [predictions, setPredictions] = useLocalStorage<OriginalityRow[]>("originality-default", []);
 
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
 
@@ -31,9 +31,9 @@ const AppContent: React.FC = () => {
     isLoading,
     isLoadingBalances,
     error,
-  } = useProcessPredictions(predictions);
+  } = useProcessOriginalityPredictions(predictions);
 
-  const handleDataParsed = (data: PredictionRow[]) => {
+  const handleDataParsed = (data: OriginalityRow[]) => {
     setPredictions(data);
   };
 
@@ -95,7 +95,7 @@ const AppContent: React.FC = () => {
                   onClick={handleStartTrading}
                   disabled={
                     !tableData ||
-                    tableData.filter((x) => x.difference).length === 0 ||
+                    tableData.filter((x) => x.upDifference || x.downDifference).length === 0 ||
                     isLoading ||
                     !account ||
                     !checkTradeExecutorResult?.isCreated
@@ -108,7 +108,7 @@ const AppContent: React.FC = () => {
             </div>
           </div>
 
-          <MarketTable
+          <OriginalityMarketTable
             markets={tableData || []}
             isLoading={isLoading}
             isLoadingBalances={isLoadingBalances}
@@ -135,7 +135,7 @@ const AppContent: React.FC = () => {
       {isCsvDialogOpen && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <CSVUpload onDataParsed={handleDataParsed} onClose={() => setIsCsvDialogOpen(false)} />
+            <OriginalityCSVUpload onDataParsed={handleDataParsed} onClose={() => setIsCsvDialogOpen(false)} />
           </div>
         </div>
       )}
@@ -144,7 +144,7 @@ const AppContent: React.FC = () => {
       {isTradeDialogOpen && tableData && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <TradingInterface
+            <OriginalityTradingInterface
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               markets={tableData}
               onClose={() => setIsTradeDialogOpen(false)}

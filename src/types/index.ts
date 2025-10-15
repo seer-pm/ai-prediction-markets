@@ -1,11 +1,16 @@
 import { SupportedChain } from "@/utils/constants";
 import { UniswapTrade } from "@swapr/sdk";
-import { Address } from "viem";
+import { Address, Or } from "viem";
 
 export interface PredictionRow {
   repo: string;
   parent: string;
   weight: number;
+}
+
+export interface OriginalityRow {
+  repo: string;
+  originality: number;
 }
 
 export interface TableData {
@@ -18,6 +23,22 @@ export interface TableData {
   hasPrediction: boolean;
   volumeUntilPrice: number;
   balance?: bigint;
+}
+export interface OriginalityTableData {
+  repo: string;
+  upPrice: number | null;
+  downPrice: number | null;
+  predictedOriginality: number | null;
+  upDifference: number | null;
+  downDifference: number | null;
+  marketId: string;
+  hasPrediction: boolean;
+  volumeUntilUpPrice: number;
+  volumeUntilDownPrice: number;
+  upBalance?: bigint;
+  downBalance?: bigint;
+  wrappedTokens: Address[];
+  collateralToken: Address;
 }
 
 export interface TradeRequest {
@@ -66,11 +87,23 @@ export interface QuoteProps {
   tableData: TableData[];
 }
 
+export interface OriginalityQuoteProps {
+  account: Address;
+  amount: string;
+  tableData: OriginalityTableData[];
+}
+
 export interface TradeProps {
   tradeExecutor: Address;
   amount: string;
   getQuotesResult: { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint } | undefined;
-  wrappedTokens: Address[]
+  wrappedTokens: Address[];
+}
+
+export interface OriginalityTradeProps {
+  tradeExecutor: Address;
+  amount: string;
+  quoteResults: { quotes: UniswapQuoteTradeResult[]; quoteType: string ; row: OriginalityTableData}[] | undefined;
 }
 
 export interface ApprovalRequest {

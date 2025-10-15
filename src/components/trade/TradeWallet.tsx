@@ -7,7 +7,7 @@ import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { DepositInterface } from "./DepositInterface";
 import { WithdrawInterface } from "./WithdrawInterface";
-import { WithdrawTokensInterface } from "./WithdrawTokensInterface";
+import { WithdrawOriginalityTokensInterface } from "./WithdrawOriginalityTokensInterface";
 
 export const TradeWallet = () => {
   const { address: account, chain } = useAccount();
@@ -52,7 +52,7 @@ export const TradeWallet = () => {
       {isWithdrawTokensDialogOpen && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <WithdrawTokensInterface
+            <WithdrawOriginalityTokensInterface
               account={account!}
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               onClose={() => setIsWithdrawTokensDialogOpen(false)}
