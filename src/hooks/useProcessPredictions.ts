@@ -25,8 +25,8 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     return acc;
   }, {} as { [key: string]: bigint });
   const sumPayout = payoutNumerators?.reduce((acc, curr) => acc + Number(curr), 0);
-  const payoutMapping = data?.wrappedTokens?.reduce((acc, curr) => {
-    acc[curr] = sumPayout ? Number(curr) / sumPayout : 0;
+  const payoutMapping = data?.wrappedTokens?.reduce((acc, curr, index) => {
+    acc[curr] = sumPayout && payoutNumerators ? Number(payoutNumerators[index]) / sumPayout : 0;
     return acc;
   }, {} as { [key: string]: number });
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
@@ -86,10 +86,10 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
       };
     })
     .sort((a, b) => {
-      if (a.currentPrice === null && b.currentPrice === null) return 0;
-      if (a.currentPrice === null) return 1;
-      if (b.currentPrice === null) return -1;
-      return b.currentPrice - a.currentPrice;
+      if (!a.payout && !b.payout) return 0;
+      if (!a.payout) return 1;
+      if (!b.payout) return -1;
+      return b.payout - a.payout;
     });
 
   return { data: processedData, isLoading, isLoadingBalances, error };
