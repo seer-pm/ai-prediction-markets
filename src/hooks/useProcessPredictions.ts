@@ -11,6 +11,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
   const { data, isLoading, error } = useMarketsData();
+  const payoutNumerators = data?.payoutNumerators;
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
     data?.wrappedTokens
@@ -20,9 +21,14 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     if (!token) {
       return acc;
     }
-    acc[token] = curr
+    acc[token] = curr;
     return acc;
   }, {} as { [key: string]: bigint });
+  const sumPayout = payoutNumerators?.reduce((acc, curr) => acc + Number(curr), 0);
+  const payoutMapping = data?.wrappedTokens?.reduce((acc, curr) => {
+    acc[curr] = sumPayout ? Number(curr) / sumPayout : 0;
+    return acc;
+  }, {} as { [key: string]: number });
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
@@ -53,6 +59,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
           hasPrediction: false,
           volumeUntilPrice: 0,
           balance: balanceMapping?.[marketId],
+          payout: payoutMapping?.[marketId],
         };
       }
       const difference = currentPrice ? prediction.weight - currentPrice : null;
@@ -75,6 +82,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
         hasPrediction: true,
         volumeUntilPrice,
         balance: balanceMapping?.[marketId],
+        payout: payoutMapping?.[marketId],
       };
     })
     .sort((a, b) => {

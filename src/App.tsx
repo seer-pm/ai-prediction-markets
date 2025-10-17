@@ -37,13 +37,6 @@ const AppContent: React.FC = () => {
     setPredictions(data);
   };
 
-  const handleStartTrading = () => {
-    setIsTradeDialogOpen(true);
-  };
-
-  const handleLoadPredictions = () => {
-    setIsCsvDialogOpen(true);
-  };
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
@@ -69,44 +62,6 @@ const AppContent: React.FC = () => {
         <div className="space-y-4 mb-20">
           <TradeWallet />
           {/* Header with actions */}
-
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
-
-            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-              {predictions.length > 0 && (
-                <button
-                  onClick={() => setPredictions([])}
-                  className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
-                >
-                  Clear Predictions
-                </button>
-              )}
-
-              <button
-                onClick={handleLoadPredictions}
-                className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors w-full sm:w-auto text-center"
-              >
-                {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
-              </button>
-
-              {checkTradeExecutorResult?.isCreated && (
-                <button
-                  onClick={handleStartTrading}
-                  disabled={
-                    !tableData ||
-                    tableData.filter((x) => x.difference).length === 0 ||
-                    isLoading ||
-                    !account ||
-                    !checkTradeExecutorResult?.isCreated
-                  }
-                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium w-full sm:w-auto text-center"
-                >
-                  🚀 Start Trading
-                </button>
-              )}
-            </div>
-          </div>
 
           <MarketTable
             markets={tableData || []}

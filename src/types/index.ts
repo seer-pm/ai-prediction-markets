@@ -18,6 +18,7 @@ export interface TableData {
   hasPrediction: boolean;
   volumeUntilPrice: number;
   balance?: bigint;
+  payout?: number;
 }
 
 export interface TradeRequest {
@@ -70,7 +71,7 @@ export interface TradeProps {
   tradeExecutor: Address;
   amount: string;
   getQuotesResult: { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint } | undefined;
-  wrappedTokens: Address[]
+  wrappedTokens: Address[];
 }
 
 export interface ApprovalRequest {
