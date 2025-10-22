@@ -99,6 +99,9 @@ export default async () => {
       const downPool = getPoolByTokenPair(market.wrappedTokens[0], market.collateralToken);
       const upPool = getPoolByTokenPair(market.wrappedTokens[1], market.collateralToken);
       const repo = (parentMarket.outcomes as string[])[market.parentOutcome];
+      if(mapping[repo]?.upPool || mapping[repo]?.downPool){
+        return mapping
+      }
       mapping[repo] = {
         id: market.id,
         upPrice: upPool?.price ?? null,
