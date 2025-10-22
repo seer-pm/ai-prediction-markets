@@ -65,20 +65,20 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
       const upDifference = upPrice ? prediction.originality - upPrice : null;
       const downDifference = downPrice ? 1 - prediction.originality - downPrice : null;
       const volumeUntilUpPrice =
-        upPool && upDifference
+        upPool && upDifference && market
           ? getVolumeUntilPrice(
               upPool,
               Math.max(prediction.originality, MIN_PRICE), //cannot sell to 0 so we set a min price
-              marketId,
+              market.wrappedTokens[1],
               upDifference > 0 ? "buy" : "sell"
             )
           : 0;
       const volumeUntilDownPrice =
-        downPool && downDifference
+        downPool && downDifference && market
           ? getVolumeUntilPrice(
               downPool,
               Math.max(1 - prediction.originality, MIN_PRICE), //cannot sell to 0 so we set a min price
-              marketId,
+              market.wrappedTokens[0],
               downDifference > 0 ? "buy" : "sell"
             )
           : 0;

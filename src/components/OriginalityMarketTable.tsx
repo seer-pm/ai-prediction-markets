@@ -48,25 +48,25 @@ export const OriginalityMarketTable: React.FC<MarketTableProps> = ({
                 Repository
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Up Balance
+                UP Balance
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Down Balance
+                DOWN Balance
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Up Price
+                UP Price
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Down Price
+                DOWN Price
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Predicted Originality
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Up Difference
+                Implied UP fair
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Down Difference
+                Implied DOWN fair
               </th>
             </tr>
           </thead>
@@ -120,41 +120,39 @@ export const OriginalityMarketTable: React.FC<MarketTableProps> = ({
                     )}
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {upPrice?.toFixed(8) ?? "-"}
+                    {upPrice?.toFixed(4) ?? "-"}
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {downPrice?.toFixed(8) ?? "-"}
+                    {downPrice?.toFixed(4) ?? "-"}
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {predictedOriginality?.toFixed(8) ?? "-"}
+                    {predictedOriginality?.toFixed(4) ?? "-"}
                   </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
+                    {predictedOriginality?.toFixed(4) ?? "-"}{" "}
                     {upDifference ? (
                       <span
                         className={`font-medium font-mono ${
                           upDifference > 0 ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {upDifference > 0 ? "+" : ""}
-                        {upDifference.toFixed(8)}
+                        ({upDifference > 0 ? "+" : ""}
+                        {upDifference.toFixed(4)})
                       </span>
-                    ) : (
-                      <span className="text-gray-900 font-mono">-</span>
-                    )}
+                    ) : null}
                   </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
+                    {predictedOriginality ? (1 - predictedOriginality).toFixed(4) : "-"}{" "}
                     {downDifference ? (
                       <span
                         className={`font-medium font-mono ${
                           downDifference > 0 ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {downDifference > 0 ? "+" : ""}
-                        {downDifference.toFixed(8)}
+                        ({downDifference > 0 ? "+" : ""}
+                        {downDifference.toFixed(4)})
                       </span>
-                    ) : (
-                      <span className="text-gray-900 font-mono">-</span>
-                    )}
+                    ) : null}
                   </td>
                 </tr>
               );

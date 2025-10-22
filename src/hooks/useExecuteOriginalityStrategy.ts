@@ -20,10 +20,12 @@ import { Address, encodeFunctionData, parseUnits } from "viem";
 
 const getSplitCalls = ({
   collateral,
+  mainCollateral,
   amount,
   market,
 }: {
   collateral: Address;
+  mainCollateral: Address;
   amount: string;
   market: Address;
 }) => {
@@ -45,7 +47,7 @@ const getSplitCalls = ({
       data: encodeFunctionData({
         abi: RouterAbi,
         functionName: "splitPosition",
-        args: [collateral, market, parsedAmount],
+        args: [mainCollateral, market, parsedAmount],
       }),
     },
   ];
@@ -56,8 +58,10 @@ const getTradeExecutorCalls = async ({
   quoteResults,
   tradeExecutor,
 }: OriginalityTradeProps) => {
+  const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
   const mainSplitCalls = getSplitCalls({
-    collateral: COLLATERAL_TOKENS[CHAIN_ID].primary.address,
+    collateral: mainCollateral,
+    mainCollateral,
     amount,
     market: ORIGINALITY_PARENT_MARKET_ID,
   });
@@ -76,6 +80,7 @@ const getTradeExecutorCalls = async ({
         const splitCalls = getSplitCalls({
           amount,
           collateral: row.collateralToken,
+          mainCollateral,
           market: row.marketId as Address,
         });
         return [...splitCalls, ...tradeApprovalCalls, ...tradeCalls];
