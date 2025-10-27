@@ -105,12 +105,7 @@ const executeOriginalityStrategy = async ({
   if (!tableData?.length) {
     throw new Error("No prediction data");
   }
-  const mainSplitCalls = getSplitCalls({
-    collateral: mainCollateral,
-    mainCollateral,
-    amount,
-    market: ORIGINALITY_PARENT_MARKET_ID,
-  });
+
   const sellFromBalanceQuotes = await getSellFromBalanceQuotes({
     account: tradeExecutor,
     tableData,
@@ -131,10 +126,7 @@ const executeOriginalityStrategy = async ({
       address: tradeExecutor,
       abi: TradeExecutorAbi,
       functionName: "batchExecute",
-      args: [
-        ...mainSplitCalls,
-        sellFromBalanceCalls.map((call) => ({ data: call.data, to: call.to })),
-      ],
+      args: [sellFromBalanceCalls.map((call) => ({ data: call.data, to: call.to }))],
       value: 0n,
       chainId: CHAIN_ID,
     });
@@ -146,7 +138,12 @@ const executeOriginalityStrategy = async ({
       throw result.error;
     }
   }
-
+  const mainSplitCalls = getSplitCalls({
+    collateral: mainCollateral,
+    mainCollateral,
+    amount,
+    market: ORIGINALITY_PARENT_MARKET_ID,
+  });
   const newTableData = tableData.map((initialRow) => {
     const row = { ...initialRow };
     //update volumeUntilPrice
@@ -181,7 +178,9 @@ const executeOriginalityStrategy = async ({
     address: tradeExecutor,
     abi: TradeExecutorAbi,
     functionName: "batchExecute",
-    args: [tradeExecutorCalls.map((call) => ({ data: call.data, to: call.to }))],
+    args: [
+      [...mainSplitCalls, ...tradeExecutorCalls].map((call) => ({ data: call.data, to: call.to })),
+    ],
     value: 0n,
     chainId: CHAIN_ID,
   });
