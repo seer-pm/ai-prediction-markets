@@ -1,66 +1,23 @@
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import React, { useState } from "react";
+import React from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { useAccount, useDisconnect, WagmiProvider } from "wagmi";
+import { WagmiProvider } from "wagmi";
 import Footer from "./components/Footer";
-import { OriginalityCSVUpload } from "./components/OriginalityCSVUpload";
-import { OriginalityMarketTable } from "./components/OriginalityMarketTable";
-import { OriginalityTradingInterface } from "./components/trade/OriginalityTradingInterface";
 import { TradeWallet } from "./components/trade/TradeWallet";
 import { WalletConnect } from "./components/WalletConnect";
 import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
-import { useCheckTradeExecutorCreated } from "./hooks/useCheckTradeExecutorCreated";
-import { useLocalStorage } from "./hooks/useLocalStorage";
-import { useProcessOriginalityPredictions } from "./hooks/useProcessOriginalityPredictions";
-import { OriginalityRow } from "./types";
+import { Tab } from "./components/Tab";
 
 const AppContent: React.FC = () => {
-  const { address: account } = useAccount();
-  const [predictions, setPredictions] = useLocalStorage<OriginalityRow[]>("originality-default", []);
-
-  const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
-
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
-  const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-  const { disconnect } = useDisconnect();
-
-  const {
-    data: tableData,
-    isLoading,
-    isLoadingBalances,
-    error,
-  } = useProcessOriginalityPredictions(predictions);
-
-  const handleDataParsed = (data: OriginalityRow[]) => {
-    setPredictions(data);
-  };
-
-  const handleStartTrading = () => {
-    setIsTradeDialogOpen(true);
-  };
-
-  const handleLoadPredictions = () => {
-    setIsCsvDialogOpen(true);
-  };
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <p className="text-red-800">Error loading market data: {error.message}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900">AI Prediction Markets</h1>
-            <WalletConnect disconnect={disconnect} />
+            <WalletConnect />
           </div>
         </div>
       </header>
@@ -68,51 +25,7 @@ const AppContent: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-4 mb-20">
           <TradeWallet />
-          {/* Header with actions */}
-
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
-
-            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-              {predictions.length > 0 && (
-                <button
-                  onClick={() => setPredictions([])}
-                  className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
-                >
-                  Clear Predictions
-                </button>
-              )}
-
-              <button
-                onClick={handleLoadPredictions}
-                className="cursor-pointer text-blue-600 hover:text-blue-800 text-sm font-medium px-4 py-2 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors w-full sm:w-auto text-center"
-              >
-                {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
-              </button>
-
-              {checkTradeExecutorResult?.isCreated && (
-                <button
-                  onClick={handleStartTrading}
-                  disabled={
-                    !tableData ||
-                    tableData.filter((x) => x.upDifference || x.downDifference).length === 0 ||
-                    isLoading ||
-                    !account ||
-                    !checkTradeExecutorResult?.isCreated
-                  }
-                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium w-full sm:w-auto text-center"
-                >
-                  🚀 Start Trading
-                </button>
-              )}
-            </div>
-          </div>
-
-          <OriginalityMarketTable
-            markets={tableData || []}
-            isLoading={isLoading}
-            isLoadingBalances={isLoadingBalances}
-          />
+          <Tab />
           <div className="mx-auto p-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg text-white">
             <h3 className="text-lg font-semibold mb-3">Want More Trading Power?</h3>
             <p className="text-sm leading-relaxed opacity-95 mb-4">
@@ -130,28 +43,6 @@ const AppContent: React.FC = () => {
           </div>
         </div>
       </main>
-
-      {/* CSv Dialog */}
-      {isCsvDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <OriginalityCSVUpload onDataParsed={handleDataParsed} onClose={() => setIsCsvDialogOpen(false)} />
-          </div>
-        </div>
-      )}
-
-      {/* Trading Dialog */}
-      {isTradeDialogOpen && tableData && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <OriginalityTradingInterface
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              markets={tableData}
-              onClose={() => setIsTradeDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 };

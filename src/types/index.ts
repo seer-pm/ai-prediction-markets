@@ -23,6 +23,7 @@ export interface TableData {
   hasPrediction: boolean;
   volumeUntilPrice: number;
   balance?: bigint;
+  payout?: number;
 }
 export interface OriginalityTableData {
   repo: string;

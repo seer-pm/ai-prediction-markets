@@ -12,6 +12,7 @@ interface GetMarketsDataApiResult {
     };
   };
   wrappedTokens: Address[];
+  payoutNumerators: string[]
 }
 
 const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
@@ -19,7 +20,7 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-markets-data`);
     return await response.json();
   } catch {
-    return { marketsData: {}, wrappedTokens: [] };
+    return { marketsData: {}, wrappedTokens: [], payoutNumerators: [] };
   }
 };
 

@@ -13,7 +13,9 @@ export default async () => {
     const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
     const { data, error } = await supabase
       .from("markets")
-      .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
+      .select(
+        "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators"
+      )
       .eq("id", AI_PREDICTION_MARKET_ID)
       .single();
     if (!data) {
@@ -83,14 +85,21 @@ export default async () => {
       };
       return mapping;
     }, {} as { [key: string]: { id: Address; price: number | null; pool: PoolInfo | null } });
-    return new Response(JSON.stringify({ marketsData: repoToPriceMapping, wrappedTokens }), {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "http://localhost:5173",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET",
-      },
-    });
+    return new Response(
+      JSON.stringify({
+        marketsData: repoToPriceMapping,
+        wrappedTokens,
+        payoutNumerators: data.payoutNumerators,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "http://localhost:5173",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "GET",
+        },
+      }
+    );
   } catch (e: any) {
     console.log(e);
     return new Response(JSON.stringify({ error: e.message || "Internal server error" }), {
