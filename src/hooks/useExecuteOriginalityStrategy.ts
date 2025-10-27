@@ -159,8 +159,8 @@ const executeOriginalityStrategy = async ({
             row.volumeUntilUpPrice - Number(formatUnits(data.sellAmount, DECIMALS));
           row.upBalance = row.upBalance ? row.upBalance - data.sellAmount : row.upBalance;
         }
-        row.amount = formatUnits(data.value + parseUnits(amount, DECIMALS), DECIMALS);
       }
+      row.amount = formatUnits((data?.value ?? 0n) + parseUnits(amount, DECIMALS), DECIMALS);
     }
     return row;
   });
