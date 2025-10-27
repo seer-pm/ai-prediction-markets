@@ -7,8 +7,6 @@ import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { DepositInterface } from "./DepositInterface";
 import { WithdrawInterface } from "./WithdrawInterface";
-import { WithdrawTokensInterface } from "./WithdrawTokensInterface";
-import { RedeemInterface } from "./RedeemInterface";
 
 export const TradeWallet = () => {
   const { address: account, chain } = useAccount();
@@ -16,8 +14,6 @@ export const TradeWallet = () => {
   const createTradeExecutorMutate = useCreateTradeExecutor();
   const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
-  const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
-  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
 
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: checkTradeExecutorResult?.predictedAddress,
@@ -47,28 +43,6 @@ export const TradeWallet = () => {
               account={account!}
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               onClose={() => setIsWithdrawDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-      {isWithdrawTokensDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <WithdrawTokensInterface
-              account={account!}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsWithdrawTokensDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-      {isRedeemDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <RedeemInterface
-              account={account!}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsRedeemDialogOpen(false)}
             />
           </div>
         </div>
@@ -120,18 +94,6 @@ export const TradeWallet = () => {
                   className="cursor-pointer px-5 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                 >
                   Withdraw sUSDS
-                </button>
-                <button
-                  onClick={() => setIsWithdrawTokensDialogOpen(true)}
-                  className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
-                >
-                  Withdraw outcome tokens
-                </button>
-                <button
-                  onClick={() => setIsRedeemDialogOpen(true)}
-                  className="cursor-pointer px-5 py-2.5 bg-[#C218C2] hover:bg-[#A014A0] rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
-                >
-                  Redeem outcome tokens
                 </button>
               </div>
             </div>

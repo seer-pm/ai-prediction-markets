@@ -1,11 +1,11 @@
 import { useAppKit } from "@reown/appkit/react";
-import { useAccount, useConnect } from "wagmi";
-import { DisconnectMutate } from "wagmi/query";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 
-export const WalletConnect = ({ disconnect }: { disconnect: DisconnectMutate<unknown> }) => {
+export const WalletConnect = () => {
   const { address, isConnected, isConnecting } = useAccount();
   const { error } = useConnect();
   const { open } = useAppKit();
+  const {disconnect} = useDisconnect()
 
   if (isConnecting) {
     return (
