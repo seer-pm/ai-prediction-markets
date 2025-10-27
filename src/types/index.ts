@@ -39,6 +39,7 @@ export interface OriginalityTableData {
   downBalance?: bigint;
   wrappedTokens: Address[];
   collateralToken: Address;
+  amount?: string
 }
 
 export interface TradeRequest {
@@ -89,7 +90,6 @@ export interface QuoteProps {
 
 export interface OriginalityQuoteProps {
   account: Address;
-  amount: string;
   tableData: OriginalityTableData[];
 }
 
@@ -103,7 +103,7 @@ export interface TradeProps {
 export interface OriginalityTradeProps {
   tradeExecutor: Address;
   amount: string;
-  quoteResults: { quotes: UniswapQuoteTradeResult[]; quoteType: string ; row: OriginalityTableData}[] | undefined;
+  tableData: OriginalityTableData[];
 }
 
 export interface ApprovalRequest {

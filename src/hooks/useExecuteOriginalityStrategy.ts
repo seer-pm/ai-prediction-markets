@@ -6,7 +6,8 @@ import { config } from "@/config/wagmi";
 import { toastifyTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getTradeApprovals7702 } from "@/lib/trade/getApprovals7702";
-import { OriginalityTradeProps } from "@/types";
+import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
+import { OriginalityTableData, OriginalityTradeProps, UniswapQuoteTradeResult } from "@/types";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -16,7 +17,7 @@ import {
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { writeContract } from "@wagmi/core";
-import { Address, encodeFunctionData, parseUnits } from "viem";
+import { Address, encodeFunctionData, formatUnits, parseUnits } from "viem";
 
 const getSplitCalls = ({
   collateral,
@@ -53,55 +54,126 @@ const getSplitCalls = ({
   ];
 };
 
+const getQuoteTradeCalls = async (tradeExecutor: Address, quotes: UniswapQuoteTradeResult[]) => {
+  const tradeApprovalCalls = quotes
+    .map((quote) => getTradeApprovals7702(tradeExecutor, quote.trade))
+    .flat();
+  const tradeCalls = await Promise.all(
+    quotes.map((quote) => getUniswapTradeExecution(quote.trade, tradeExecutor))
+  );
+  return [...tradeApprovalCalls, ...tradeCalls];
+};
+const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
+
 const getTradeExecutorCalls = async ({
-  amount,
   quoteResults,
   tradeExecutor,
+}: {
+  tradeExecutor: Address;
+  quoteResults: {
+    quotes: UniswapQuoteTradeResult[];
+    quoteType: string;
+    row: OriginalityTableData;
+  }[];
+}) => {
+  const calls = (
+    await Promise.all(
+      quoteResults!.map(async ({ quotes, quoteType, row }) => {
+        const tradeCalls = await getQuoteTradeCalls(tradeExecutor, quotes);
+        if (quoteType === "simple") {
+          return tradeCalls;
+        }
+        const splitCalls = getSplitCalls({
+          amount: row.amount!,
+          collateral: row.collateralToken,
+          mainCollateral,
+          market: row.marketId as Address,
+        });
+        return [...splitCalls, ...tradeCalls];
+      })
+    )
+  ).flat();
+
+  return [...calls];
+};
+
+const executeOriginalityStrategy = async ({
+  amount,
+  tableData,
+  tradeExecutor,
 }: OriginalityTradeProps) => {
-  const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
+  if (!tableData?.length) {
+    throw new Error("No prediction data");
+  }
   const mainSplitCalls = getSplitCalls({
     collateral: mainCollateral,
     mainCollateral,
     amount,
     market: ORIGINALITY_PARENT_MARKET_ID,
   });
-  const calls = (
-    await Promise.all(
-      quoteResults!.map(async ({ quotes, quoteType, row }) => {
-        const tradeApprovalCalls = quotes
-          .map((quote) => getTradeApprovals7702(tradeExecutor, quote.trade))
-          .flat();
-        const tradeCalls = await Promise.all(
-          quotes.map((quote) => getUniswapTradeExecution(quote.trade, tradeExecutor))
-        );
-        if (quoteType === "simple") {
-          return [...tradeApprovalCalls, ...tradeCalls];
-        }
-        const splitCalls = getSplitCalls({
-          amount,
-          collateral: row.collateralToken,
-          mainCollateral,
-          market: row.marketId as Address,
-        });
-        return [...splitCalls, ...tradeApprovalCalls, ...tradeCalls];
-      })
-    )
-  ).flat();
+  const sellFromBalanceQuotes = await getSellFromBalanceQuotes({
+    account: tradeExecutor,
+    tableData,
+  });
 
-  return [...mainSplitCalls, ...calls];
-};
+  const sellTokenMapping = sellFromBalanceQuotes.reduce((acc, result) => {
+    acc[result.sellToken.toLowerCase()] = {
+      sellAmount: BigInt(result.sellAmount),
+      value: BigInt(result.value),
+    };
+    return acc;
+  }, {} as { [key: string]: { sellAmount: bigint; value: bigint } });
 
-const executeOriginalityStrategy = async ({
-  amount,
-  quoteResults,
-  tradeExecutor,
-}: OriginalityTradeProps) => {
-  if (!quoteResults?.length) {
-    throw new Error("No quote found");
+  // we execute sellFromBalance trades first to update main quotes
+  if (sellFromBalanceQuotes.length) {
+    const sellFromBalanceCalls = await getQuoteTradeCalls(tradeExecutor, sellFromBalanceQuotes);
+    const writePromise = writeContract(config, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [
+        ...mainSplitCalls,
+        sellFromBalanceCalls.map((call) => ({ data: call.data, to: call.to })),
+      ],
+      value: 0n,
+      chainId: CHAIN_ID,
+    });
+    const result = await toastifyTx(() => writePromise, {
+      txSent: { title: "Selling overvalued tokens from balance..." },
+      txSuccess: { title: "Tokens sold!" },
+    });
+    if (!result.status) {
+      throw result.error;
+    }
   }
+
+  const newTableData = tableData.map((initialRow) => {
+    const row = { ...initialRow };
+    //update volumeUntilPrice
+    for (let i = 0; i < row.wrappedTokens.length; i++) {
+      const data = sellTokenMapping[row.wrappedTokens[i]];
+      if (data) {
+        if (i === 0) {
+          row.volumeUntilDownPrice =
+            row.volumeUntilDownPrice - Number(formatUnits(data.sellAmount, DECIMALS));
+          row.downBalance = row.downBalance ? row.downBalance - data.sellAmount : row.downBalance;
+        } else {
+          row.volumeUntilUpPrice =
+            row.volumeUntilUpPrice - Number(formatUnits(data.sellAmount, DECIMALS));
+          row.upBalance = row.upBalance ? row.upBalance - data.sellAmount : row.upBalance;
+        }
+        row.amount = formatUnits(data.value + parseUnits(amount, DECIMALS), DECIMALS);
+      }
+    }
+    return row;
+  });
+  const originalityQuoteResults = await getOriginalityQuotes({
+    account: tradeExecutor,
+    tableData: newTableData,
+  });
+
   const tradeExecutorCalls = await getTradeExecutorCalls({
-    amount,
-    quoteResults,
+    quoteResults: originalityQuoteResults,
     tradeExecutor,
   });
 

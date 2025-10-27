@@ -1,6 +1,4 @@
-import useDebounce from "@/hooks/useDebounce";
 import { useExecuteOriginalityStrategy } from "@/hooks/useExecuteOriginalityStrategy";
-import { useGetOriginalityQuotes } from "@/hooks/useGetOriginalityQuotes";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { OriginalityTableData } from "@/types";
 import { collateral, DECIMALS } from "@/utils/constants";
@@ -41,19 +39,6 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const amount = watch("amount");
 
-  const debouncedAmount = useDebounce(amount, 500);
-  const {
-    data: quoteResults,
-    isLoading: isLoadingQuotes,
-    isError: isErrorGettingQuotes,
-    error: errorGettingQuotes,
-    progress,
-  } = useGetOriginalityQuotes({
-    account: tradeExecutor,
-    amount: debouncedAmount,
-    tableData: markets,
-  });
-
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -70,7 +55,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   const onSubmit = ({ amount }: TradeFormData) => {
     executeTradeMutation.mutate({
       amount,
-      quoteResults,
+      tableData: markets,
       tradeExecutor,
     });
   };
@@ -95,9 +80,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
     if (errors.amount) {
       return errors.amount.message;
     }
-    if (isLoadingQuotes) {
-      return "Getting quotes...";
-    }
+
     return "🚀 Execute Strategy";
   };
 
@@ -133,9 +116,6 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
             onDismiss={executeTradeMutation.reset}
           />
         )}
-        {isErrorGettingQuotes && (
-          <ErrorPanel title="Quote Failed" description={errorGettingQuotes?.message} />
-        )}
 
         {/* Loading Overlay */}
         {executeTradeMutation.isPending && (
@@ -146,17 +126,11 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
           />
         )}
 
-        {isLoadingQuotes && (
-          <LoadingPanel
-            title={`Getting quotes: ${progress}/${readyMarkets.length} markets`}
-            description="Obtaining quotes to construct and execute trades. This may take a while..."
-          />
-        )}
-
         <div className="px-4 py-2 bg-gray-50 rounded-lg">
           <h4 className="font-medium text-gray-800 mb-2">Strategy Overview</h4>
           <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 marker:font-semibold">
             <li>Mint complete sets of the Level 1 market using sUSDS inputs.</li>
+            <li>Sell overvalued UP/DOWN tokens from balance (but never below fair value).</li>
             <li>
               For each Level 2 scalar market, the strategy will either:
               <ol className="list-[lower-alpha] list-inside ml-6 space-y-1">
@@ -231,14 +205,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
             <button
               type="submit"
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 sm:py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={
-                executeTradeMutation.isPending ||
-                !!errors.amount ||
-                isLoadingQuotes ||
-                !quoteResults ||
-                isErrorGettingQuotes ||
-                !amount
-              }
+              disabled={executeTradeMutation.isPending || !!errors.amount || !amount}
             >
               {renderButtonText()}
             </button>

@@ -341,13 +341,13 @@ const complexBuyOriginalityQuotes = async ({
 
 const compareOriginalityQuotes = async ({
   account,
-  amount,
   row,
 }: {
   account: Address;
-  amount: string;
   row: OriginalityTableData;
 }) => {
+  if (!row.amount) return;
+  const amount = row.amount;
   const complexQuoteResults = await complexBuyOriginalityQuotes({ account, amount, row });
   const simpleQuoteResults = await simpleBuyOriginalityQuotes({ account, amount, row });
   const complexBuyQuote = complexQuoteResults[1];
@@ -360,24 +360,73 @@ const compareOriginalityQuotes = async ({
     ? {
         quoteType: "simple",
         quotes: simpleQuoteResults,
-        row
+        row,
       }
     : {
         quoteType: "complex",
         quotes: complexQuoteResults,
-        row
+        row,
       };
+};
+
+export const getSellFromBalanceQuotes = async ({
+  account,
+  tableData,
+}: {
+  account: Address;
+  tableData: OriginalityTableData[];
+}) => {
+  const sellPromises = tableData.reduce((promises, row) => {
+    if (!row.upDifference || !row.downDifference) return promises;
+    const hasOvervaluedToken =
+      (row.upDifference && row.upDifference < 0 && row.upBalance) ||
+      (row.downDifference && row.downDifference < 0 && row.downBalance);
+    if (!hasOvervaluedToken) return promises;
+    const chainId = CHAIN_ID;
+    const availableSellVolume = (row.upDifference < 0 ? row.upBalance : row.downBalance) ?? 0n;
+    const volumeUntilPrice =
+      row.upDifference < 0 ? row.volumeUntilUpPrice : row.volumeUntilDownPrice;
+    const volume =
+      parseUnits(volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
+        ? formatUnits(availableSellVolume, DECIMALS)
+        : volumeUntilPrice.toString();
+    if (Number(volume) < VOLUME_MIN) {
+      return [];
+    }
+    const token = row.upDifference < 0 ? row.wrappedTokens[1] : row.wrappedTokens[0];
+    // sell from token to collateral
+    promises.push(
+      getUniswapQuote(
+        chainId,
+        account,
+        volume,
+        { address: token, symbol: row.upDifference > 0 ? "UP" : "DOWN", decimals: DECIMALS },
+        { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+        "sell"
+      )
+    );
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  const sellQuoteResults = await Promise.allSettled(sellPromises);
+  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+
+  return sellQuotes;
 };
 
 export const getOriginalityQuotes = async ({
   account,
-  amount,
   tableData,
   onProgress,
 }: OriginalityQuoteProps & { onProgress?: ProgressCallback }) => {
   let currentProgress = 0;
   const quotePromises = tableData.map((row) =>
-    compareOriginalityQuotes({ account, amount, row })
+    compareOriginalityQuotes({ account, row })
       .then((result) => {
         currentProgress++;
         onProgress?.(currentProgress);
@@ -403,12 +452,12 @@ export const getOriginalityQuotes = async ({
     [] as {
       quoteType: string;
       quotes: UniswapQuoteTradeResult[];
-      row: OriginalityTableData
+      row: OriginalityTableData;
     }[]
   );
 
   if (!quotes) {
     throw new Error("Quote Error: Cannot execute strategy");
   }
-  return quotes
+  return quotes;
 };
