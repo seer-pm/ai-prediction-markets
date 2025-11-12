@@ -7,7 +7,7 @@ export const SUPPORTED_CHAINS = { [optimism.id]: optimism };
 export type SupportedChain = keyof typeof SUPPORTED_CHAINS;
 
 export const AI_PREDICTION_MARKET_ID = "0xb88275fe4e2494e04cea8fb5e9d913aa48add581";
-export const ORIGINALITY_PARENT_MARKET_ID = "0xce79f7ecfdc5ac831859b011cdf78ea082e9c7d8"
+export const ORIGINALITY_PARENT_MARKET_ID = "0xdb3aae8d1c964767eeaa17805be25cded7a17210"
 
 export const CHAIN_ID = 10 as SupportedChain;
 
