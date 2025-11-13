@@ -7,7 +7,7 @@ import { useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 
-export const Round1 = () => {
+export const AiMarkets = () => {
   const { data: tableData, isLoading, isLoadingBalances, error } = useProcessPredictions([]);
   const { address: account } = useAccount();
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);

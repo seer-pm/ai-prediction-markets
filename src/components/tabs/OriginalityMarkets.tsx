@@ -10,7 +10,7 @@ import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { WithdrawOriginalityTokensInterface } from "../trade/WithdrawOriginalityTokensInterface";
 
-export const Round2 = () => {
+export const OriginalityMarkets = () => {
   const { address: account } = useAccount();
   const [predictions, setPredictions] = useLocalStorage<OriginalityRow[]>(
     "originality-default",
