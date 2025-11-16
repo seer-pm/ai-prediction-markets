@@ -6,8 +6,8 @@ export const Tab = () => {
   const [activeTab, setActiveTab] = useState("round1");
 
   const tabs = [
-    { id: "round1", label: "Round 1", component: <OriginalityMarkets /> },
-    { id: "round2", label: "Round 2", component: <AiMarkets /> },
+    { id: "round1", label: "Round 2 Originality", component: <OriginalityMarkets /> },
+    { id: "round2", label: "Round 1", component: <AiMarkets /> },
   ];
 
   return (
