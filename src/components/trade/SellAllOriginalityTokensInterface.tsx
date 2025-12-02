@@ -52,7 +52,7 @@ export const SellAllOriginalityTokensInterface: React.FC<SellAllTokensInterfaceP
       </div>
 
       <div className="px-6 py-4 space-y-4">
-        {false ? (
+        {!hasTokens ? (
           <p>Nothing to sell</p>
         ) : (
           <div className="flex space-x-4 mb-2">
