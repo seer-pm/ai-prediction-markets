@@ -145,6 +145,7 @@ export const toastify: ToastifyFn<any> = async (execute, config) => {
 
 export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
   let hash: `0x${string}` | undefined = undefined;
+  const TIMEOUT = 30000;
   try {
     const result = await contractWrite();
 
@@ -160,7 +161,7 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       receipt = await waitForTransactionReceipt(wagmiConfig, {
         hash,
         confirmations: 0,
-        timeout: 40000, //x seconds timeout, then we poll manually
+        timeout: TIMEOUT, //x seconds timeout, then we poll manually
       });
     } else {
       const { receipts = [] } = await waitForCallsStatus(wagmiConfig, {
@@ -176,7 +177,7 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       receipt = await waitForTransactionReceipt(wagmiConfig, {
         hash,
         confirmations: 0,
-        timeout: 40000, //x seconds timeout, then we poll manually
+        timeout: TIMEOUT, //x seconds timeout, then we poll manually
       });
     }
 
@@ -193,7 +194,8 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       hash &&
       (error instanceof WaitForTransactionReceiptTimeoutError ||
         error instanceof TransactionNotFoundError ||
-        error instanceof TransactionReceiptNotFoundError)
+        error instanceof TransactionReceiptNotFoundError ||
+        error?.message?.toLowerCase()?.includes("timed out"))
     ) {
       const newReceipt = await pollForTransactionReceipt(hash);
       if (newReceipt) {
@@ -240,7 +242,7 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
     const result = await toastifyTx(
       () => sendCalls(wagmiConfig, { calls: batch }),
       isSingleBatch
-        ? config 
+        ? config
         : {
             txSent: {
               title: config?.txSent?.title || `Sending batch ${i + 1}/${batches.length}...`,

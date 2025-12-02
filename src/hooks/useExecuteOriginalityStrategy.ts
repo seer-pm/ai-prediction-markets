@@ -54,7 +54,10 @@ const getSplitCalls = ({
   ];
 };
 
-export const getQuoteTradeCalls = async (tradeExecutor: Address, quotes: UniswapQuoteTradeResult[]) => {
+export const getQuoteTradeCalls = async (
+  tradeExecutor: Address,
+  quotes: UniswapQuoteTradeResult[]
+) => {
   const tradeApprovalCalls = quotes
     .map((quote) => getTradeApprovals7702(tradeExecutor, quote.trade))
     .flat();
@@ -114,7 +117,6 @@ export const toastifyBatchTx = async (
   }
 
   const isSingleBatch = batches.length === 1;
-  console.log(calls.length);
   // Show initial info about batching
   if (!isSingleBatch) {
     toastInfo({
@@ -149,11 +151,6 @@ export const toastifyBatchTx = async (
     });
     if (!result.status) {
       return { status: false, error: result.error };
-    }
-
-    // If any batch fails, abort the entire process and return the error
-    if (!result.status) {
-      return result;
     }
 
     lastReceipt = result.receipt;
@@ -225,7 +222,9 @@ const executeOriginalityStrategy = async ({
     account: tradeExecutor,
     tableData: newTableData,
   });
-
+  if (!originalityQuoteResults.length) {
+    throw new Error("No quote found");
+  }
   const tradeExecutorCalls = await getTradeExecutorCalls({
     quoteResults: originalityQuoteResults,
     tradeExecutor,
