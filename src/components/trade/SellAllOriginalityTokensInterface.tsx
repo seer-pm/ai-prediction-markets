@@ -1,5 +1,7 @@
 import { useSellToCollateral } from "@/hooks/useSellToCollateral";
+import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { OriginalityTableData } from "@/types";
+import { minBigIntArray } from "@/utils/common";
 import React from "react";
 import { Address } from "viem";
 
@@ -25,8 +27,13 @@ export const SellAllOriginalityTokensInterface: React.FC<SellAllTokensInterfaceP
       tableData: markets,
     });
   };
-
-  const hasTokens = !!markets?.filter((x) => x.upBalance || x.downBalance)?.length;
+  const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
+    tradeExecutor,
+    markets?.map((x) => x.collateralToken)
+  );
+  const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
+  const hasTokens =
+    !!markets?.filter((x) => x.upBalance || x.downBalance)?.length || hasMergeAmount;
 
   return (
     <div className="max-h-[90vh] overflow-y-auto">
@@ -52,7 +59,9 @@ export const SellAllOriginalityTokensInterface: React.FC<SellAllTokensInterfaceP
       </div>
 
       <div className="px-6 py-4 space-y-4">
-        {!hasTokens ? (
+        {isLoadingBalances ? (
+          <p>Checking balances...</p>
+        ) : !hasTokens ? (
           <p>Nothing to sell</p>
         ) : (
           <div className="flex space-x-4 mb-2">

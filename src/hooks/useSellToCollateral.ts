@@ -33,11 +33,12 @@ async function sellToCollateral({ tradeExecutor, tableData }: SellAllProps) {
     tradeExecutor,
     tableData.map((x) => x.collateralToken)
   );
+
   const mergeAmount = minBigIntArray(
     balances.map((balance, index) => {
-      const soldValue =
-        sellAllQuotes.find((data) => isTwoStringsEqual(data.buyToken, collateralTokens[index]))
-          ?.value ?? 0n;
+      const soldValue = sellAllQuotes
+        .filter((data) => isTwoStringsEqual(data.buyToken, collateralTokens[index]))
+        .reduce((acc, curr) => acc + curr.value, 0n);
       return balance + soldValue;
     })
   );

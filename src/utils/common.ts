@@ -78,7 +78,7 @@ export function formatBytecode(bytecode: string): Hex {
 
 export function minBigIntArray(values: bigint[]): bigint {
   if (values.length === 0) {
-    throw new Error("Cannot compute min of empty array");
+   return 0n
   }
   return values.reduce((min, v) => (v < min ? v : min));
 }
