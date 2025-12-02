@@ -84,7 +84,7 @@ async function getTradeArgs(
     amount
   );
 
-  const maximumSlippage = new Percent("1", "100");
+  const maximumSlippage = new Percent("5", "1000");
 
   return {
     buyToken,
