@@ -1,3 +1,6 @@
+import { OriginalityCSVUpload } from "@/components/OriginalityCSVUpload";
+import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
+import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
@@ -5,9 +8,7 @@ import { OriginalityRow } from "@/types";
 import { useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
-import { OriginalityCSVUpload } from "@/components/OriginalityCSVUpload";
-import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
-import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
+import { SellAllOriginalityTokensInterface } from "../trade/SellAllOriginalityTokensInterface";
 import { WithdrawOriginalityTokensInterface } from "../trade/WithdrawOriginalityTokensInterface";
 
 export const OriginalityMarkets = () => {
@@ -19,6 +20,7 @@ export const OriginalityMarkets = () => {
 
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
   const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
+  const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
@@ -76,6 +78,12 @@ export const OriginalityMarkets = () => {
           >
             Withdraw outcome tokens
           </button>
+          <button
+            onClick={() => setIsSellAllDialogOpen(true)}
+            className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
+          >
+            Sell all to sUSDS
+          </button>
           {checkTradeExecutorResult?.isCreated && (
             <button
               onClick={handleStartTrading}
@@ -131,6 +139,17 @@ export const OriginalityMarkets = () => {
               account={account!}
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               onClose={() => setIsWithdrawTokensDialogOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+      {isSellAllDialogOpen && (
+        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
+            <SellAllOriginalityTokensInterface
+              markets={tableData}
+              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+              onClose={() => setIsSellAllDialogOpen(false)}
             />
           </div>
         </div>

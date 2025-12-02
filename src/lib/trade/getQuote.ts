@@ -419,6 +419,54 @@ export const getSellFromBalanceQuotes = async ({
   return sellQuotes;
 };
 
+export const getSellAllQuotes = async ({
+  account,
+  tableData,
+}: {
+  account: Address;
+  tableData: OriginalityTableData[];
+}) => {
+  const chainId = CHAIN_ID;
+  const sellPromises = tableData.reduce((promises, row) => {
+    // sell from token to collateral
+    if (row.upBalance) {
+      promises.push(
+        getUniswapQuote(
+          chainId,
+          account,
+          formatUnits(row.upBalance, DECIMALS),
+          { address: row.wrappedTokens[1], symbol: "UP", decimals: DECIMALS },
+          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+          "sell"
+        )
+      );
+    }
+    if (row.downBalance) {
+      promises.push(
+        getUniswapQuote(
+          chainId,
+          account,
+          formatUnits(row.downBalance, DECIMALS),
+          { address: row.wrappedTokens[0], symbol: "DOWN", decimals: DECIMALS },
+          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+          "sell"
+        )
+      );
+    }
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  const sellQuoteResults = await Promise.allSettled(sellPromises);
+  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+
+  return sellQuotes;
+};
+
 export const getOriginalityQuotes = async ({
   account,
   tableData,

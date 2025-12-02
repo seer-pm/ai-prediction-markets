@@ -54,7 +54,7 @@ const getSplitCalls = ({
   ];
 };
 
-const getQuoteTradeCalls = async (tradeExecutor: Address, quotes: UniswapQuoteTradeResult[]) => {
+export const getQuoteTradeCalls = async (tradeExecutor: Address, quotes: UniswapQuoteTradeResult[]) => {
   const tradeApprovalCalls = quotes
     .map((quote) => getTradeApprovals7702(tradeExecutor, quote.trade))
     .flat();
@@ -97,7 +97,7 @@ const getTradeExecutorCalls = async ({
   return [...calls];
 };
 
-const toastifyBatchTx = async (
+export const toastifyBatchTx = async (
   tradeExecutor: Address,
   calls: {
     to: `0x${string}`;

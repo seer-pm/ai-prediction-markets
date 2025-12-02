@@ -160,7 +160,7 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       receipt = await waitForTransactionReceipt(wagmiConfig, {
         hash,
         confirmations: 0,
-        timeout: 20000, //20 seconds timeout, then we poll manually
+        timeout: 40000, //x seconds timeout, then we poll manually
       });
     } else {
       const { receipts = [] } = await waitForCallsStatus(wagmiConfig, {
@@ -176,7 +176,7 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       receipt = await waitForTransactionReceipt(wagmiConfig, {
         hash,
         confirmations: 0,
-        timeout: 20000, //20 seconds timeout, then we poll manually
+        timeout: 40000, //x seconds timeout, then we poll manually
       });
     }
 
@@ -240,7 +240,7 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
     const result = await toastifyTx(
       () => sendCalls(wagmiConfig, { calls: batch }),
       isSingleBatch
-        ? config
+        ? config 
         : {
             txSent: {
               title: config?.txSent?.title || `Sending batch ${i + 1}/${batches.length}...`,
