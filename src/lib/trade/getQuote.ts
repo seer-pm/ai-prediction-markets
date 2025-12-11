@@ -8,7 +8,14 @@ import {
   OriginalityTableData,
 } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
-import { CHAIN_ID, collateral, DECIMALS, NATIVE_TOKEN, VOLUME_MIN } from "@/utils/constants";
+import {
+  CHAIN_ID,
+  collateral,
+  DECIMALS,
+  NATIVE_TOKEN,
+  OTHER_TOKEN_ID,
+  VOLUME_MIN,
+} from "@/utils/constants";
 import {
   Currency,
   CurrencyAmount,
@@ -151,6 +158,9 @@ export const getQuotes = async ({
   );
   //get sell quotes first
   const sellPromises = sellMarkets.reduce((promises, row) => {
+    if (isTwoStringsEqual(row.outcomeId, OTHER_TOKEN_ID)) {
+      return promises;
+    }
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
       parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
@@ -165,7 +175,7 @@ export const getQuotes = async ({
         chainId,
         account,
         volume,
-        { address: row.marketId as Address, symbol: row.repo, decimals: DECIMALS },
+        { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
         collateral,
         "sell"
       )
@@ -198,12 +208,25 @@ export const getQuotes = async ({
 
   const collateralFromSell = sellQuotes.reduce((acc, curr) => acc + BigInt(curr!.value), 0n);
 
-  //get new balances
-  const newBalances = tableData.map(
-    (row) =>
-      (row.balance ?? 0n) + parseUnits(amount, DECIMALS) - (sellTokenMapping[row.marketId] ?? 0n)
-  );
-  //get collateral from merge
+  //get collateral from merge: we merge other tokens first, then we merge the rest
+  const newOtherBalances = tableData
+    .filter((row) => row.isOther)
+    .map(
+      (row) =>
+        (row.balance ?? 0n) + parseUnits(amount, DECIMALS) - (sellTokenMapping[row.outcomeId] ?? 0n)
+    );
+  const otherTokensFromMergeOther = minBigIntArray(newOtherBalances);
+
+  const newBalances = tableData
+    .filter((row) => !row.isOther)
+    .map((row) => {
+      if (row.outcomeId === OTHER_TOKEN_ID) {
+        return (row.balance ?? 0n) + otherTokensFromMergeOther;
+      }
+      return (
+        (row.balance ?? 0n) + parseUnits(amount, DECIMALS) - (sellTokenMapping[row.outcomeId] ?? 0n)
+      );
+    });
   const collateralFromMerge = minBigIntArray(newBalances);
 
   const totalCollateral = collateralFromSell + collateralFromMerge;
@@ -231,7 +254,7 @@ export const getQuotes = async ({
         chainId,
         account,
         volume.toString(),
-        { address: row.marketId as Address, symbol: row.repo, decimals: DECIMALS },
+        { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
         collateral,
         row.difference! > 0 ? "buy" : "sell"
       )
@@ -264,7 +287,11 @@ export const getQuotes = async ({
     throw new Error(`Quote Error: Cannot buy from ${collateral.symbol}`);
   }
   // sell first, then buy
-  return { quotes: [...sellQuotes, ...buyQuotes], mergeAmount: collateralFromMerge };
+  return {
+    quotes: [...sellQuotes, ...buyQuotes],
+    mergeAmount: collateralFromMerge,
+    otherTokensFromMergeOther,
+  };
 };
 
 const simpleBuyOriginalityQuotes = async ({
@@ -508,4 +535,44 @@ export const getOriginalityQuotes = async ({
     throw new Error("Quote Error: Cannot execute strategy");
   }
   return quotes;
+};
+
+export const getSellAllL1Quotes = async ({
+  account,
+  tableData,
+}: {
+  account: Address;
+  tableData: TableData[];
+}) => {
+  const chainId = CHAIN_ID;
+  const sellPromises = tableData.reduce((promises, row) => {
+    if (isTwoStringsEqual(row.outcomeId, OTHER_TOKEN_ID)) {
+      return promises;
+    }
+    // sell from token to collateral
+    if (row.balance) {
+      promises.push(
+        getUniswapQuote(
+          chainId,
+          account,
+          formatUnits(row.balance, DECIMALS),
+          { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
+          collateral,
+          "sell"
+        )
+      );
+    }
+
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  const sellQuoteResults = await Promise.allSettled(sellPromises);
+  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+
+  return sellQuotes;
 };

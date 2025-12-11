@@ -42,7 +42,7 @@ export const AiMarkets = () => {
         </div>
       </div>
       <MarketTable
-        markets={tableData || []}
+        rows={tableData || []}
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
       />
