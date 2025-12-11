@@ -4,7 +4,7 @@ import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 
 export const Tab = () => {
-  const [activeTab, setActiveTab] = useState("round1");
+  const [activeTab, setActiveTab] = useState("round2-l1");
 
   const tabs = [
     { id: "round2-l1", label: "Round 2 L1", component: <L1Markets /> },
