@@ -5,6 +5,7 @@ import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useL1MarketsData } from "./useL1MarketsData";
 import { useTokensBalances } from "./useTokensBalances";
 import { OTHER_MARKET_ID } from "@/utils/constants";
+import { isTwoStringsEqual } from "@/utils/common";
 
 const MIN_PRICE = 0.0001;
 
@@ -54,7 +55,7 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
           hasPrediction: false,
           volumeUntilPrice: 0,
           balance: balanceMapping?.[outcomeId],
-          isOther: outcome.marketId === OTHER_MARKET_ID,
+          isOther: isTwoStringsEqual(outcome.marketId, OTHER_MARKET_ID),
         };
       }
       const difference = currentPrice ? prediction.weight - currentPrice : null;
@@ -77,7 +78,7 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
         hasPrediction: true,
         volumeUntilPrice,
         balance: balanceMapping?.[outcomeId],
-        isOther: outcome.marketId === OTHER_MARKET_ID
+        isOther: isTwoStringsEqual(outcome.marketId, OTHER_MARKET_ID),
       };
     })
     .sort((a, b) => {
@@ -86,6 +87,5 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
       if (b.currentPrice === null) return -1;
       return b.currentPrice - a.currentPrice;
     });
-
   return { data: processedData, isLoading, isLoadingBalances, error };
 };

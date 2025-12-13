@@ -26,7 +26,7 @@ export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
     });
   };
 
-  const hasTokens = !!rows?.filter((x) => x.balance)?.length;
+  const hasTokens = !!rows?.filter((x) => x.currentPrice && x.balance)?.length;
 
   return (
     <div className="max-h-[90vh] overflow-y-auto">
@@ -69,7 +69,7 @@ export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={sellAllFromTradeExecutor.isPending}
             >
-              Sell
+              {sellAllFromTradeExecutor.isPending ? "Executing..." : "Sell"}
             </button>
           </div>
         )}

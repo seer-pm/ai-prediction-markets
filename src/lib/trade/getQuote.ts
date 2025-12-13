@@ -213,18 +213,23 @@ export const getQuotes = async ({
     .filter((row) => row.isOther)
     .map(
       (row) =>
-        (row.balance ?? 0n) + parseUnits(amount, DECIMALS) - (sellTokenMapping[row.outcomeId] ?? 0n)
+        (row.balance ?? 0n) +
+        parseUnits(amount, DECIMALS) -
+        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n)
     );
+  console.log({ newOtherBalances });
   const otherTokensFromMergeOther = minBigIntArray(newOtherBalances);
 
   const newBalances = tableData
     .filter((row) => !row.isOther)
     .map((row) => {
-      if (row.outcomeId === OTHER_TOKEN_ID) {
+      if (isTwoStringsEqual(row.outcomeId, OTHER_TOKEN_ID)) {
         return (row.balance ?? 0n) + otherTokensFromMergeOther;
       }
       return (
-        (row.balance ?? 0n) + parseUnits(amount, DECIMALS) - (sellTokenMapping[row.outcomeId] ?? 0n)
+        (row.balance ?? 0n) +
+        parseUnits(amount, DECIMALS) -
+        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n)
       );
     });
   const collateralFromMerge = minBigIntArray(newBalances);
