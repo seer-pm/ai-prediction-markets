@@ -19,11 +19,12 @@ export interface TableData {
   currentPrice: number | null;
   predictedWeight: number | null;
   difference: number | null;
-  marketId: string;
+  outcomeId: string;
   hasPrediction: boolean;
   volumeUntilPrice: number;
   balance?: bigint;
   payout?: number;
+  isOther: boolean;
 }
 export interface OriginalityTableData {
   repo: string;
@@ -40,7 +41,7 @@ export interface OriginalityTableData {
   downBalance?: bigint;
   wrappedTokens: Address[];
   collateralToken: Address;
-  amount?: string
+  amount?: string;
 }
 
 export interface TradeRequest {
@@ -97,8 +98,10 @@ export interface OriginalityQuoteProps {
 export interface TradeProps {
   tradeExecutor: Address;
   amount: string;
-  getQuotesResult: { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint } | undefined;
-  wrappedTokens: Address[];
+  getQuotesResult:
+    | { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint; otherTokensFromMergeOther: bigint }
+    | undefined;
+  tableData: TableData[];
 }
 
 export interface OriginalityTradeProps {

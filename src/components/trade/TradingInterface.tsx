@@ -9,10 +9,9 @@ import { useForm } from "react-hook-form";
 import { Address, formatUnits, parseUnits } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
 import { LoadingPanel } from "./LoadingPanel";
-import { useMarketsData } from "@/hooks/useMarketsData";
 
 interface TradingInterfaceProps {
-  markets: TableData[];
+  rows: TableData[];
   onClose: () => void;
   tradeExecutor: Address;
 }
@@ -23,7 +22,7 @@ interface TradeFormData {
 
 export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   tradeExecutor,
-  markets,
+  rows,
   onClose,
 }) => {
   const {
@@ -52,9 +51,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   } = useGetQuotes({
     account: tradeExecutor,
     amount: debouncedAmount,
-    tableData: markets,
+    tableData: rows,
   });
-  const { data } = useMarketsData();
 
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
@@ -74,7 +72,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       amount,
       getQuotesResult,
       tradeExecutor,
-      wrappedTokens: data?.wrappedTokens ?? [],
+      tableData: rows,
     });
   };
 
@@ -85,8 +83,8 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
   };
 
   // Strategy analysis
-  const buyMarkets = markets.filter((m) => m.difference && m.difference > 0);
-  const sellMarkets = markets.filter((m) => m.difference && m.difference < 0);
+  const buyOutcomes = rows.filter((m) => m.difference && m.difference > 0);
+  const sellOutcomes = rows.filter((m) => m.difference && m.difference < 0);
   const renderButtonText = () => {
     if (executeTradeMutation.isPending) {
       return (
@@ -146,7 +144,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
           <LoadingPanel
             title="Executing Trade Strategy"
             description={`Processing transactions across ${
-              buyMarkets.length + sellMarkets.length
+              buyOutcomes.length + sellOutcomes.length
             } markets.
                   This may take a few moments...`}
           />
@@ -154,7 +152,9 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
         {isLoadingQuotes && (
           <LoadingPanel
-            title={`Getting quotes: ${progress}/${buyMarkets.length + sellMarkets.length} markets`}
+            title={`Getting quotes: ${progress}/${
+              buyOutcomes.length + sellOutcomes.length
+            } markets`}
             description="Obtaining quotes to construct and execute trades. This may take a while..."
           />
         )}
@@ -163,11 +163,11 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         <div className="grid grid-cols-2 gap-4">
           <div className="px-4 py-2 bg-green-50 rounded-lg">
             <h4 className="font-medium text-green-800 mb-1">Overvalued Markets</h4>
-            <p className="text-2xl font-bold text-green-600">{buyMarkets.length}</p>
+            <p className="text-2xl font-bold text-green-600">{buyOutcomes.length}</p>
           </div>
           <div className="px-4 py-2 bg-red-50 rounded-lg">
             <h4 className="font-medium text-red-800 mb-1">Undervalued Markets</h4>
-            <p className="text-2xl font-bold text-red-600">{sellMarkets.length}</p>
+            <p className="text-2xl font-bold text-red-600">{sellOutcomes.length}</p>
           </div>
         </div>
 

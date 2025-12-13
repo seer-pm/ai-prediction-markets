@@ -1,46 +1,45 @@
 import { RouterAbi } from "@/abis/RouterAbi";
-import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { queryClient } from "@/config/queryClient";
-import { config } from "@/config/wagmi";
-import { toastifyTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
 import { TradeProps, UniswapQuoteTradeResult } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
-  AI_PREDICTION_MARKET_ID,
   CHAIN_ID,
   COLLATERAL_TOKENS,
+  L1_MARKET_ID,
+  OTHER_MARKET_ID,
+  OTHER_TOKEN_ID,
   ROUTER_ADDRESSES,
   SupportedChain,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
+import { toastifyBatchTx } from "./useExecuteOriginalityStrategy";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
-function splitFromRouter(router: Address, amount: bigint): Execution {
+function splitFromRouter(router: Address, amount: bigint, marketId: Address): Execution {
   return {
     to: router,
     value: 0n,
     data: encodeFunctionData({
       abi: RouterAbi,
       functionName: "splitPosition",
-      args: [collateral.address, AI_PREDICTION_MARKET_ID, amount],
+      args: [collateral.address, marketId, amount],
     }),
   };
 }
 
-function mergeFromRouter(router: Address, amount: bigint): Execution {
+function mergeFromRouter(router: Address, amount: bigint, marketId: Address): Execution {
   return {
     to: router,
     value: 0n,
     data: encodeFunctionData({
       abi: RouterAbi,
       functionName: "mergePositions",
-      args: [collateral.address, AI_PREDICTION_MARKET_ID, amount],
+      args: [collateral.address, marketId, amount],
     }),
   };
 }
@@ -49,9 +48,9 @@ const checkAndAddApproveCalls = async ({
   tradeExecutor,
   amount,
   getQuotesResult,
-  wrappedTokens,
+  tableData,
 }: TradeProps) => {
-  const { quotes, mergeAmount } = getQuotesResult!;
+  const { quotes, mergeAmount, otherTokensFromMergeOther } = getQuotesResult!;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const [buyQuotes, sellQuotes] = quotes.reduce(
     (acc, quote) => {
@@ -60,7 +59,7 @@ const checkAndAddApproveCalls = async ({
     },
     [[], []] as [UniswapQuoteTradeResult[], UniswapQuoteTradeResult[]]
   );
-  // split + sell + merge + buy approval calls
+  // split (main + other) + sell + merge + buy approval calls
   const calls: Execution[] = [
     ...(Number(amount) > 0
       ? [
@@ -69,6 +68,13 @@ const checkAndAddApproveCalls = async ({
             account: tradeExecutor,
             spender: router,
             amounts: parseUnits(amount, collateral.decimals),
+            chainId: CHAIN_ID,
+          },
+          {
+            tokensAddresses: [OTHER_TOKEN_ID as Address],
+            account: tradeExecutor,
+            spender: router,
+            amounts: parseUnits(amount, 18),
             chainId: CHAIN_ID,
           },
         ]
@@ -80,14 +86,27 @@ const checkAndAddApproveCalls = async ({
       amounts: getMaximumAmountIn(trade),
       chainId: trade.chainId as SupportedChain,
     })),
+    ...(otherTokensFromMergeOther > 0n
+      ? tableData
+          .filter((row) => row.isOther)
+          .map((row) => ({
+            tokensAddresses: [row.outcomeId as Address],
+            account: tradeExecutor,
+            spender: router,
+            amounts: otherTokensFromMergeOther,
+            chainId: CHAIN_ID,
+          }))
+      : []),
     ...(mergeAmount > 0n
-      ? wrappedTokens.map((token) => ({
-          tokensAddresses: [token],
-          account: tradeExecutor,
-          spender: router,
-          amounts: mergeAmount,
-          chainId: CHAIN_ID,
-        }))
+      ? tableData
+          .filter((row) => !row.isOther)
+          .map((row) => ({
+            tokensAddresses: [row.outcomeId as Address],
+            account: tradeExecutor,
+            spender: router,
+            amounts: mergeAmount,
+            chainId: CHAIN_ID,
+          }))
       : []),
     {
       tokensAddresses: [buyQuotes[0].trade.executionPrice.baseCurrency.address as `0x${string}`],
@@ -107,9 +126,9 @@ const getTradeExecutorCalls = async ({
   amount,
   getQuotesResult,
   tradeExecutor,
-  wrappedTokens,
+  tableData,
 }: TradeProps) => {
-  const { mergeAmount } = getQuotesResult!;
+  const { mergeAmount, otherTokensFromMergeOther } = getQuotesResult!;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
   const calls: Execution[] = [];
@@ -117,11 +136,12 @@ const getTradeExecutorCalls = async ({
     amount,
     getQuotesResult,
     tradeExecutor,
-    wrappedTokens,
+    tableData,
   });
   calls.push(...approveCalls);
   if (Number(amount) > 0) {
-    calls.push(splitFromRouter(router, parsedSplitAmount));
+    calls.push(splitFromRouter(router, parsedSplitAmount, L1_MARKET_ID));
+    calls.push(splitFromRouter(router, parsedSplitAmount, OTHER_MARKET_ID));
   }
   // push sell trade transactions
   const sellTradeTransactions = await Promise.all(
@@ -130,10 +150,14 @@ const getTradeExecutorCalls = async ({
       .map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
   );
   calls.push(...sellTradeTransactions);
+  console.log({result: getQuotesResult?.quotes, otherTokensFromMergeOther, mergeAmount})
 
   // push merge
+  if (otherTokensFromMergeOther > 0n) {
+    calls.push(mergeFromRouter(router, otherTokensFromMergeOther, OTHER_MARKET_ID));
+  }
   if (mergeAmount > 0n) {
-    calls.push(mergeFromRouter(router, mergeAmount));
+    calls.push(mergeFromRouter(router, mergeAmount, L1_MARKET_ID));
   }
 
   // push buy trade transactions
@@ -150,34 +174,29 @@ const executeTradeStrategyContract = async ({
   amount,
   getQuotesResult,
   tradeExecutor,
-  wrappedTokens,
+  tableData,
 }: TradeProps) => {
   if (!getQuotesResult?.quotes || !getQuotesResult.quotes.length) {
     throw new Error("No quote found");
   }
-  if (!wrappedTokens.length) {
+  if (!tableData.length) {
     throw new Error("No token found");
   }
   const tradeExecutorCalls = await getTradeExecutorCalls({
     amount,
     getQuotesResult,
     tradeExecutor,
-    wrappedTokens,
+    tableData,
   });
 
-  const writePromise = writeContract(config, {
-    address: tradeExecutor,
-    abi: TradeExecutorAbi,
-    functionName: "batchExecute",
-    args: [tradeExecutorCalls.map((call) => ({ data: call.data, to: call.to }))],
-    value: 0n,
-    chainId: CHAIN_ID,
+  const result = await toastifyBatchTx(tradeExecutor, tradeExecutorCalls, {
+    txSent: "Executing trade...",
+    txSuccess: "Trade executed!",
   });
+  if (!result.status) {
+    throw result.error;
+  }
 
-  const result = await toastifyTx(() => writePromise, {
-    txSent: { title: "Executing trade..." },
-    txSuccess: { title: "Trade executed!" },
-  });
   if (!result.status) {
     throw result.error;
   }
@@ -190,7 +209,7 @@ export const useExecuteTradeStrategy = (onSuccess?: () => unknown) => {
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["useMarketsData"] });
+        queryClient.refetchQueries({ queryKey: ["useL1MarketsData"] });
         queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
         queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
         queryClient.invalidateQueries({ queryKey: ["useGetQuotes"] });

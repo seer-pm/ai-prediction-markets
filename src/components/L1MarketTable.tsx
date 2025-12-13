@@ -9,7 +9,7 @@ interface MarketTableProps {
   isLoadingBalances: boolean;
 }
 
-export const MarketTable: React.FC<MarketTableProps> = ({
+export const L1MarketTable: React.FC<MarketTableProps> = ({
   rows,
   isLoading,
   isLoadingBalances,
@@ -37,7 +37,7 @@ export const MarketTable: React.FC<MarketTableProps> = ({
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-6 border-b">
         <h2 className="text-2xl font-bold">Repository Contribution to Ethereum</h2>
-        <p className="text-gray-600">Repositories ranked by resolved weight</p>
+        <p className="text-gray-600">Repositories ranked by current weight</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -52,15 +52,25 @@ export const MarketTable: React.FC<MarketTableProps> = ({
                 Balance
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Resolved Weight
+                Parent
+              </th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Current Weight
+              </th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Predicted Weight
+              </th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Difference
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 text-sm">
             {rows.map((row) => {
-              const { outcomeId, repo, payout, balance } = row;
+              const { outcomeId, repo, parent, currentPrice, predictedWeight, difference, balance } =
+                row;
 
-              if (repo === "Invalid result") return null;
+              if (repo === "Invalid result" || repo.includes("Other repositories")) return null;
 
               return (
                 <tr key={outcomeId} className="hover:bg-gray-50">
@@ -82,8 +92,26 @@ export const MarketTable: React.FC<MarketTableProps> = ({
                       </div>
                     )}
                   </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">{parent ?? "-"}</td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
+                    {currentPrice?.toFixed(8) ?? "-"}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
+                    {predictedWeight?.toFixed(8) ?? "-"}
+                  </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    {payout?.toFixed(8) ?? "-"}
+                    {difference ? (
+                      <span
+                        className={`font-medium font-mono ${
+                          difference > 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {difference > 0 ? "+" : ""}
+                        {difference.toFixed(8)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-900 font-mono">-</span>
+                    )}
                   </td>
                 </tr>
               );
