@@ -7,10 +7,11 @@ export const SUPPORTED_CHAINS = { [optimism.id]: optimism };
 export type SupportedChain = keyof typeof SUPPORTED_CHAINS;
 
 export const AI_PREDICTION_MARKET_ID = "0xb88275fe4e2494e04cea8fb5e9d913aa48add581";
-export const ORIGINALITY_PARENT_MARKET_ID = "0xdb3aae8d1c964767eeaa17805be25cded7a17210"
-export const L1_MARKET_ID =   "0x3220a208aaf4d2ceecde5a2e21ec0c9145f40ba6"
-export const OTHER_MARKET_ID =   "0xfea47428981f70110c64dd678889826c3627245b"
-export const OTHER_TOKEN_ID =   "0x63a4f76ef5846f68d069054c271465b7118e8ed9"
+export const ORIGINALITY_PARENT_MARKET_ID = "0xdb3aae8d1c964767eeaa17805be25cded7a17210";
+export const L1_MARKET_ID = "0x3220a208aaf4d2ceecde5a2e21ec0c9145f40ba6";
+export const OTHER_MARKET_ID = "0xfea47428981f70110c64dd678889826c3627245b";
+export const OTHER_TOKEN_ID = "0x63a4f76ef5846f68d069054c271465b7118e8ed9";
+export const L2_PARENT_MARKET_ID = "0x2d05454c1b4387b5d8be84bee20d58390a01ca64";
 
 export const CHAIN_ID = 10 as SupportedChain;
 
