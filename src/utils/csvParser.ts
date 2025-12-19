@@ -1,4 +1,4 @@
-import { OriginalityRow, PredictionRow } from "@/types";
+import { L2Row, OriginalityRow, PredictionRow } from "@/types";
 
 export const parseCSV = (csvText: string): PredictionRow[] => {
   const lines = csvText.trim().split("\n");
@@ -127,7 +127,74 @@ export const parseOriginalityCSV = (csvText: string): OriginalityRow[] => {
 
     results.push({
       repo,
-      originality
+      originality,
+    });
+  }
+
+  if (results.length === 0) {
+    throw new Error("CSV contains no valid data rows");
+  }
+
+  return results;
+};
+
+export const parseL2CSV = (csvText: string): L2Row[] => {
+  const lines = csvText.trim().split("\n");
+
+  if (lines.length < 2) {
+    throw new Error("CSV must have at least a header row and one data row");
+  }
+
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+
+  // Check for required columns
+  if (headers.length !== 3) {
+    throw new Error("CSV must have exactly 3 columns: dependency, repo, weight");
+  }
+
+  if (!headers.includes("dependency") || !headers.includes("repo") || !headers.includes("weight")) {
+    throw new Error("CSV must have columns: dependency, repo, weight");
+  }
+
+  const seenDependencies = new Set<string>();
+  const results: L2Row[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
+
+    const values = line.split(",").map((v) => v.trim());
+
+    if (values.length !== 3) {
+      throw new Error(`Row ${i + 1}: Expected 3 columns, found ${values.length}`);
+    }
+    const [dependency, repo, weightStr] = values;
+
+    // Check for empty values
+    if (!dependency || !repo || !weightStr) {
+      throw new Error(`Row ${i + 1}: All columns must have values`);
+    }
+
+    // Check for duplicate dependency
+    if (seenDependencies.has(dependency)) {
+      throw new Error(`Row ${i + 1}: Duplicate dependency "${dependency}"`);
+    }
+    seenDependencies.add(dependency);
+
+    // Validate weight
+    const weight = parseFloat(weightStr);
+    if (isNaN(weight)) {
+      throw new Error(`Row ${i + 1}: Weight "${weightStr}" is not a valid number`);
+    }
+
+    if (weight < 0) {
+      throw new Error(`Row ${i + 1}: Weight cannot be negative`);
+    }
+
+    results.push({
+      dependency,
+      repo,
+      weight,
     });
   }
 
