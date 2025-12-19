@@ -2,6 +2,7 @@ import { L2TableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
 import React from "react";
 import { formatUnits } from "viem";
+import MarketsPagination from "./MarketsPagination";
 
 interface MarketTableProps {
   rows: L2TableData[];
@@ -14,6 +15,9 @@ export const L2MarketTable: React.FC<MarketTableProps> = ({
   isLoading,
   isLoadingBalances,
 }) => {
+  const PAGE_SIZE = 50;
+  const pageCount = Math.ceil(rows.length / PAGE_SIZE);
+  const [pageIndex, setPageIndex] = React.useState(0);
   if (isLoading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -32,12 +36,11 @@ export const L2MarketTable: React.FC<MarketTableProps> = ({
   if (rows.length === 0) {
     return null;
   }
-
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="p-6 border-b">
-        <h2 className="text-2xl font-bold">Repository Contribution to Ethereum</h2>
-        <p className="text-gray-600">Dependencies</p>
+        <h2 className="text-2xl font-bold">Dependency Contribution to Ethereum</h2>
+        <p className="text-gray-600">By Repository</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -66,7 +69,7 @@ export const L2MarketTable: React.FC<MarketTableProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 text-sm">
-            {rows.map((row) => {
+            {rows.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE).map((row) => {
               const {
                 outcomeId,
                 dependency,
@@ -77,7 +80,7 @@ export const L2MarketTable: React.FC<MarketTableProps> = ({
                 balance,
               } = row;
 
-              if (repo === "Invalid result") return null;
+              if (repo === "Invalid result" || dependency === "Invalid result") return null;
 
               return (
                 <tr key={outcomeId} className="hover:bg-gray-50">
@@ -129,6 +132,13 @@ export const L2MarketTable: React.FC<MarketTableProps> = ({
             })}
           </tbody>
         </table>
+      </div>
+      <div className="my-5">
+        <MarketsPagination
+          pageCount={pageCount}
+          handlePageClick={({ selected }) => setPageIndex(selected)}
+          page={pageIndex + 1}
+        />
       </div>
     </div>
   );

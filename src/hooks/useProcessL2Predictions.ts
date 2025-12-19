@@ -64,6 +64,7 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
             collateralToken: market.collateralToken,
             wrappedTokens: market.wrappedTokens,
           });
+          continue;
         }
         const difference = currentPrice ? prediction.weight - currentPrice : null;
         const volumeUntilPrice =
