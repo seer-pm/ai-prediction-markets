@@ -4,7 +4,6 @@ import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useL2MarketsData } from "./useL2MarketsData";
 import { useTokensBalances } from "./useTokensBalances";
-import { zeroAddress } from "viem";
 
 const MIN_PRICE = 0.0001;
 
