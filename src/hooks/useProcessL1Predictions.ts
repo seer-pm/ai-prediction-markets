@@ -41,7 +41,7 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
 
   const processedData: TableData[] = Object.entries(data.marketsData)
     .map(([outcomeRepo, outcome]) => {
-      const prediction = repoToPredictionMapping[outcomeRepo];
+      const prediction = repoToPredictionMapping[outcomeRepo.replace("\\t", "")];
       const { id: outcomeId, pool, price: currentPrice } = outcome;
 
       if (!prediction) {

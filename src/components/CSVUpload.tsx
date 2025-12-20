@@ -1,6 +1,7 @@
 import { PredictionRow } from "@/types";
 import { downloadCsv } from "@/utils/common";
 import { parseCSV } from "@/utils/csvParser";
+import { sampleL1Predictions } from "@/utils/sampleL1Predictions";
 import React, { useCallback } from "react";
 import { useForm } from "react-hook-form";
 
@@ -61,18 +62,13 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
           title: "weight",
         },
       ],
-      [
-        {
-          repo: "https://github.com/a16z/helios",
+      sampleL1Predictions.map((row) => {
+        return {
+          repo: `https://github.com/${row.item}`,
           parent: "ethereum",
-          weight: "0.01363775945",
-        },
-        {
-          repo: "https://github.com/ethereum/go-ethereum",
-          parent: "ethereum",
-          weight: "0.02100000",
-        },
-      ],
+          weight: row.weight,
+        };
+      }),
       "predictions"
     );
   };
