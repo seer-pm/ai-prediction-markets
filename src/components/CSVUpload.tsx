@@ -1,5 +1,7 @@
 import { PredictionRow } from "@/types";
+import { downloadCsv } from "@/utils/common";
 import { parseCSV } from "@/utils/csvParser";
+import { sampleL1Predictions } from "@/utils/sampleL1Predictions";
 import React, { useCallback } from "react";
 import { useForm } from "react-hook-form";
 
@@ -44,6 +46,33 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
     [onDataParsed, setError, clearErrors]
   );
 
+  const downloadSampleCsv = () => {
+    downloadCsv(
+      [
+        {
+          key: "repo",
+          title: "repo",
+        },
+        {
+          key: "parent",
+          title: "parent",
+        },
+        {
+          key: "weight",
+          title: "weight",
+        },
+      ],
+      sampleL1Predictions.map((row) => {
+        return {
+          repo: `https://github.com/${row.item}`,
+          parent: "ethereum",
+          weight: row.weight,
+        };
+      }),
+      "predictions"
+    );
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       {/* Header */}
@@ -70,7 +99,16 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select CSV File</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-gray-700">Select CSV File</label>
+              <button
+                type="button"
+                onClick={() => downloadSampleCsv()}
+                className="hover:underline cursor-pointer text-gray-500 text-sm"
+              >
+                Download Sample CSV
+              </button>
+            </div>
             <input
               {...register("csvFile", { required: "CSV file is required" })}
               type="file"
