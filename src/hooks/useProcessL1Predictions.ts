@@ -35,13 +35,13 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
   }
 
   const repoToPredictionMapping = predictions.reduce((acc, curr) => {
-    acc[curr.repo.replace("https://github.com/", "")] = curr;
+    acc[curr.repo.replace("https://github.com/", "").toLowerCase()] = curr;
     return acc;
   }, {} as { [key: string]: PredictionRow });
 
   const processedData: TableData[] = Object.entries(data.marketsData)
     .map(([outcomeRepo, outcome]) => {
-      const prediction = repoToPredictionMapping[outcomeRepo.replace("\\t", "")];
+      const prediction = repoToPredictionMapping[outcomeRepo.replace("\\t", "").toLowerCase()];
       const { id: outcomeId, pool, price: currentPrice } = outcome;
 
       if (!prediction) {
