@@ -15,7 +15,7 @@ import { Address } from "viem";
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
 export async function getPools(tokenPairs: { token0: Address; token1: Address }[]) {
-  const maxAttempts = 5;
+  const maxAttempts = 10;
   let attempt = 0;
   let id = undefined;
   let total: GetPoolsQuery["pools"] = [];
