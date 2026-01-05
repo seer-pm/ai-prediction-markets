@@ -109,7 +109,7 @@ export const toastifyBatchTx = async (
   }[],
   messageConfig: { txSent: string; txSuccess: string }
 ) => {
-  const BATCH_SIZE = 50;
+  const BATCH_SIZE = 75;
   const batches = [];
 
   for (let i = 0; i < calls.length; i += BATCH_SIZE) {

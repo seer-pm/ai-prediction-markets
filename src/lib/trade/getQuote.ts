@@ -309,9 +309,13 @@ export const getL2Quotes = async ({
 }: L2QuoteProps & { onProgress?: ProgressCallback }) => {
   const chainId = CHAIN_ID;
   let currentProgress = 0;
-  const l2Markets = Array.from(new Set(tableData.map((row) => row.marketId)));
+  const l2MarketsWithData = Array.from(
+    new Set(
+      tableData.filter((row) => row.hasPrediction && row.difference).map((row) => row.marketId)
+    )
+  );
   const marketsExecution = await Promise.all(
-    l2Markets.map(async (marketId) => {
+    l2MarketsWithData.map(async (marketId) => {
       currentProgress++;
       onProgress?.(currentProgress);
       const rowsWithData = tableData.filter(
@@ -339,7 +343,7 @@ export const getL2Quotes = async ({
             chainId,
             account,
             volume,
-            { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
+            { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
             { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
             "sell"
           )
@@ -392,16 +396,16 @@ export const getL2Quotes = async ({
             chainId,
             account,
             volume.toString(),
-            { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
-            collateral,
-            row.difference! > 0 ? "buy" : "sell"
+            { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
+            { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+            "buy"
           )
         );
         return promises;
       }, [] as Promise<UniswapQuoteTradeResult>[]);
 
       if (!buyPromises.length) {
-        throw new Error("Quote Error: Amount too small");
+        return null;
       }
       const buyQuoteResult = await Promise.allSettled(buyPromises);
       const buyQuotes = buyQuoteResult.reduce((quotes, result) => {
@@ -410,7 +414,6 @@ export const getL2Quotes = async ({
         }
         return quotes;
       }, [] as UniswapQuoteTradeResult[]);
-
       if (!buyQuotes) {
         return null;
       }
@@ -420,6 +423,7 @@ export const getL2Quotes = async ({
       };
     })
   );
+  console.log(marketsExecution);
   return marketsExecution.filter((x) => x) as {
     quotes: UniswapQuoteTradeResult[];
     mergeAmount: bigint;

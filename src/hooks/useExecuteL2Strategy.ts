@@ -123,19 +123,19 @@ const executeL2StrategyContract = async ({
   tradeExecutor,
   tableData,
 }: L2TradeProps) => {
+  const filteredTableData = tableData.filter((row) => row.hasPrediction && row.difference);
   if (!getQuotesResults.length) {
     throw new Error("No quote found");
   }
-  if (!tableData.length) {
+  if (!filteredTableData.length) {
     throw new Error("No token found");
   }
   const tradeExecutorCalls = await getTradeExecutorCalls({
     amount,
     getQuotesResults,
     tradeExecutor,
-    tableData,
+    tableData: filteredTableData,
   });
-
   const result = await toastifyBatchTx(tradeExecutor, tradeExecutorCalls, {
     txSent: "Executing trade...",
     txSuccess: "Trade executed!",

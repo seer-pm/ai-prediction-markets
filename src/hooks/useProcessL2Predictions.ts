@@ -34,7 +34,9 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
   }
 
   const dependencyToPredictionMapping = predictions.reduce((acc, curr) => {
-    acc[curr.dependency.replace("https://github.com/", "").toLowerCase()] = curr;
+    const dependency = curr.dependency.replace("https://github.com/", "").toLowerCase();
+    const repo = curr.repo.replace("https://github.com/", "").toLowerCase();
+    acc[`${dependency}-${repo}`] = curr;
     return acc;
   }, {} as { [key: string]: L2Row });
 
@@ -45,7 +47,8 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
       if (!market) return acc;
       for (let i = 0; i < market.wrappedTokens.length; i++) {
         const dependency = market.outcomes[i];
-        const prediction = dependencyToPredictionMapping[dependency.toLowerCase()];
+        const prediction =
+          dependencyToPredictionMapping[`${dependency.toLowerCase()}-${marketRepo.toLowerCase()}`];
         const outcomeId = market.wrappedTokens[i];
         const currentPrice = prices[i];
         const pool = pools[i];

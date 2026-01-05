@@ -14,6 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData } from "viem";
 import { getQuoteTradeCalls, toastifyBatchTx } from "./useExecuteOriginalityStrategy";
 import { fetchTokensBalances } from "./useTokensBalances";
+import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 
 interface SellAllProps {
   tradeExecutor: Address;
@@ -28,9 +29,8 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
     tableData,
   });
   const swapCalls = await getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
-  const collateralTokens = Array.from(new Set(tableData.map((x) => x.collateralToken)));
+  const collateralTokens = l2MarketOutcomes as Address[];
   const balances = await fetchTokensBalances(tradeExecutor, collateralTokens);
-
   const mergeAmount = minBigIntArray(
     balances.map((balance, index) => {
       const soldValue = sellAllQuotes
@@ -41,29 +41,15 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
   );
   if (mergeAmount > 0n) {
     swapCalls.push(
-      ...tableData
-        .map((data) =>
-          getApprovals7702({
-            tokensAddresses: [data.collateralToken],
-            account: tradeExecutor,
-            spender: router,
-            amounts: mergeAmount,
-            chainId: CHAIN_ID,
-          })
-        )
-        .flat()
-    );
-    // need to approval INVALID too
-    const INVALID = "0x7f5866a4204ddce2c95355d4b265b2b54b5d7365";
-    swapCalls.push(
       ...getApprovals7702({
-        tokensAddresses: [INVALID],
+        tokensAddresses: collateralTokens,
         account: tradeExecutor,
         spender: router,
         amounts: mergeAmount,
         chainId: CHAIN_ID,
       })
     );
+
     swapCalls.push({
       to: router,
       value: 0n,
