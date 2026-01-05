@@ -16,7 +16,7 @@ import {
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { writeContract } from "@wagmi/core";
+import { simulateContract, writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, formatUnits, parseUnits, TransactionReceipt } from "viem";
 
 const getSplitCalls = ({
@@ -109,6 +109,28 @@ export const toastifyBatchTx = async (
   }[],
   messageConfig: { txSent: string; txSuccess: string }
 ) => {
+  //static call first
+  try {
+    await simulateContract(config, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [
+        calls.map((call) => ({
+          to: call.to,
+          data: call.data,
+        })),
+      ],
+      value: 0n,
+      chainId: CHAIN_ID,
+    });
+  } catch (err) {
+    return {
+      status: false,
+      error: err,
+    };
+  }
+
   const BATCH_SIZE = 75;
   const batches = [];
 

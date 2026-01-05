@@ -423,7 +423,6 @@ export const getL2Quotes = async ({
       };
     })
   );
-  console.log(marketsExecution);
   return marketsExecution.filter((x) => x) as {
     quotes: UniswapQuoteTradeResult[];
     mergeAmount: bigint;
