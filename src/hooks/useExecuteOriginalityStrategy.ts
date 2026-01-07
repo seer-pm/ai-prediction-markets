@@ -158,7 +158,28 @@ export const toastifyBatchTx = async (
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     const isLastBatch = i === batches.length - 1;
-
+    //static call each batch with gas limit first
+    try {
+      await simulateContract(config, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "batchExecute",
+        args: [
+          batch.map((call) => ({
+            to: call.to,
+            data: call.data,
+          })),
+        ],
+        value: 0n,
+        chainId: CHAIN_ID,
+        gas: 20_000_000n,
+      });
+    } catch (err) {
+      return {
+        status: false,
+        error: err,
+      };
+    }
     const writePromise = writeContract(config, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,
