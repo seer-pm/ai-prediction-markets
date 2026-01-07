@@ -156,7 +156,7 @@ export const parseL2CSV = (csvText: string): L2Row[] => {
     throw new Error("CSV must have columns: dependency, repo, weight");
   }
 
-  const seenDependencies = new Set<string>();
+  const seenDependenciesByRepos = new Set<string>();
   const results: L2Row[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -175,11 +175,12 @@ export const parseL2CSV = (csvText: string): L2Row[] => {
       throw new Error(`Row ${i + 1}: All columns must have values`);
     }
 
-    // Check for duplicate dependency
-    if (seenDependencies.has(dependency)) {
-      throw new Error(`Row ${i + 1}: Duplicate dependency "${dependency}"`);
+    // Check for duplicate dependency + repo
+    const dependencyByRepo = `${dependency}-${repo}`;
+    if (seenDependenciesByRepos.has(dependencyByRepo)) {
+      throw new Error(`Row ${i + 1}: Duplicate dependency "${dependency}" of repo "${repo}"`);
     }
-    seenDependencies.add(dependency);
+    seenDependenciesByRepos.add(dependencyByRepo);
 
     // Validate weight
     const weight = parseFloat(weightStr);
