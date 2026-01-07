@@ -58,13 +58,17 @@ export const getQuoteTradeCalls = async (
   tradeExecutor: Address,
   quotes: UniswapQuoteTradeResult[]
 ) => {
-  const tradeApprovalCalls = quotes
-    .map((quote) => getTradeApprovals7702(tradeExecutor, quote.trade))
-    .flat();
-  const tradeCalls = await Promise.all(
-    quotes.map((quote) => getUniswapTradeExecution(quote.trade, tradeExecutor))
-  );
-  return [...tradeApprovalCalls, ...tradeCalls];
+  const calls = (
+    await Promise.all(
+      quotes.map(async (quote) => {
+        return [
+          ...getTradeApprovals7702(tradeExecutor, quote.trade),
+          await getUniswapTradeExecution(quote.trade, tradeExecutor),
+        ];
+      })
+    )
+  ).flat();
+  return calls;
 };
 const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
 
@@ -131,7 +135,7 @@ export const toastifyBatchTx = async (
     };
   }
 
-  const BATCH_SIZE = 75;
+  const BATCH_SIZE = 50;
   const batches = [];
 
   for (let i = 0; i < calls.length; i += BATCH_SIZE) {
