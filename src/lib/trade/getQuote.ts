@@ -219,7 +219,6 @@ export const getQuotes = async ({
         parseUnits(amount, DECIMALS) -
         (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n)
     );
-  console.log({ newOtherBalances });
   const otherTokensFromMergeOther = minBigIntArray(newOtherBalances);
 
   const newBalances = tableData
@@ -246,8 +245,8 @@ export const getQuotes = async ({
   const sumBuyDifference = buyMarkets.reduce((acc, curr) => acc + curr.difference!, 0);
   const buyPromises = buyMarkets.reduce((promises, row) => {
     const availableBuyVolume =
-      (parseUnits(row.difference!.toString(), DECIMALS) * totalCollateral) /
-      parseUnits(sumBuyDifference!.toString(), DECIMALS);
+      (parseUnits(row.difference!.toFixed(15), DECIMALS) * totalCollateral) /
+      parseUnits(sumBuyDifference!.toFixed(15), DECIMALS);
     const volume =
       parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableBuyVolume
         ? formatUnits(availableBuyVolume, DECIMALS)

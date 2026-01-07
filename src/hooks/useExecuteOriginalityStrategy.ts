@@ -172,7 +172,7 @@ export const toastifyBatchTx = async (
         ],
         value: 0n,
         chainId: CHAIN_ID,
-        gas: 20_000_000n,
+        gas: 15_000_000n,
       });
     } catch (err) {
       return {
