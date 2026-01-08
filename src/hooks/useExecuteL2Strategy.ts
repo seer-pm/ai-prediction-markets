@@ -74,6 +74,16 @@ function mergeFromRouter(
   ];
 }
 
+const mintCalls = async (tradeExecutor: Address, calls: Execution[], title:string) => {
+  const result = await toastifyBatchTx(tradeExecutor, calls, {
+    txSent: title,
+    txSuccess: "Tokens minted!",
+  });
+  if (!result.status) {
+    throw result.error;
+  }
+};
+
 const getTradeExecutorCalls = async ({
   amount,
   getQuotesResults,
@@ -83,18 +93,24 @@ const getTradeExecutorCalls = async ({
   // mint l1
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
-  const calls = splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address);
+  await mintCalls(
+    tradeExecutor,
+    splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
+    "Minting parent outcome tokens..."
+  );
   // mint l2 markets
-  const l2Markets = {} as { [key: string]: { marketId: string; collateralToken: string } };
-  for (const { marketId, collateralToken } of tableData) {
-    l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken };
+  const l2Markets = {} as { [key: string]: { marketId: string; collateralToken: string; repo:string } };
+  for (const { marketId, collateralToken, repo } of tableData) {
+    l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken, repo };
   }
-  for (const { marketId, collateralToken } of Object.values(l2Markets)) {
-    calls.push(
-      ...splitFromRouter(router, parsedSplitAmount, marketId as Address, collateralToken as Address)
+  for (const { marketId, collateralToken, repo } of Object.values(l2Markets)) {
+    await mintCalls(
+      tradeExecutor,
+      splitFromRouter(router, parsedSplitAmount, marketId as Address, collateralToken as Address),
+      `Minting tokens for market ${repo}`
     );
   }
-
+  const calls: Execution[] = [];
   //trade transactions
   for (const { quotes, mergeAmount } of getQuotesResults) {
     const sellQuotes = quotes.filter((quote) => quote.swapType === "sell");
@@ -144,9 +160,6 @@ const executeL2StrategyContract = async ({
     throw result.error;
   }
 
-  if (!result.status) {
-    throw result.error;
-  }
   return result;
 };
 
