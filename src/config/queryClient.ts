@@ -18,7 +18,7 @@ persistQueryClient({
   persister: localStoragePersister,
   dehydrateOptions: {
     shouldDehydrateQuery: (query) => {
-      return query.queryKey[0] === "useMarketsData";
+      return query.queryKey[0] === "useMarketsData" || query.queryKey[0] === 'useTokensBalances';
     },
   },
 });
