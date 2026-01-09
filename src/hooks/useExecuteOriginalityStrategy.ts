@@ -16,7 +16,7 @@ import {
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { writeContract } from "@wagmi/core";
+import { simulateContract, writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData, formatUnits, parseUnits, TransactionReceipt } from "viem";
 
 const getSplitCalls = ({
@@ -58,13 +58,17 @@ export const getQuoteTradeCalls = async (
   tradeExecutor: Address,
   quotes: UniswapQuoteTradeResult[]
 ) => {
-  const tradeApprovalCalls = quotes
-    .map((quote) => getTradeApprovals7702(tradeExecutor, quote.trade))
-    .flat();
-  const tradeCalls = await Promise.all(
-    quotes.map((quote) => getUniswapTradeExecution(quote.trade, tradeExecutor))
-  );
-  return [...tradeApprovalCalls, ...tradeCalls];
+  const calls = (
+    await Promise.all(
+      quotes.map(async (quote) => {
+        return [
+          ...getTradeApprovals7702(tradeExecutor, quote.trade),
+          await getUniswapTradeExecution(quote.trade, tradeExecutor),
+        ];
+      })
+    )
+  ).flat();
+  return calls;
 };
 const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
 
@@ -109,6 +113,28 @@ export const toastifyBatchTx = async (
   }[],
   messageConfig: { txSent: string; txSuccess: string }
 ) => {
+  //static call first
+  try {
+    await simulateContract(config, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [
+        calls.map((call) => ({
+          to: call.to,
+          data: call.data,
+        })),
+      ],
+      value: 0n,
+      chainId: CHAIN_ID,
+    });
+  } catch (err) {
+    return {
+      status: false,
+      error: err,
+    };
+  }
+
   const BATCH_SIZE = 50;
   const batches = [];
 
@@ -132,7 +158,28 @@ export const toastifyBatchTx = async (
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
     const isLastBatch = i === batches.length - 1;
-
+    //static call each batch with gas limit first
+    try {
+      await simulateContract(config, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "batchExecute",
+        args: [
+          batch.map((call) => ({
+            to: call.to,
+            data: call.data,
+          })),
+        ],
+        value: 0n,
+        chainId: CHAIN_ID,
+        gas: 20_000_000n,
+      });
+    } catch (err) {
+      return {
+        status: false,
+        error: err,
+      };
+    }
     const writePromise = writeContract(config, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,

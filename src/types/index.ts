@@ -13,6 +13,12 @@ export interface OriginalityRow {
   originality: number;
 }
 
+export interface L2Row {
+  repo: string;
+  dependency: string;
+  weight: number;
+}
+
 export interface TableData {
   repo: string;
   parent: string | null;
@@ -42,6 +48,22 @@ export interface OriginalityTableData {
   wrappedTokens: Address[];
   collateralToken: Address;
   amount?: string;
+}
+
+export interface L2TableData {
+  marketId: string;
+  repo: string;
+  dependency: string;
+  currentPrice: number | null;
+  predictedWeight: number | null;
+  difference: number | null;
+  outcomeId: string;
+  hasPrediction: boolean;
+  volumeUntilPrice: number;
+  collateralToken:Address;
+  wrappedTokens: Address[]
+  balance?: bigint;
+  payout?: number;
 }
 
 export interface TradeRequest {
@@ -90,6 +112,12 @@ export interface QuoteProps {
   tableData: TableData[];
 }
 
+export interface L2QuoteProps {
+  account: Address;
+  amount: string;
+  tableData: L2TableData[];
+}
+
 export interface OriginalityQuoteProps {
   account: Address;
   tableData: OriginalityTableData[];
@@ -108,6 +136,13 @@ export interface OriginalityTradeProps {
   tradeExecutor: Address;
   amount: string;
   tableData: OriginalityTableData[];
+}
+
+export interface L2TradeProps {
+  tradeExecutor: Address;
+  amount: string;
+  tableData: L2TableData[];
+  getQuotesResults: { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint }[];
 }
 
 export interface ApprovalRequest {
