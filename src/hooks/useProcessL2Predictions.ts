@@ -40,8 +40,8 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
     return acc;
   }, {} as { [key: string]: L2Row });
 
-  const processedData: L2TableData[] = Object.entries(data.marketsData).reduce(
-    (acc, [marketRepo, marketPoolData]) => {
+  const processedData: L2TableData[] = Object.entries(data.marketsData)
+    .reduce((acc, [marketRepo, marketPoolData]) => {
       const { id: marketId, prices, pools } = marketPoolData;
       const market = data.markets.find((market) => market.id === marketId);
       if (!market) return acc;
@@ -96,9 +96,10 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
       }
 
       return acc;
-    },
-    [] as L2TableData[]
-  );
+    }, [] as L2TableData[])
+    .sort((a, b) => {
+      return a.repo.toLowerCase() > b.repo.toLowerCase() ? 1 : -1;
+    });
 
   return { data: processedData, isLoading, isLoadingBalances, error };
 };

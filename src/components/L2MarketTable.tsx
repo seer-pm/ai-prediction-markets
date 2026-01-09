@@ -20,7 +20,11 @@ export const L2MarketTable: React.FC<MarketTableProps> = ({
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedRepos, setRepos] = useState<string[]>([]);
   const [searchText, setSearchText] = useState("");
-  const repoOptions = Array.from(new Set(rows.map((x) => x.repo))).map((x) => ({ id: x, text: x }));
+  const repoOptions = Array.from(new Set(rows.map((x) => x.repo)))
+    .map((x) => ({ id: x, text: x }))
+    .sort((a, b) => {
+      return a.text.toLowerCase() > b.text.toLowerCase() ? 1 : -1;
+    });
   if (isLoading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md">
