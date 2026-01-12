@@ -6,17 +6,22 @@ import {
   SendCallsReturnType,
   getTransactionReceipt,
   sendCalls,
+  simulateContract,
   waitForCallsStatus,
   waitForTransactionReceipt,
+  writeContract,
 } from "@wagmi/core";
 import { Theme, ToastOptions, ToastPosition, toast } from "react-toastify";
 import {
+  Address,
   TransactionNotFoundError,
   TransactionReceipt,
   TransactionReceiptNotFoundError,
   WaitForTransactionReceiptTimeoutError,
 } from "viem";
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
+import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
+import { CHAIN_ID } from "@/utils/constants";
 
 export const DEFAULT_TOAST_OPTIONS = {
   position: "top-center" as ToastPosition,
@@ -265,6 +270,109 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
     // If any batch fails, abort the entire process and return the error
     if (!result.status) {
       return result;
+    }
+
+    lastReceipt = result.receipt;
+  }
+
+  return { status: true, receipt: lastReceipt! };
+};
+
+export const toastifyBatchTx = async (
+  tradeExecutor: Address,
+  calls: {
+    to: `0x${string}`;
+    value?: bigint;
+    data: `0x${string}`;
+  }[],
+  messageConfig: { txSent: string; txSuccess: string },
+  batchSize?: number
+) => {
+  //static call first
+  try {
+    await simulateContract(wagmiConfig, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [
+        calls.map((call) => ({
+          to: call.to,
+          data: call.data,
+        })),
+      ],
+      value: 0n,
+      chainId: CHAIN_ID,
+    });
+  } catch (err) {
+    return {
+      status: false,
+      error: err,
+    };
+  }
+
+  const BATCH_SIZE = batchSize || 50;
+  const batches = [];
+
+  for (let i = 0; i < calls.length; i += BATCH_SIZE) {
+    batches.push(calls.slice(i, i + BATCH_SIZE));
+  }
+
+  const isSingleBatch = batches.length === 1;
+  // Show initial info about batching
+  if (!isSingleBatch) {
+    toastInfo({
+      title: "Processing multiple batches",
+      subtitle: `Due to wallet limitations, ${calls.length} calls will be processed in ${batches.length} batches of up to ${BATCH_SIZE} calls each.`,
+      options: { autoClose: 8000 },
+    });
+  }
+
+  let lastReceipt: TransactionReceipt | undefined;
+
+  // Process each batch sequentially
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    const isLastBatch = i === batches.length - 1;
+    //static call each batch with gas limit first
+    try {
+      await simulateContract(wagmiConfig, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "batchExecute",
+        args: [
+          batch.map((call) => ({
+            to: call.to,
+            data: call.data,
+          })),
+        ],
+        value: 0n,
+        chainId: CHAIN_ID,
+        gas: 20_000_000n,
+      });
+    } catch (err) {
+      return {
+        status: false,
+        error: err,
+      };
+    }
+    const writePromise = writeContract(wagmiConfig, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [batch.map((call) => ({ data: call.data, to: call.to }))],
+      value: 0n,
+      chainId: CHAIN_ID,
+    });
+    const result = await toastifyTx(() => writePromise, {
+      txSent: {
+        title: isSingleBatch ? messageConfig.txSent : `Sending batch ${i + 1}/${batches.length}...`,
+      },
+      txSuccess: {
+        title: isLastBatch ? messageConfig.txSuccess : `Batch ${i + 1}/${batches.length} sent!`,
+      },
+    });
+    if (!result.status) {
+      return { status: false, error: result.error };
     }
 
     lastReceipt = result.receipt;

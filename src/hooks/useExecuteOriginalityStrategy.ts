@@ -1,9 +1,7 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
-import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { queryClient } from "@/config/queryClient";
-import { config } from "@/config/wagmi";
-import { toastifyTx, toastInfo } from "@/lib/toastify";
+import { toastifyBatchTx } from "@/lib/toastify";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
 import { getTradeApprovals7702 } from "@/lib/trade/getApprovals7702";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
@@ -16,8 +14,7 @@ import {
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { simulateContract, writeContract } from "@wagmi/core";
-import { Address, encodeFunctionData, formatUnits, parseUnits, TransactionReceipt } from "viem";
+import { Address, encodeFunctionData, formatUnits, parseUnits } from "viem";
 
 const getSplitCalls = ({
   collateral,
@@ -102,108 +99,6 @@ const getTradeExecutorCalls = async ({
   ).flat();
 
   return [...calls];
-};
-
-export const toastifyBatchTx = async (
-  tradeExecutor: Address,
-  calls: {
-    to: `0x${string}`;
-    value?: bigint;
-    data: `0x${string}`;
-  }[],
-  messageConfig: { txSent: string; txSuccess: string }
-) => {
-  //static call first
-  try {
-    await simulateContract(config, {
-      address: tradeExecutor,
-      abi: TradeExecutorAbi,
-      functionName: "batchExecute",
-      args: [
-        calls.map((call) => ({
-          to: call.to,
-          data: call.data,
-        })),
-      ],
-      value: 0n,
-      chainId: CHAIN_ID,
-    });
-  } catch (err) {
-    return {
-      status: false,
-      error: err,
-    };
-  }
-
-  const BATCH_SIZE = 50;
-  const batches = [];
-
-  for (let i = 0; i < calls.length; i += BATCH_SIZE) {
-    batches.push(calls.slice(i, i + BATCH_SIZE));
-  }
-
-  const isSingleBatch = batches.length === 1;
-  // Show initial info about batching
-  if (!isSingleBatch) {
-    toastInfo({
-      title: "Processing multiple batches",
-      subtitle: `Due to wallet limitations, ${calls.length} calls will be processed in ${batches.length} batches of up to ${BATCH_SIZE} calls each.`,
-      options: { autoClose: 8000 },
-    });
-  }
-
-  let lastReceipt: TransactionReceipt | undefined;
-
-  // Process each batch sequentially
-  for (let i = 0; i < batches.length; i++) {
-    const batch = batches[i];
-    const isLastBatch = i === batches.length - 1;
-    //static call each batch with gas limit first
-    try {
-      await simulateContract(config, {
-        address: tradeExecutor,
-        abi: TradeExecutorAbi,
-        functionName: "batchExecute",
-        args: [
-          batch.map((call) => ({
-            to: call.to,
-            data: call.data,
-          })),
-        ],
-        value: 0n,
-        chainId: CHAIN_ID,
-        gas: 20_000_000n,
-      });
-    } catch (err) {
-      return {
-        status: false,
-        error: err,
-      };
-    }
-    const writePromise = writeContract(config, {
-      address: tradeExecutor,
-      abi: TradeExecutorAbi,
-      functionName: "batchExecute",
-      args: [batch.map((call) => ({ data: call.data, to: call.to }))],
-      value: 0n,
-      chainId: CHAIN_ID,
-    });
-    const result = await toastifyTx(() => writePromise, {
-      txSent: {
-        title: isSingleBatch ? messageConfig.txSent : `Sending batch ${i + 1}/${batches.length}...`,
-      },
-      txSuccess: {
-        title: isLastBatch ? messageConfig.txSuccess : `Batch ${i + 1}/${batches.length} sent!`,
-      },
-    });
-    if (!result.status) {
-      return { status: false, error: result.error };
-    }
-
-    lastReceipt = result.receipt;
-  }
-
-  return { status: true, receipt: lastReceipt! };
 };
 
 const executeOriginalityStrategy = async ({

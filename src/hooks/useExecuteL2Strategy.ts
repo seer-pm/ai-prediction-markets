@@ -12,7 +12,8 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { getQuoteTradeCalls, toastifyBatchTx } from "./useExecuteOriginalityStrategy";
+import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
+import { toastifyBatchTx } from "@/lib/toastify";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -74,7 +75,7 @@ function mergeFromRouter(
   ];
 }
 
-const mintCalls = async (tradeExecutor: Address, calls: Execution[], title:string) => {
+const mintCalls = async (tradeExecutor: Address, calls: Execution[], title: string) => {
   const result = await toastifyBatchTx(tradeExecutor, calls, {
     txSent: title,
     txSuccess: "Tokens minted!",
@@ -99,7 +100,9 @@ const getTradeExecutorCalls = async ({
     "Minting parent outcome tokens..."
   );
   // mint l2 markets
-  const l2Markets = {} as { [key: string]: { marketId: string; collateralToken: string; repo:string } };
+  const l2Markets = {} as {
+    [key: string]: { marketId: string; collateralToken: string; repo: string };
+  };
   for (const { marketId, collateralToken, repo } of tableData) {
     l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken, repo };
   }
@@ -152,10 +155,15 @@ const executeL2StrategyContract = async ({
     tradeExecutor,
     tableData: filteredTableData,
   });
-  const result = await toastifyBatchTx(tradeExecutor, tradeExecutorCalls, {
-    txSent: "Executing trade...",
-    txSuccess: "Trade executed!",
-  });
+  const result = await toastifyBatchTx(
+    tradeExecutor,
+    tradeExecutorCalls,
+    {
+      txSent: "Executing trade...",
+      txSuccess: "Trade executed!",
+    },
+    100
+  );
   if (!result.status) {
     throw result.error;
   }
