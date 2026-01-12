@@ -12,9 +12,10 @@ import {
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData } from "viem";
-import { getQuoteTradeCalls, toastifyBatchTx } from "./useExecuteOriginalityStrategy";
+import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { fetchTokensBalances } from "./useTokensBalances";
 import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
+import { toastifyBatchTx } from "@/lib/toastify";
 
 interface SellAllProps {
   tradeExecutor: Address;

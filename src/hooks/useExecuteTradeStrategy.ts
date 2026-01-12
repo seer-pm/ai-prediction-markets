@@ -16,7 +16,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { toastifyBatchTx } from "./useExecuteOriginalityStrategy";
+import { toastifyBatchTx } from "@/lib/toastify";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 

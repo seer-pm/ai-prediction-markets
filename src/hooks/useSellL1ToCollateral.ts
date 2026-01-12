@@ -3,7 +3,8 @@ import { getSellAllL1Quotes } from "@/lib/trade/getQuote";
 import { TableData } from "@/types";
 import { useMutation } from "@tanstack/react-query";
 import { Address } from "viem";
-import { getQuoteTradeCalls, toastifyBatchTx } from "./useExecuteOriginalityStrategy";
+import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
+import { toastifyBatchTx } from "@/lib/toastify";
 
 interface SellAllProps {
   tradeExecutor: Address;
