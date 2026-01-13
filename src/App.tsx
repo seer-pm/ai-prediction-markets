@@ -9,6 +9,7 @@ import { WalletConnect } from "./components/WalletConnect";
 import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { Tab } from "./components/Tab";
+import { OldTradeWallet } from "./components/trade/OldTradeWallet";
 
 const AppContent: React.FC = () => {
   return (
@@ -24,6 +25,7 @@ const AppContent: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-4 mb-20">
+          <OldTradeWallet />
           <TradeWallet />
           <Tab />
           <div className="mx-auto p-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg text-white">

@@ -735,17 +735,20 @@ export const getSellAllL2Quotes = async ({
   tableData: L2TableData[];
 }) => {
   const chainId = CHAIN_ID;
+  const limit = pLimit(50);
   const sellPromises = tableData.reduce((promises, row) => {
     // sell from token to collateral
     if (row.balance) {
       promises.push(
-        getUniswapQuote(
-          chainId,
-          account,
-          formatUnits(row.balance, DECIMALS),
-          { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
-          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-          "sell"
+        limit(() =>
+          getUniswapQuote(
+            chainId,
+            account,
+            formatUnits(row.balance!, DECIMALS),
+            { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
+            { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+            "sell"
+          )
         )
       );
     }

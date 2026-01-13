@@ -1,6 +1,7 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
+import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { L2TradeProps } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
@@ -13,7 +14,6 @@ import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
-import { toastifyBatchTx, toastifyBatchTxSessionKey } from "@/lib/toastify";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -75,16 +75,6 @@ function mergeFromRouter(
   ];
 }
 
-const mintCalls = async (tradeExecutor: Address, calls: Execution[], title: string) => {
-  const result = await toastifyBatchTx(tradeExecutor, calls, {
-    txSent: title,
-    txSuccess: "Tokens minted!",
-  });
-  if (!result.status) {
-    throw result.error;
-  }
-};
-
 const getTradeExecutorCalls = async ({
   amount,
   getQuotesResults,
@@ -130,7 +120,10 @@ const getTradeExecutorCalls = async ({
     //push buy trade
     calls.push(...(await getQuoteTradeCalls(tradeExecutor, buyQuotes)));
   }
-  batchesOfCalls.push(calls);
+  // split trade calls into batches of 100
+  for (let i = 0; i < calls.length; i += 100) {
+    batchesOfCalls.push(calls.slice(i, i + 100));
+  }
   return batchesOfCalls;
 };
 

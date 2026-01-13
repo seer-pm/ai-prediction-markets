@@ -32,7 +32,8 @@ class SessionKeyManager {
   }
 }
 
-const fundSessionKey = async (minBalance: bigint = parseEther("0.000001")) => {
+const fundSessionKey = async () => {
+  const minBalance = parseEther("0.0001");
   let sessionPrivateKey = SessionKeyManager.get();
   let sessionAccount = sessionPrivateKey ? privateKeyToAccount(sessionPrivateKey) : null;
 
@@ -61,7 +62,7 @@ const fundSessionKey = async (minBalance: bigint = parseEther("0.000001")) => {
   }
 
   // Prompt user to fund
-  const fundAmount = minBalance - balance;
+  const fundAmount = parseEther("0.0002");
 
   const result = await toastifyTx(
     () =>

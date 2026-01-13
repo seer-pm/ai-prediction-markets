@@ -1,5 +1,6 @@
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
+import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getApprovals7702 } from "@/lib/trade/getApprovals7702";
 import { getSellAllL2Quotes } from "@/lib/trade/getQuote";
 import { L2TableData } from "@/types";
@@ -10,12 +11,11 @@ import {
   L2_PARENT_MARKET_ID,
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
+import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData } from "viem";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { fetchTokensBalances } from "./useTokensBalances";
-import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
-import { toastifyBatchTx } from "@/lib/toastify";
 
 interface SellAllProps {
   tradeExecutor: Address;
@@ -61,7 +61,15 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
       }),
     });
   }
-  const result = await toastifyBatchTx(tradeExecutor, swapCalls, {
+
+  console.log(swapCalls.length);
+  const BATCH_SIZE = 100;
+  const batches = [];
+
+  for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
+    batches.push(swapCalls.slice(i, i + BATCH_SIZE));
+  }
+  const result = await toastifyBatchTxSessionKey(tradeExecutor, batches, {
     txSent: "Selling all tokens to sUSDS...",
     txSuccess: "Tokens sold!",
   });

@@ -25,6 +25,7 @@ import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { CHAIN_ID } from "@/utils/constants";
 import { authorizeSessionKey } from "./on-chain/sessionKey";
+import { optimism } from "viem/chains";
 
 export const DEFAULT_TOAST_OPTIONS = {
   position: "top-center" as ToastPosition,
@@ -398,7 +399,7 @@ export const toastifyBatchTxSessionKey = async (
   // Create wallet client with session key
   const sessionWallet = createWalletClient({
     account: sessionAccount,
-    chain: wagmiConfig.chains[0],
+    chain: optimism,
     transport: http(),
   });
 
@@ -407,38 +408,20 @@ export const toastifyBatchTxSessionKey = async (
   for (let i = 0; i < batchesOfCalls.length; i++) {
     const batch = batchesOfCalls[i];
 
-    // Determine if we need value calls
-    const hasValue = batch.some((c) => c.value && c.value > 0n);
-    const functionName = hasValue ? "batchValueExecute" : "batchExecute";
-
-    // Prepare calls based on function
-    const calls = hasValue
-      ? batch.map((c) => ({ to: c.to, value: c.value || 0n, data: c.data }))
-      : batch.map((c) => ({ to: c.to, data: c.data }));
-
-    // Calculate total value needed
-    const totalValue = hasValue ? batch.reduce((sum, c) => sum + (c.value || 0n), 0n) : 0n;
-
-    // 🧪 Simulate
-    await simulateContract(wagmiConfig, {
-      address: tradeExecutor,
-      abi: TradeExecutorAbi,
-      functionName,
-      args: [calls],
-      account: sessionAccount,
-      chainId: CHAIN_ID,
-      value: totalValue,
-    });
-
-    // 🚀 Execute with session key (NO POPUP!)
     const { request } = await simulateContract(wagmiConfig, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,
-      functionName,
-      args: [calls],
+      functionName: "batchExecute",
+      args: [
+        batch.map((call) => ({
+          to: call.to,
+          data: call.data,
+        })),
+      ],
       account: sessionAccount,
+      value: 0n,
       chainId: CHAIN_ID,
-      value: totalValue,
+      gas: 20_000_000n,
     });
 
     const result = await toastifyTx(() => sessionWallet.writeContract(request), {

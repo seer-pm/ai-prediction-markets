@@ -9,14 +9,12 @@ import { L2CSVUpload } from "../L2CSVUpload";
 import { L2MarketTable } from "../L2MarketTable";
 import { L2TradingInterface } from "../trade/L2TradingInterface";
 import { SellAllL2TokensInterface } from "../trade/SellAllL2TokensInterface";
-import { WithdrawOriginalityTokensInterface } from "../trade/WithdrawOriginalityTokensInterface";
 
 export const L2Markets = () => {
   const { address: account } = useAccount();
   const [predictions, setPredictions] = useLocalStorage<L2Row[]>("l2-default", []);
 
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
-  const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
@@ -73,12 +71,6 @@ export const L2Markets = () => {
           {checkTradeExecutorResult?.isCreated && (
             <>
               <button
-                onClick={() => setIsWithdrawTokensDialogOpen(true)}
-                className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
-              >
-                Withdraw outcome tokens
-              </button>
-              <button
                 onClick={() => setIsSellAllDialogOpen(true)}
                 className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
               >
@@ -132,17 +124,7 @@ export const L2Markets = () => {
           </div>
         </div>
       )}
-      {isWithdrawTokensDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <WithdrawOriginalityTokensInterface
-              account={account!}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsWithdrawTokensDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+
       {isSellAllDialogOpen && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
