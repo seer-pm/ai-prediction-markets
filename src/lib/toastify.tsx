@@ -14,6 +14,8 @@ import {
 import { Theme, ToastOptions, ToastPosition, toast } from "react-toastify";
 import {
   Address,
+  createWalletClient,
+  http,
   TransactionNotFoundError,
   TransactionReceipt,
   TransactionReceiptNotFoundError,
@@ -22,6 +24,7 @@ import {
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { CHAIN_ID } from "@/utils/constants";
+import { authorizeSessionKey } from "./on-chain/sessionKey";
 
 export const DEFAULT_TOAST_OPTIONS = {
   position: "top-center" as ToastPosition,
@@ -371,6 +374,82 @@ export const toastifyBatchTx = async (
         title: isLastBatch ? messageConfig.txSuccess : `Batch ${i + 1}/${batches.length} sent!`,
       },
     });
+    if (!result.status) {
+      return { status: false, error: result.error };
+    }
+
+    lastReceipt = result.receipt;
+  }
+
+  return { status: true, receipt: lastReceipt! };
+};
+
+export const toastifyBatchTxSessionKey = async (
+  tradeExecutor: Address,
+  batchesOfCalls: {
+    to: `0x${string}`;
+    value?: bigint;
+    data: `0x${string}`;
+  }[][],
+  messageConfig: { txSent: string; txSuccess: string }
+) => {
+  const sessionAccount = await authorizeSessionKey(tradeExecutor);
+
+  // Create wallet client with session key
+  const sessionWallet = createWalletClient({
+    account: sessionAccount,
+    chain: wagmiConfig.chains[0],
+    transport: http(),
+  });
+
+  let lastReceipt: TransactionReceipt | undefined;
+
+  for (let i = 0; i < batchesOfCalls.length; i++) {
+    const batch = batchesOfCalls[i];
+
+    // Determine if we need value calls
+    const hasValue = batch.some((c) => c.value && c.value > 0n);
+    const functionName = hasValue ? "batchValueExecute" : "batchExecute";
+
+    // Prepare calls based on function
+    const calls = hasValue
+      ? batch.map((c) => ({ to: c.to, value: c.value || 0n, data: c.data }))
+      : batch.map((c) => ({ to: c.to, data: c.data }));
+
+    // Calculate total value needed
+    const totalValue = hasValue ? batch.reduce((sum, c) => sum + (c.value || 0n), 0n) : 0n;
+
+    // 🧪 Simulate
+    await simulateContract(wagmiConfig, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName,
+      args: [calls],
+      account: sessionAccount,
+      chainId: CHAIN_ID,
+      value: totalValue,
+    });
+
+    // 🚀 Execute with session key (NO POPUP!)
+    const { request } = await simulateContract(wagmiConfig, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName,
+      args: [calls],
+      account: sessionAccount,
+      chainId: CHAIN_ID,
+      value: totalValue,
+    });
+
+    const result = await toastifyTx(() => sessionWallet.writeContract(request), {
+      txSent: {
+        title: `Sending batch ${i + 1}/${batchesOfCalls.length}`,
+      },
+      txSuccess: {
+        title: i === batchesOfCalls.length - 1 ? messageConfig.txSuccess : `Batch ${i + 1} sent`,
+      },
+    });
+
     if (!result.status) {
       return { status: false, error: result.error };
     }
