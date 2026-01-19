@@ -77,18 +77,18 @@ type ToastifyConfig = {
 
 type ToastifyFn<T> = (
   execute: () => Promise<T>,
-  config?: ToastifyConfig
+  config?: ToastifyConfig,
 ) => Promise<ToastifyReturn<T>>;
 
 type ToastifyTxFn = (
   contractWrite: () => Promise<`0x${string}` | SendCallsReturnType>,
-  config?: ToastifyConfig
+  config?: ToastifyConfig,
 ) => Promise<ToastifyTxReturn>;
 
 type ToastifySendCalls = (
   calls: Execution[],
   wagmiConfig: Config,
-  config?: ToastifyConfig
+  config?: ToastifyConfig,
 ) => Promise<ToastifyTxReturn>;
 
 interface ToastContentType {
@@ -271,7 +271,7 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
               subtitle: config?.txError?.subtitle,
             },
             options: config?.options,
-          }
+          },
     );
 
     // If any batch fails, abort the entire process and return the error
@@ -293,7 +293,7 @@ export const toastifyBatchTx = async (
     data: `0x${string}`;
   }[],
   messageConfig: { txSent: string; txSuccess: string },
-  batchSize?: number
+  batchSize?: number,
 ) => {
   //static call first
   try {
@@ -396,7 +396,7 @@ export const toastifyBatchTxSessionKey = async (
     data: `0x${string}`;
   }[][],
   messages: string[],
-  onStateChange: (state: string) => void
+  onStateChange: (state: string) => void,
 ) => {
   const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
 
@@ -408,7 +408,7 @@ export const toastifyBatchTxSessionKey = async (
   });
 
   const data = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
-  const maxGasCost = 15_000_000n * BigInt(batchesOfCalls.length) * data.maxFeePerGas;
+  const maxGasCost = 10_000_000n * BigInt(batchesOfCalls.length) * data.maxFeePerGas;
 
   await fundSessionKey(maxGasCost, onStateChange);
 
@@ -446,7 +446,7 @@ export const toastifyBatchTxSessionKey = async (
 async function pollForTransactionReceipt(
   hash: `0x${string}`,
   maxAttempts = 7,
-  initialInterval = 500
+  initialInterval = 500,
 ) {
   for (let i = 0; i < maxAttempts; i++) {
     try {
