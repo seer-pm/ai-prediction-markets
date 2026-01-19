@@ -154,7 +154,6 @@ const executeL2StrategyContract = async ({
     tradeExecutor,
     tableData: filteredTableData,
   });
-  return
   const result = await toastifyBatchTxSessionKey(
     tradeExecutor,
     tradeExecutorCalls.batchesOfCalls,
