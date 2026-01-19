@@ -26,8 +26,8 @@ export const useTokenBalance = ({
     refetchOnReconnect: false,
     refetchOnMount: false,
     refetchInterval: false,
-    staleTime: Infinity,
-    gcTime: Infinity,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["useTokenBalance", address, token],
     queryFn: () => fetchTokenBalance(address!, token),
   });

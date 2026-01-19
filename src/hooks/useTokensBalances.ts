@@ -34,8 +34,8 @@ export const useTokensBalances = (account: Address | undefined, tokens: Address[
     refetchOnReconnect: false,
     refetchOnMount: false,
     refetchInterval: false,
-    staleTime: Infinity,
-    gcTime: Infinity,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["useTokensBalances", account, tokens],
     queryFn: () => fetchTokensBalances(account!, tokens!),
   });
