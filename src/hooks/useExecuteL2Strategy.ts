@@ -1,7 +1,7 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
-import { toastifyBatchTxSessionKey } from "@/lib/toastify";
+import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { L2TradeProps } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
@@ -22,7 +22,7 @@ function splitFromRouter(
   router: Address,
   amount: bigint,
   marketId: Address,
-  token: Address
+  token: Address,
 ): Execution[] {
   return [
     {
@@ -50,7 +50,7 @@ function mergeFromRouter(
   router: Address,
   amount: bigint,
   marketId: Address,
-  tokens: Address[]
+  tokens: Address[],
 ): Execution[] {
   return [
     ...tokens.map((token) => {
@@ -88,7 +88,7 @@ const getTradeExecutorCalls = async ({
   const batchesOfCalls: Execution[][] = [];
   const messages: string[] = [];
   batchesOfCalls.push(
-    splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address)
+    splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
   );
   messages.push("Minting parent tokens");
   // mint l2 markets
@@ -101,7 +101,7 @@ const getTradeExecutorCalls = async ({
   for (let i = 0; i < Object.values(l2Markets).length; i++) {
     const { marketId, collateralToken } = Object.values(l2Markets)[i];
     batchesOfCalls.push(
-      splitFromRouter(router, parsedSplitAmount, marketId as Address, collateralToken as Address)
+      splitFromRouter(router, parsedSplitAmount, marketId as Address, collateralToken as Address),
     );
     messages.push(`Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`);
   }
@@ -120,7 +120,7 @@ const getTradeExecutorCalls = async ({
       const row = tableData.find((row) => isTwoStringsEqual(row.outcomeId, outcomeId));
       if (!row) continue;
       calls.push(
-        ...mergeFromRouter(router, mergeAmount, row.marketId as Address, row.wrappedTokens)
+        ...mergeFromRouter(router, mergeAmount, row.marketId as Address, row.wrappedTokens),
       );
     }
     //push buy trade
@@ -131,7 +131,7 @@ const getTradeExecutorCalls = async ({
     batchesOfCalls.push(calls.slice(i, i + 100));
     messages.push(`Swapping tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`);
   }
-  return {batchesOfCalls, messages};
+  return { batchesOfCalls, messages };
 };
 
 const executeL2StrategyContract = async ({
@@ -158,12 +158,14 @@ const executeL2StrategyContract = async ({
     tradeExecutor,
     tradeExecutorCalls.batchesOfCalls,
     tradeExecutorCalls.messages,
-    onStateChange
+    onStateChange,
   );
   if (!result.status) {
     throw result.error;
   }
-
+  toastSuccess({
+    title: "Trade executed",
+  });
   return result;
 };
 
