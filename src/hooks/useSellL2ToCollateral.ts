@@ -21,10 +21,13 @@ import { useState } from "react";
 interface SellAllProps {
   tradeExecutor: Address;
   tableData: L2TableData[];
-  onStateChange: (state: string) => void;
 }
 
-async function sellL2ToCollateral({ tradeExecutor, tableData, onStateChange }: SellAllProps) {
+async function sellL2ToCollateral({
+  tradeExecutor,
+  tableData,
+  onStateChange,
+}: SellAllProps & { onStateChange: (state: string) => void }) {
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const sellAllQuotes = await getSellAllL2Quotes({
