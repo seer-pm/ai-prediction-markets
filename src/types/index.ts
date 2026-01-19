@@ -142,7 +142,6 @@ export interface L2TradeProps {
   tradeExecutor: Address;
   amount: string;
   tableData: L2TableData[];
-  getQuotesResults: { quotes: UniswapQuoteTradeResult[]; mergeAmount: bigint }[];
 }
 
 export interface ApprovalRequest {

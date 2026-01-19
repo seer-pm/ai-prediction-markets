@@ -42,32 +42,35 @@ export const getSessionAccount = (onStateChange: (state: string) => void) => {
     sessionAccount = privateKeyToAccount(sessionPrivateKey);
     onStateChange(
       `Session key created: ${sessionAccount.address.slice(0, 6)}...${sessionAccount.address.slice(
-        -4
-      )}`
+        -4,
+      )}`,
     );
   }
 
   return sessionAccount!;
 };
 
-export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: string) => void) => {
-  const sessionAccount = getSessionAccount(onStateChange);
+export const fundSessionKey = async (
+  sessionAddress: Address,
+  gasCost: bigint,
+  onStateChange: (state: string) => void,
+) => {
   // Check if session key exists and has sufficient balance
-  const data = await getBalance(config, {
-    address: sessionAccount.address,
+  const { value: balance } = await getBalance(config, {
+    address: sessionAddress,
   });
-  const balance = data.value;
+  console.log({ balance, gasCost });
   if (balance >= gasCost) {
-    return sessionAccount;
+    return;
   }
 
   // Prompt user to fund
   onStateChange("Funding session key...");
   const result = await handleTx(() =>
     sendTransaction(config, {
-      to: sessionAccount!.address,
+      to: sessionAddress,
       value: gasCost - balance,
-    })
+    }),
   );
 
   if (!result.status) {
@@ -75,12 +78,12 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: str
     throw new Error("Failed to fund session key");
   }
 
-  return sessionAccount!;
+  return;
 };
 
 export const authorizeSessionKey = async (
   tradeExecutor: Address,
-  onStateChange: (state: string) => void
+  onStateChange: (state: string) => void,
 ) => {
   const sessionAccount = getSessionAccount(onStateChange);
   // Set session key in contract
@@ -109,7 +112,7 @@ export const authorizeSessionKey = async (
         abi: TradeExecutorAbi,
         functionName: "setTemporaryPermission",
         args: [sessionAccount.address, BigInt(expiry)],
-      })
+      }),
     );
 
     if (!result.status) {

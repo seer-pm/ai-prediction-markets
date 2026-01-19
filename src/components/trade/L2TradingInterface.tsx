@@ -1,6 +1,4 @@
-import useDebounce from "@/hooks/useDebounce";
 import { useExecuteL2Strategy } from "@/hooks/useExecuteL2Strategy";
-import { useGetL2Quotes } from "@/hooks/useGetL2Quotes";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { L2TableData } from "@/types";
 import { collateral, DECIMALS } from "@/utils/constants";
@@ -38,22 +36,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
       amount: "",
     },
   });
-
   const amount = watch("amount");
-
-  const debouncedAmount = useDebounce(amount, 1000);
-  const {
-    data: getQuotesResults,
-    isLoading: isLoadingQuotes,
-    isError: isErrorGettingQuotes,
-    error: errorGettingQuotes,
-    progress,
-  } = useGetL2Quotes({
-    account: tradeExecutor,
-    amount: debouncedAmount,
-    tableData: rows,
-  });
-
   // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -70,7 +53,6 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
   const onSubmit = ({ amount }: TradeFormData) => {
     executeTradeMutation.mutate({
       amount,
-      getQuotesResults: getQuotesResults ?? [],
       tradeExecutor,
       tableData: rows,
     });
@@ -82,10 +64,6 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
     }
   };
 
-  // Strategy analysis
-  const readyMarkets = Array.from(
-    new Set(rows.filter((row) => row.difference).map((row) => row.marketId))
-  );
   const renderButtonText = () => {
     if (executeTradeMutation.isPending) {
       return (
@@ -98,9 +76,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
     if (errors.amount) {
       return errors.amount.message;
     }
-    if (isLoadingQuotes) {
-      return "Getting quotes...";
-    }
+
     return "🚀 Execute Strategy";
   };
 
@@ -136,22 +112,12 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
             onDismiss={executeTradeMutation.reset}
           />
         )}
-        {isErrorGettingQuotes && (
-          <ErrorPanel title="Quote Failed" description={errorGettingQuotes?.message} />
-        )}
 
         {/* Loading Overlay */}
         {executeTradeMutation.isPending && (
           <LoadingPanel
             title="Executing Trade Strategy"
             description={executeTradeMutation.txState}
-          />
-        )}
-
-        {isLoadingQuotes && (
-          <LoadingPanel
-            title={`Getting quotes: ${progress}/${readyMarkets.length} markets`}
-            description="Obtaining quotes to construct and execute trades. This may take a while..."
           />
         )}
 
@@ -234,13 +200,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
             <button
               type="submit"
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 sm:py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={
-                executeTradeMutation.isPending ||
-                !!errors.amount ||
-                isLoadingQuotes ||
-                !getQuotesResults ||
-                isErrorGettingQuotes
-              }
+              disabled={executeTradeMutation.isPending || !!errors.amount || !amount}
             >
               {renderButtonText()}
             </button>

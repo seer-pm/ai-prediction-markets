@@ -388,6 +388,39 @@ export const toastifyBatchTx = async (
   return { status: true, receipt: lastReceipt! };
 };
 
+async function splitAndFilter(
+  calls: Execution[],
+  simulateBatch: (calls: Execution[]) => Promise<any>,
+  good: Execution[] = [],
+  bad: Execution[] = [],
+): Promise<{ good: Execution[]; bad: Execution[] }> {
+  if (!calls.length) return { good, bad };
+
+  if (calls.length === 1) {
+    try {
+      await simulateBatch(calls);
+      good.push(calls[0]);
+    } catch {
+      bad.push(calls[0]);
+    }
+    return { good, bad };
+  }
+
+  try {
+    await simulateBatch(calls);
+    good.push(...calls);
+    return { good, bad };
+  } catch {
+    const mid = Math.floor(calls.length / 2);
+    const left = calls.slice(0, mid);
+    const right = calls.slice(mid);
+
+    await splitAndFilter(left, simulateBatch, good, bad);
+    await splitAndFilter(right, simulateBatch, good, bad);
+    return { good, bad };
+  }
+}
+
 export const toastifyBatchTxSessionKey = async (
   tradeExecutor: Address,
   batchesOfCalls: {
@@ -397,6 +430,7 @@ export const toastifyBatchTxSessionKey = async (
   }[][],
   messages: string[],
   onStateChange: (state: string) => void,
+  skipFailCalls = false,
 ) => {
   const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
 
@@ -407,31 +441,71 @@ export const toastifyBatchTxSessionKey = async (
     transport: http(),
   });
 
-  const data = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
-  const maxGasCost = 10_000_000n * BigInt(batchesOfCalls.length) * data.maxFeePerGas;
+  const { maxFeePerGas } = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
+  const maxGasCost = 15_000_000n * BigInt(batchesOfCalls.length) * maxFeePerGas;
 
-  await fundSessionKey(maxGasCost, onStateChange);
+  await fundSessionKey(sessionAccount.address, maxGasCost, onStateChange);
 
   let lastReceipt: TransactionReceipt | undefined;
-
-  for (let i = 0; i < batchesOfCalls.length; i++) {
-    const batch = batchesOfCalls[i];
-    onStateChange(messages[i] ?? `Executing batch ${i + 1}`);
+  async function simulateBatch(calls: Execution[]) {
     const { request } = await simulateContract(wagmiConfig, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,
       functionName: "batchExecute",
-      args: [
-        batch.map((call) => ({
-          to: call.to,
-          data: call.data,
-        })),
-      ],
+      args: [calls.map((c) => ({ to: c.to, data: c.data }))],
       account: sessionAccount,
-      value: 0n,
       chainId: CHAIN_ID,
       gas: 20_000_000n,
     });
+
+    return request;
+  }
+  for (let i = 0; i < batchesOfCalls.length; i++) {
+    const batch = batchesOfCalls[i];
+    onStateChange(messages[i] ?? `Executing batch ${i + 1}`);
+    let request: any;
+    try {
+      const data = await simulateContract(wagmiConfig, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "batchExecute",
+        args: [
+          batch.map((call) => ({
+            to: call.to,
+            data: call.data,
+          })),
+        ],
+        account: sessionAccount,
+        value: 0n,
+        chainId: CHAIN_ID,
+        gas: 20_000_000n,
+      });
+      request = data.request;
+    } catch (e) {
+      if (!skipFailCalls) {
+        throw e;
+      }
+      const { good } = await splitAndFilter(batch as Execution[], simulateBatch);
+      if (!good.length) {
+        throw e;
+      }
+      const data = await simulateContract(wagmiConfig, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "batchExecute",
+        args: [
+          good.map((call) => ({
+            to: call.to,
+            data: call.data,
+          })),
+        ],
+        account: sessionAccount,
+        value: 0n,
+        chainId: CHAIN_ID,
+        gas: 20_000_000n,
+      });
+      request = data.request;
+    }
     const result = await handleTx(() => sessionWallet.writeContract(request));
 
     if (!result.status) {
