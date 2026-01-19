@@ -100,7 +100,6 @@ export const authorizeSessionKey = async (
   const isPermitted =
     isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) &&
     Number(currentExpiry) > now;
-  console.log(currentSessionKey, sessionAccount.address);
   if (!isPermitted) {
     const expiry = Math.floor(new Date().getTime() / 1000) + 60 * 15; //15 minutes
     onStateChange("Authorizing session key...");

@@ -30,9 +30,11 @@ async function sellL2ToCollateral({
 }: SellAllProps & { onStateChange: (state: string) => void }) {
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
+  onStateChange("Getting quotes");
   const sellAllQuotes = await getSellAllL2Quotes({
     account: tradeExecutor,
     tableData,
+    onStateChange
   });
   const swapCalls = await getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const collateralTokens = l2MarketOutcomes as Address[];
@@ -43,7 +45,7 @@ async function sellL2ToCollateral({
         .filter((data) => isTwoStringsEqual(data.buyToken, collateralTokens[index]))
         .reduce((acc, curr) => acc + curr.value, 0n);
       return balance + soldValue;
-    })
+    }),
   );
   if (mergeAmount > 0n) {
     swapCalls.push(
@@ -53,7 +55,7 @@ async function sellL2ToCollateral({
         spender: router,
         amounts: mergeAmount,
         chainId: CHAIN_ID,
-      })
+      }),
     );
 
     swapCalls.push({
@@ -73,7 +75,7 @@ async function sellL2ToCollateral({
   for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
     batches.push(swapCalls.slice(i, i + BATCH_SIZE));
     messages.push(
-      `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`
+      `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
     );
   }
   const result = await toastifyBatchTxSessionKey(tradeExecutor, batches, messages, onStateChange);

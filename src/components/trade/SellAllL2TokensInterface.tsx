@@ -4,6 +4,8 @@ import { L2TableData } from "@/types";
 import { minBigIntArray } from "@/utils/common";
 import React from "react";
 import { Address } from "viem";
+import { LoadingPanel } from "./LoadingPanel";
+import { ErrorPanel } from "./ErrorPanel";
 
 interface SellAllTokensInterfaceProps {
   onClose: () => void;
@@ -29,7 +31,7 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
   };
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     tradeExecutor,
-    Array.from(new Set(rows?.map((x) => x.collateralToken) ?? []))
+    Array.from(new Set(rows?.map((x) => x.collateralToken) ?? [])),
   );
   const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
   const hasTokens = !!rows?.filter((x) => x.balance)?.length || hasMergeAmount;
@@ -42,6 +44,7 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
           <h3 className="text-xl font-bold text-white">Sell all outcome tokens</h3>
           <p className="text-sm text-white">Sell all positions to sUSDS</p>
         </div>
+
         <button
           onClick={onClose}
           className="cursor-pointer text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
@@ -58,6 +61,16 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
       </div>
 
       <div className="px-6 py-4 space-y-4">
+        {sellAllFromTradeExecutor.isError && (
+          <ErrorPanel
+            title="Sell Tokens Failed"
+            description={sellAllFromTradeExecutor.error?.message}
+            onDismiss={sellAllFromTradeExecutor.reset}
+          />
+        )}
+        {sellAllFromTradeExecutor.isPending && (
+          <LoadingPanel title="Selling tokens" description={sellAllFromTradeExecutor.txState} />
+        )}
         {isLoadingBalances ? (
           <p>Checking balances...</p>
         ) : !hasTokens ? (

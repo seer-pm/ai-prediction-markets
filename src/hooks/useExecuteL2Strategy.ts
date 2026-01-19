@@ -154,6 +154,7 @@ const executeL2StrategyContract = async ({
     tradeExecutor,
     tableData: filteredTableData,
   });
+  return
   const result = await toastifyBatchTxSessionKey(
     tradeExecutor,
     tradeExecutorCalls.batchesOfCalls,
@@ -170,7 +171,7 @@ const executeL2StrategyContract = async ({
 };
 
 export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("Hello world");
+  const [txState, setTxState] = useState("");
   const mutation = useMutation({
     mutationFn: (tradeProps: L2TradeProps) =>
       executeL2StrategyContract({ ...tradeProps, onStateChange: setTxState }),

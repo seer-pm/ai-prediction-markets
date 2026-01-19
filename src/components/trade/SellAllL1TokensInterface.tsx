@@ -2,6 +2,8 @@ import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
 import { TableData } from "@/types";
 import React from "react";
 import { Address } from "viem";
+import { ErrorPanel } from "./ErrorPanel";
+import { LoadingPanel } from "./LoadingPanel";
 
 interface SellAllTokensInterfaceProps {
   onClose: () => void;
@@ -52,6 +54,16 @@ export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
       </div>
 
       <div className="px-6 py-4 space-y-4">
+        {sellAllFromTradeExecutor.isError && (
+          <ErrorPanel
+            title="Sell Tokens Failed"
+            description={sellAllFromTradeExecutor.error?.message}
+            onDismiss={sellAllFromTradeExecutor.reset}
+          />
+        )}
+        {sellAllFromTradeExecutor.isPending && (
+          <LoadingPanel title="Selling tokens" description={""} />
+        )}
         {!hasTokens ? (
           <p>Nothing to sell</p>
         ) : (
