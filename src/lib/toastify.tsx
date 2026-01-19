@@ -1,9 +1,12 @@
-import { Execution } from "@/hooks/useCheck7702Support";
+import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config as wagmiConfig } from "@/config/wagmi";
+import { Execution } from "@/hooks/useCheck7702Support";
+import { CHAIN_ID } from "@/utils/constants";
 import {
   Config,
   ConnectorNotConnectedError,
   SendCallsReturnType,
+  estimateFeesPerGas,
   getTransactionReceipt,
   sendCalls,
   simulateContract,
@@ -18,10 +21,12 @@ import {
   TransactionReceipt,
   TransactionReceiptNotFoundError,
   WaitForTransactionReceiptTimeoutError,
+  createWalletClient,
+  http,
 } from "viem";
+import { optimism } from "viem/chains";
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
-import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
-import { CHAIN_ID } from "@/utils/constants";
+import { authorizeSessionKey, fundSessionKey } from "./on-chain/sessionKey";
 
 export const DEFAULT_TOAST_OPTIONS = {
   position: "top-center" as ToastPosition,
@@ -72,18 +77,18 @@ type ToastifyConfig = {
 
 type ToastifyFn<T> = (
   execute: () => Promise<T>,
-  config?: ToastifyConfig
+  config?: ToastifyConfig,
 ) => Promise<ToastifyReturn<T>>;
 
 type ToastifyTxFn = (
   contractWrite: () => Promise<`0x${string}` | SendCallsReturnType>,
-  config?: ToastifyConfig
+  config?: ToastifyConfig,
 ) => Promise<ToastifyTxReturn>;
 
 type ToastifySendCalls = (
   calls: Execution[],
   wagmiConfig: Config,
-  config?: ToastifyConfig
+  config?: ToastifyConfig,
 ) => Promise<ToastifyTxReturn>;
 
 interface ToastContentType {
@@ -148,16 +153,11 @@ export const toastify: ToastifyFn<any> = async (execute, config) => {
   }
 };
 
-export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
+export const handleTx: ToastifyTxFn = async (contractWrite) => {
   let hash: `0x${string}` | undefined = undefined;
   const TIMEOUT = 30000;
   try {
     const result = await contractWrite();
-
-    toastInfo({
-      title: config?.txSent?.title || "Sending transaction...",
-      subtitle: config?.txSent?.subtitle,
-    });
 
     let receipt: TransactionReceipt;
     if (typeof result === "string") {
@@ -186,11 +186,6 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       });
     }
 
-    toastSuccess({
-      title: config?.txSuccess?.title || "Transaction sent!",
-      subtitle: config?.txSent?.subtitle,
-    });
-
     return { status: true, receipt: receipt };
     // biome-ignore lint/suspicious/noExplicitAny:
   } catch (error: any) {
@@ -204,17 +199,29 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
     ) {
       const newReceipt = await pollForTransactionReceipt(hash);
       if (newReceipt) {
-        toastSuccess({
-          title: config?.txSuccess?.title || "Transaction sent!",
-          subtitle: config?.txSent?.subtitle,
-        });
         return { status: true, receipt: newReceipt };
       }
     }
-    toastError({ title: getErrorMessage(error), subtitle: config?.txSent?.subtitle });
 
     return { status: false, error };
   }
+};
+
+export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
+  toastInfo({
+    title: config?.txSent?.title || "Sending transaction...",
+    subtitle: config?.txSent?.subtitle,
+  });
+  const result = await handleTx(contractWrite);
+  if (result.status) {
+    toastSuccess({
+      title: config?.txSuccess?.title || "Transaction sent!",
+      subtitle: config?.txSent?.subtitle,
+    });
+  } else {
+    toastError({ title: getErrorMessage(result.error), subtitle: config?.txSent?.subtitle });
+  }
+  return result;
 };
 
 export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig, config) => {
@@ -264,7 +271,7 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
               subtitle: config?.txError?.subtitle,
             },
             options: config?.options,
-          }
+          },
     );
 
     // If any batch fails, abort the entire process and return the error
@@ -286,7 +293,7 @@ export const toastifyBatchTx = async (
     data: `0x${string}`;
   }[],
   messageConfig: { txSent: string; txSuccess: string },
-  batchSize?: number
+  batchSize?: number,
 ) => {
   //static call first
   try {
@@ -381,10 +388,65 @@ export const toastifyBatchTx = async (
   return { status: true, receipt: lastReceipt! };
 };
 
+export const toastifyBatchTxSessionKey = async (
+  tradeExecutor: Address,
+  batchesOfCalls: {
+    to: `0x${string}`;
+    value?: bigint;
+    data: `0x${string}`;
+  }[][],
+  messages: string[],
+  onStateChange: (state: string) => void,
+) => {
+  const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
+
+  // Create wallet client with session key
+  const sessionWallet = createWalletClient({
+    account: sessionAccount,
+    chain: optimism,
+    transport: http(),
+  });
+
+  const data = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
+  const maxGasCost = 10_000_000n * BigInt(batchesOfCalls.length) * data.maxFeePerGas;
+
+  await fundSessionKey(maxGasCost, onStateChange);
+
+  let lastReceipt: TransactionReceipt | undefined;
+
+  for (let i = 0; i < batchesOfCalls.length; i++) {
+    const batch = batchesOfCalls[i];
+    onStateChange(messages[i] ?? `Executing batch ${i + 1}`);
+    const { request } = await simulateContract(wagmiConfig, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "batchExecute",
+      args: [
+        batch.map((call) => ({
+          to: call.to,
+          data: call.data,
+        })),
+      ],
+      account: sessionAccount,
+      value: 0n,
+      chainId: CHAIN_ID,
+      gas: 20_000_000n,
+    });
+    const result = await handleTx(() => sessionWallet.writeContract(request));
+
+    if (!result.status) {
+      return { status: false, error: result.error };
+    }
+    lastReceipt = result.receipt;
+  }
+
+  return { status: true, receipt: lastReceipt! };
+};
+
 async function pollForTransactionReceipt(
   hash: `0x${string}`,
   maxAttempts = 7,
-  initialInterval = 500
+  initialInterval = 500,
 ) {
   for (let i = 0; i < maxAttempts; i++) {
     try {

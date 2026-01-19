@@ -5,7 +5,7 @@ import { Address, erc20Abi } from "viem";
 
 export const fetchTokensBalances = async (
   account: Address,
-  tokens: Address[]
+  tokens: Address[],
 ): Promise<bigint[]> => {
   try {
     const balances: bigint[] = await readContractsInBatch(
@@ -18,17 +18,24 @@ export const fetchTokensBalances = async (
       })),
       CHAIN_ID,
       50,
-      true
+      true,
     );
-    return balances
+    return balances;
   } catch {
-    return []
+    return [];
   }
 };
 
 export const useTokensBalances = (account: Address | undefined, tokens: Address[] | undefined) => {
   return useQuery({
     enabled: !!account && tokens && tokens.length > 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    refetchInterval: false,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["useTokensBalances", account, tokens],
     queryFn: () => fetchTokensBalances(account!, tokens!),
   });

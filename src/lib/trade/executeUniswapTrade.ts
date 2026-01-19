@@ -31,7 +31,6 @@ export async function getUniswapTradeExecution(
   const populatedTransaction = await trade.swapTransaction({
     recipient: account,
   });
-
   return {
     to: populatedTransaction.to! as `0x${string}`,
     data: populatedTransaction.data!.toString() as `0x${string}`,

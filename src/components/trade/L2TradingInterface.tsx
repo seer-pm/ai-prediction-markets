@@ -144,8 +144,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
         {executeTradeMutation.isPending && (
           <LoadingPanel
             title="Executing Trade Strategy"
-            description={`Processing transactions across ${readyMarkets.length} markets.
-                  This may take a few moments...`}
+            description={executeTradeMutation.txState}
           />
         )}
 

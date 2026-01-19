@@ -16,6 +16,7 @@ import {
   DECIMALS,
   NATIVE_TOKEN,
   OTHER_TOKEN_ID,
+  UNISWAP_ROUTER_ADDRESSES,
   VOLUME_MIN,
 } from "@/utils/constants";
 import {
@@ -27,14 +28,16 @@ import {
   TokenAmount,
   TradeType,
 } from "@swapr/sdk";
-import { Address, formatUnits, parseUnits, zeroAddress } from "viem";
+import { Address, encodeFunctionData, formatUnits, parseUnits, zeroAddress } from "viem";
 import pLimit from "p-limit";
+import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
+import { erc20Abi } from "@/abis/erc20Abi";
 
 function getCurrenciesFromTokens(
   chainId: number,
   buyToken: Token,
   sellToken: Token,
-  amount: string
+  amount: string,
 ): {
   currencyIn: Currency;
   currencyOut: Currency;
@@ -46,14 +49,14 @@ function getCurrenciesFromTokens(
     currencyIn = SwaprToken.getNative(chainId);
     currencyAmountIn = CurrencyAmount.nativeCurrency(
       parseUnits(String(amount), currencyIn.decimals),
-      chainId
+      chainId,
     );
   } else {
     const tokenIn = new SwaprToken(
       chainId,
       sellToken.address,
       sellToken.decimals,
-      sellToken.symbol
+      sellToken.symbol,
     );
     currencyAmountIn = new TokenAmount(tokenIn, parseUnits(String(amount), tokenIn.decimals));
     currencyIn = tokenIn;
@@ -78,7 +81,7 @@ async function getTradeArgs(
   amount: string,
   outcomeToken: Token,
   collateralToken: Token,
-  swapType: "buy" | "sell"
+  swapType: "buy" | "sell",
 ) {
   const [buyToken, sellToken] =
     swapType === "buy"
@@ -91,7 +94,7 @@ async function getTradeArgs(
     chainId,
     buyToken,
     sellToken,
-    amount
+    amount,
   );
 
   const maximumSlippage = new Percent("5", "1000");
@@ -113,7 +116,7 @@ export const getUniswapQuote: QuoteTradeFn = async (
   amount: string,
   outcomeToken: Token,
   collateralToken: Token,
-  swapType: "buy" | "sell"
+  swapType: "buy" | "sell",
 ) => {
   const { currencyAmountIn, currencyOut, maximumSlippage, sellAmount, sellToken, buyToken } =
     await getTradeArgs(chainId, amount, outcomeToken, collateralToken, swapType);
@@ -129,7 +132,6 @@ export const getUniswapQuote: QuoteTradeFn = async (
   if (!trade) {
     throw new Error("No route found");
   }
-
   return {
     value: BigInt(trade.outputAmount.raw.toString()),
     decimals: sellToken.decimals,
@@ -139,6 +141,50 @@ export const getUniswapQuote: QuoteTradeFn = async (
     sellAmount: sellAmount.toString(),
     swapType,
   };
+};
+
+export const getUniswapTradeData = (
+  _chainId: number,
+  account: Address | undefined,
+  amount: string,
+  outcomeToken: Token,
+  collateralToken: Token,
+  swapType: "buy" | "sell",
+) => {
+  const [tokenIn, tokenOut] =
+    swapType === "buy"
+      ? [collateralToken.address, outcomeToken.address]
+      : [outcomeToken.address, collateralToken.address];
+  return [
+    {
+      to: tokenIn,
+      value: 0n,
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [UNISWAP_ROUTER_ADDRESSES[CHAIN_ID], parseUnits(amount, DECIMALS)],
+      }),
+    },
+    {
+      to: UNISWAP_ROUTER_ADDRESSES[CHAIN_ID],
+      value: 0n,
+      data: encodeFunctionData({
+        abi: UniswapRouterAbi,
+        functionName: "exactInputSingle",
+        args: [
+          {
+            tokenIn,
+            tokenOut,
+            fee: 10000,
+            recipient: account || zeroAddress,
+            amountIn: parseUnits(amount, DECIMALS),
+            amountOutMinimum: 0n,
+            sqrtPriceLimitX96: 0n,
+          },
+        ],
+      }),
+    },
+  ];
 };
 
 type ProgressCallback = (current: number) => void;
@@ -157,7 +203,7 @@ export const getQuotes = async ({
       acc[curr.difference! > 0 ? 0 : 1].push(curr);
       return acc;
     },
-    [[], []] as [TableData[], TableData[]]
+    [[], []] as [TableData[], TableData[]],
   );
   //get sell quotes first
   const sellPromises = sellMarkets.reduce((promises, row) => {
@@ -180,7 +226,7 @@ export const getQuotes = async ({
         volume,
         { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
         collateral,
-        "sell"
+        "sell",
       )
         .then((result) => {
           currentProgress++;
@@ -191,7 +237,7 @@ export const getQuotes = async ({
           currentProgress++;
           onProgress?.(currentProgress);
           throw e;
-        })
+        }),
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
@@ -218,7 +264,7 @@ export const getQuotes = async ({
       (row) =>
         (row.balance ?? 0n) +
         parseUnits(amount, DECIMALS) -
-        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n)
+        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n),
     );
   const otherTokensFromMergeOther = minBigIntArray(newOtherBalances);
 
@@ -263,7 +309,7 @@ export const getQuotes = async ({
         volume.toString(),
         { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
         collateral,
-        row.difference! > 0 ? "buy" : "sell"
+        row.difference! > 0 ? "buy" : "sell",
       )
         .then((result) => {
           currentProgress++;
@@ -274,7 +320,7 @@ export const getQuotes = async ({
           currentProgress++;
           onProgress?.(currentProgress);
           throw e;
-        })
+        }),
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
@@ -309,14 +355,14 @@ export const getL2MarketQuotes = async ({
 }: L2QuoteProps & { marketId: string }) => {
   const chainId = CHAIN_ID;
   const rowsWithData = tableData.filter(
-    (row) => row.hasPrediction && row.difference && isTwoStringsEqual(row.marketId, marketId)
+    (row) => row.hasPrediction && row.difference && isTwoStringsEqual(row.marketId, marketId),
   );
   const [buyRows, sellRows] = rowsWithData.reduce(
     (acc, curr) => {
       acc[curr.difference! > 0 ? 0 : 1].push(curr);
       return acc;
     },
-    [[], []] as [L2TableData[], L2TableData[]]
+    [[], []] as [L2TableData[], L2TableData[]],
   );
   const sellPromises = sellRows.reduce((promises, row) => {
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
@@ -335,8 +381,8 @@ export const getL2MarketQuotes = async ({
         volume,
         { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
         { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-        "sell"
-      )
+        "sell",
+      ),
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
@@ -388,8 +434,8 @@ export const getL2MarketQuotes = async ({
         volume.toString(),
         { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
         { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-        "buy"
-      )
+        "buy",
+      ),
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
@@ -422,8 +468,8 @@ export const getL2Quotes = async ({
   let currentProgress = 0;
   const l2MarketsWithData = Array.from(
     new Set(
-      tableData.filter((row) => row.hasPrediction && row.difference).map((row) => row.marketId)
-    )
+      tableData.filter((row) => row.hasPrediction && row.difference).map((row) => row.marketId),
+    ),
   );
 
   const promises = [];
@@ -434,7 +480,7 @@ export const getL2Quotes = async ({
         currentProgress++;
         onProgress?.(currentProgress);
         return getL2MarketQuotes({ account, amount, tableData, marketId });
-      })
+      }),
     );
   }
   const marketsExecution = (await Promise.all(promises)).filter((x) => x) as {
@@ -471,7 +517,7 @@ const simpleBuyOriginalityQuotes = async ({
     volume,
     { address: token, symbol: row.upDifference > 0 ? "UP" : "DOWN", decimals: DECIMALS },
     { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-    "buy"
+    "buy",
   );
   return [quoteResult];
 };
@@ -504,7 +550,7 @@ const complexBuyOriginalityQuotes = async ({
     volume,
     { address: token, symbol: row.upDifference > 0 ? "UP" : "DOWN", decimals: DECIMALS },
     { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-    "sell"
+    "sell",
   );
   const collateralAmount = sellQuote.value;
   //use sell collateral to buy
@@ -579,8 +625,8 @@ export const getSellFromBalanceQuotes = async ({
         volume,
         { address: token, symbol: row.upDifference > 0 ? "UP" : "DOWN", decimals: DECIMALS },
         { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-        "sell"
-      )
+        "sell",
+      ),
     );
     return promises;
   }, [] as Promise<UniswapQuoteTradeResult>[]);
@@ -614,8 +660,8 @@ export const getSellAllQuotes = async ({
           formatUnits(row.upBalance, DECIMALS),
           { address: row.wrappedTokens[1], symbol: "UP", decimals: DECIMALS },
           { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-          "sell"
-        )
+          "sell",
+        ),
       );
     }
     if (row.downBalance) {
@@ -626,8 +672,8 @@ export const getSellAllQuotes = async ({
           formatUnits(row.downBalance, DECIMALS),
           { address: row.wrappedTokens[0], symbol: "DOWN", decimals: DECIMALS },
           { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-          "sell"
-        )
+          "sell",
+        ),
       );
     }
     return promises;
@@ -661,7 +707,7 @@ export const getOriginalityQuotes = async ({
         currentProgress++;
         onProgress?.(currentProgress);
         throw e;
-      })
+      }),
   );
   if (!quotePromises.length) {
     throw new Error("Quote Error: Amount too small");
@@ -678,7 +724,7 @@ export const getOriginalityQuotes = async ({
       quoteType: string;
       quotes: UniswapQuoteTradeResult[];
       row: OriginalityTableData;
-    }[]
+    }[],
   );
 
   if (!quotes) {
@@ -708,8 +754,8 @@ export const getSellAllL1Quotes = async ({
           formatUnits(row.balance, DECIMALS),
           { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
           collateral,
-          "sell"
-        )
+          "sell",
+        ),
       );
     }
 
@@ -730,23 +776,41 @@ export const getSellAllL1Quotes = async ({
 export const getSellAllL2Quotes = async ({
   account,
   tableData,
+  onStateChange,
 }: {
   account: Address;
   tableData: L2TableData[];
+  onStateChange: (state: string) => void;
 }) => {
   const chainId = CHAIN_ID;
+  const limit = pLimit(50);
+  let currentQuote = 0;
+  const totalQuotes = tableData.filter((x) => x.balance).length;
+  onStateChange(`Getting quotes ${currentQuote}/${totalQuotes}`);
   const sellPromises = tableData.reduce((promises, row) => {
     // sell from token to collateral
     if (row.balance) {
       promises.push(
-        getUniswapQuote(
-          chainId,
-          account,
-          formatUnits(row.balance, DECIMALS),
-          { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
-          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-          "sell"
-        )
+        limit(() =>
+          getUniswapQuote(
+            chainId,
+            account,
+            formatUnits(row.balance!, DECIMALS),
+            { address: row.outcomeId as Address, symbol: row.dependency, decimals: DECIMALS },
+            { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+            "sell",
+          )
+            .then((result) => {
+              currentQuote++;
+              onStateChange(`Getting quotes ${currentQuote}/${totalQuotes}`);
+              return result;
+            })
+            .catch((e) => {
+              currentQuote++;
+              onStateChange(`Getting quotes ${currentQuote}/${totalQuotes}`);
+              throw e;
+            }),
+        ),
       );
     }
 

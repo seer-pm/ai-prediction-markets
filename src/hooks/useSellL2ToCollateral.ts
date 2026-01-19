@@ -1,5 +1,6 @@
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
+import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getApprovals7702 } from "@/lib/trade/getApprovals7702";
 import { getSellAllL2Quotes } from "@/lib/trade/getQuote";
 import { L2TableData } from "@/types";
@@ -10,24 +11,30 @@ import {
   L2_PARENT_MARKET_ID,
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
+import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData } from "viem";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { fetchTokensBalances } from "./useTokensBalances";
-import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
-import { toastifyBatchTx } from "@/lib/toastify";
+import { useState } from "react";
 
 interface SellAllProps {
   tradeExecutor: Address;
   tableData: L2TableData[];
 }
 
-async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
+async function sellL2ToCollateral({
+  tradeExecutor,
+  tableData,
+  onStateChange,
+}: SellAllProps & { onStateChange: (state: string) => void }) {
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
   const router = ROUTER_ADDRESSES[CHAIN_ID];
+  onStateChange("Getting quotes");
   const sellAllQuotes = await getSellAllL2Quotes({
     account: tradeExecutor,
     tableData,
+    onStateChange
   });
   const swapCalls = await getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const collateralTokens = l2MarketOutcomes as Address[];
@@ -38,7 +45,7 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
         .filter((data) => isTwoStringsEqual(data.buyToken, collateralTokens[index]))
         .reduce((acc, curr) => acc + curr.value, 0n);
       return balance + soldValue;
-    })
+    }),
   );
   if (mergeAmount > 0n) {
     swapCalls.push(
@@ -48,7 +55,7 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
         spender: router,
         amounts: mergeAmount,
         chainId: CHAIN_ID,
-      })
+      }),
     );
 
     swapCalls.push({
@@ -61,10 +68,17 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
       }),
     });
   }
-  const result = await toastifyBatchTx(tradeExecutor, swapCalls, {
-    txSent: "Selling all tokens to sUSDS...",
-    txSuccess: "Tokens sold!",
-  });
+
+  const BATCH_SIZE = 100;
+  const batches = [];
+  const messages = [];
+  for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
+    batches.push(swapCalls.slice(i, i + BATCH_SIZE));
+    messages.push(
+      `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
+    );
+  }
+  const result = await toastifyBatchTxSessionKey(tradeExecutor, batches, messages, onStateChange);
   if (!result.status) {
     throw result.error;
   }
@@ -72,12 +86,18 @@ async function sellL2ToCollateral({ tradeExecutor, tableData }: SellAllProps) {
 }
 
 export const useSellL2ToCollateral = (onSuccess?: () => unknown) => {
-  return useMutation({
-    mutationFn: (props: SellAllProps) => sellL2ToCollateral(props),
+  const [txState, setTxState] = useState("");
+  const mutation = useMutation({
+    mutationFn: (props: SellAllProps) =>
+      sellL2ToCollateral({ ...props, onStateChange: setTxState }),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
       queryClient.invalidateQueries({ queryKey: ["useTokensBalances"] });
     },
   });
+  return {
+    ...mutation,
+    txState,
+  };
 };

@@ -21,6 +21,13 @@ export const useTokenBalance = ({
 }) => {
   return useQuery({
     enabled: !!address,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    refetchInterval: false,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["useTokenBalance", address, token],
     queryFn: () => fetchTokenBalance(address!, token),
   });

@@ -1,6 +1,7 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
+import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { L2TradeProps } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
@@ -13,7 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
-import { toastifyBatchTx } from "@/lib/toastify";
+import { useState } from "react";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -21,7 +22,7 @@ function splitFromRouter(
   router: Address,
   amount: bigint,
   marketId: Address,
-  token: Address
+  token: Address,
 ): Execution[] {
   return [
     {
@@ -49,7 +50,7 @@ function mergeFromRouter(
   router: Address,
   amount: bigint,
   marketId: Address,
-  tokens: Address[]
+  tokens: Address[],
 ): Execution[] {
   return [
     ...tokens.map((token) => {
@@ -75,16 +76,6 @@ function mergeFromRouter(
   ];
 }
 
-const mintCalls = async (tradeExecutor: Address, calls: Execution[], title: string) => {
-  const result = await toastifyBatchTx(tradeExecutor, calls, {
-    txSent: title,
-    txSuccess: "Tokens minted!",
-  });
-  if (!result.status) {
-    throw result.error;
-  }
-};
-
 const getTradeExecutorCalls = async ({
   amount,
   getQuotesResults,
@@ -94,25 +85,27 @@ const getTradeExecutorCalls = async ({
   // mint l1
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
-  await mintCalls(
-    tradeExecutor,
+  const batchesOfCalls: Execution[][] = [];
+  const messages: string[] = [];
+  batchesOfCalls.push(
     splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
-    "Minting parent outcome tokens..."
   );
+  messages.push("Minting parent tokens");
   // mint l2 markets
   const l2Markets = {} as {
-    [key: string]: { marketId: string; collateralToken: string; repo: string };
+    [key: string]: { marketId: string; collateralToken: string };
   };
-  for (const { marketId, collateralToken, repo } of tableData) {
-    l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken, repo };
+  for (const { marketId, collateralToken } of tableData) {
+    l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken };
   }
-  for (const { marketId, collateralToken, repo } of Object.values(l2Markets)) {
-    await mintCalls(
-      tradeExecutor,
+  for (let i = 0; i < Object.values(l2Markets).length; i++) {
+    const { marketId, collateralToken } = Object.values(l2Markets)[i];
+    batchesOfCalls.push(
       splitFromRouter(router, parsedSplitAmount, marketId as Address, collateralToken as Address),
-      `Minting tokens for market ${repo}`
     );
+    messages.push(`Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`);
   }
+
   const calls: Execution[] = [];
   //trade transactions
   for (const { quotes, mergeAmount } of getQuotesResults) {
@@ -127,13 +120,18 @@ const getTradeExecutorCalls = async ({
       const row = tableData.find((row) => isTwoStringsEqual(row.outcomeId, outcomeId));
       if (!row) continue;
       calls.push(
-        ...mergeFromRouter(router, mergeAmount, row.marketId as Address, row.wrappedTokens)
+        ...mergeFromRouter(router, mergeAmount, row.marketId as Address, row.wrappedTokens),
       );
     }
     //push buy trade
     calls.push(...(await getQuoteTradeCalls(tradeExecutor, buyQuotes)));
   }
-  return calls;
+  // split trade calls into batches of 100
+  for (let i = 0; i < calls.length; i += 100) {
+    batchesOfCalls.push(calls.slice(i, i + 100));
+    messages.push(`Swapping tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`);
+  }
+  return { batchesOfCalls, messages };
 };
 
 const executeL2StrategyContract = async ({
@@ -141,7 +139,8 @@ const executeL2StrategyContract = async ({
   getQuotesResults,
   tradeExecutor,
   tableData,
-}: L2TradeProps) => {
+  onStateChange,
+}: L2TradeProps & { onStateChange: (state: string) => void }) => {
   const filteredTableData = tableData.filter((row) => row.hasPrediction && row.difference);
   if (!getQuotesResults.length) {
     throw new Error("No quote found");
@@ -155,25 +154,26 @@ const executeL2StrategyContract = async ({
     tradeExecutor,
     tableData: filteredTableData,
   });
-  const result = await toastifyBatchTx(
+  const result = await toastifyBatchTxSessionKey(
     tradeExecutor,
-    tradeExecutorCalls,
-    {
-      txSent: "Executing trade...",
-      txSuccess: "Trade executed!",
-    },
-    100
+    tradeExecutorCalls.batchesOfCalls,
+    tradeExecutorCalls.messages,
+    onStateChange,
   );
   if (!result.status) {
     throw result.error;
   }
-
+  toastSuccess({
+    title: "Trade executed",
+  });
   return result;
 };
 
 export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
-  return useMutation({
-    mutationFn: (tradeProps: L2TradeProps) => executeL2StrategyContract(tradeProps),
+  const [txState, setTxState] = useState("");
+  const mutation = useMutation({
+    mutationFn: (tradeProps: L2TradeProps) =>
+      executeL2StrategyContract({ ...tradeProps, onStateChange: setTxState }),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
@@ -184,4 +184,8 @@ export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
       }, 3000);
     },
   });
+  return {
+    ...mutation,
+    txState,
+  };
 };

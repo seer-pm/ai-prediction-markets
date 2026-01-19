@@ -58,3 +58,7 @@ export const CONDITIONAL_TOKENS = {
 export const ROUTER_ADDRESSES = {
   [optimism.id]: "0x179d8F8c811B8C759c33809dbc6c5ceDc62D05DD",
 } as const;
+
+export const UNISWAP_ROUTER_ADDRESSES = {
+  [optimism.id]: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+} as const;

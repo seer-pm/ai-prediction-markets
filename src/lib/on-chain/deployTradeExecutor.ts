@@ -1,5 +1,5 @@
 import { CreateCallAbi } from "@/abis/CreateCallAbi";
-import { TradeExecutorBytecode } from "@/abis/TradeExecutorAbi";
+import { OldTradeExecutorBytecode, TradeExecutorBytecode } from "@/abis/TradeExecutorAbi";
 import { config } from "@/config/wagmi";
 import { formatBytecode } from "@/utils/common";
 import { CHAIN_ID, CREATE_FACTORIES, SALT_KEY } from "@/utils/constants";
@@ -130,6 +130,16 @@ export async function checkTradeExecutorCreated(account: Address) {
     factoryAddress: CREATE_FACTORIES[CHAIN_ID],
     ownerAddress: account,
     bytecode: formatBytecode(TradeExecutorBytecode),
+    constructorData,
+  });
+}
+
+export async function checkOldTradeExecutorCreated(account: Address) {
+  const constructorData = encodeAbiParameters([{ type: "address" }], [account]);
+  return await checkContractCreated({
+    factoryAddress: CREATE_FACTORIES[CHAIN_ID],
+    ownerAddress: account,
+    bytecode: formatBytecode(OldTradeExecutorBytecode),
     constructorData,
   });
 }

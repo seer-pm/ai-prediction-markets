@@ -7,16 +7,16 @@ interface GetL2MarketsDataApiResult {
   marketsData: {
     [key: string]: {
       id: Address;
-      prices: (number | null)[]
-      pools: (PoolInfo | null)[]
+      prices: (number | null)[];
+      pools: (PoolInfo | null)[];
     };
   };
   markets: {
-    id: Address
-    wrappedTokens: Address[]
-    collateralToken: Address
-    outcomes: string[]
-  }[]
+    id: Address;
+    wrappedTokens: Address[];
+    collateralToken: Address;
+    outcomes: string[];
+  }[];
 }
 
 const fetchL2MarketsData = async (): Promise<GetL2MarketsDataApiResult> => {
@@ -30,6 +30,13 @@ const fetchL2MarketsData = async (): Promise<GetL2MarketsDataApiResult> => {
 
 export const useL2MarketsData = () => {
   return useQuery({
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    refetchInterval: false,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["fetchL2MarketsData"],
     queryFn: fetchL2MarketsData,
   });
