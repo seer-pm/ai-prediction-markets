@@ -30,6 +30,13 @@ const fetchL2MarketsData = async (): Promise<GetL2MarketsDataApiResult> => {
 
 export const useL2MarketsData = () => {
   return useQuery({
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    refetchInterval: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
     queryKey: ["fetchL2MarketsData"],
     queryFn: fetchL2MarketsData,
   });
