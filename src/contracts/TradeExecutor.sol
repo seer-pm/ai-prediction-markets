@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.30;
+pragma solidity 0.8.31;
 
 contract TradeExecutor {
     struct Call {
@@ -16,8 +16,9 @@ contract TradeExecutor {
     /// @dev Contract owner
     address public immutable owner;
 
-    /// @dev sessionKey uses to call contract function
-    address public sessionKey;
+    
+    address public permitted; /// @dev wallet address which is temporary allowed to call functions.
+	uint public expire; /// @dev wallet address which is temporary allowed to call functions.
     
     /// @dev Modifier to restrict access to owner only
     modifier onlyOwner() {
@@ -25,9 +26,9 @@ contract TradeExecutor {
         _;
     }
 
-    /// @dev Modifier to restrict access to sessionKey only
-    modifier onlySessionKey() {
-        require(msg.sender == owner || msg.sender == sessionKey, "Caller is not the owner or sessionKey");
+    /// @dev Modifier to restrict access to owner or wallet
+    modifier onlyAuthorized() {
+        require(msg.sender==owner || (msg.sender==permitted && block.timestamp<expire),  "Caller is not authorized");
         _;
     }
 
@@ -37,26 +38,28 @@ contract TradeExecutor {
         address _owner
     ) {
         owner = _owner;
-        sessionKey = _owner;
     }
 
-    /// @dev set session key to call the contract functions. Only callable by owner.
-    function setSessionKey(address _sessionKey) external onlyOwner {
-        sessionKey = _sessionKey;
+    /// @dev set wallet to call the contract functions. Only callable by owner.
+	/// @param _permitted an address temporarily allowed to control the trade executor.
+	/// @param _expire the time when this permission expire.
+    function setTemporaryPermission(address _permitted, uint _expire) external onlyOwner {
+        permitted = _permitted;
+		expire = _expire;
     }
     
-    /// @dev Execute calls in a single transaction. Only callable by the session key.
+    /// @dev Execute calls in a single transaction. Only callable by the owner or current wallet.
     /// @param calls Array of calls to execute
-    function batchExecute(Call[] calldata calls) external onlySessionKey {
+    function batchExecute(Call[] calldata calls) external onlyAuthorized {
         for (uint i = 0; i < calls.length; i++) {
             (bool success,) = calls[i].to.call(calls[i].data);
             require(success, "Call failed");
         }
     }
 
-    /// @dev Execute calls with value in a single transaction. Only callable by the session key.
+    /// @dev Execute calls with value in a single transaction. Only callable by the owner or current wallet.
     /// @param calls Array of calls to execute
-    function batchValueExecute(ValueCall[] calldata calls) external payable onlySessionKey {
+    function batchValueExecute(ValueCall[] calldata calls) external payable onlyAuthorized {
         for (uint i = 0; i < calls.length; i++) {
             (bool success,) = calls[i].to.call{value: calls[i].value}(calls[i].data);
             require(success, "Call failed");

@@ -1,9 +1,12 @@
-import { Execution } from "@/hooks/useCheck7702Support";
+import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config as wagmiConfig } from "@/config/wagmi";
+import { Execution } from "@/hooks/useCheck7702Support";
+import { CHAIN_ID } from "@/utils/constants";
 import {
   Config,
   ConnectorNotConnectedError,
   SendCallsReturnType,
+  estimateFeesPerGas,
   getTransactionReceipt,
   sendCalls,
   simulateContract,
@@ -14,18 +17,16 @@ import {
 import { Theme, ToastOptions, ToastPosition, toast } from "react-toastify";
 import {
   Address,
-  createWalletClient,
-  http,
   TransactionNotFoundError,
   TransactionReceipt,
   TransactionReceiptNotFoundError,
   WaitForTransactionReceiptTimeoutError,
+  createWalletClient,
+  http,
 } from "viem";
-import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
-import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
-import { CHAIN_ID } from "@/utils/constants";
-import { authorizeSessionKey } from "./on-chain/sessionKey";
 import { optimism } from "viem/chains";
+import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
+import { authorizeSessionKey, fundSessionKey } from "./on-chain/sessionKey";
 
 export const DEFAULT_TOAST_OPTIONS = {
   position: "top-center" as ToastPosition,
@@ -152,16 +153,11 @@ export const toastify: ToastifyFn<any> = async (execute, config) => {
   }
 };
 
-export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
+export const handleTx: ToastifyTxFn = async (contractWrite) => {
   let hash: `0x${string}` | undefined = undefined;
   const TIMEOUT = 30000;
   try {
     const result = await contractWrite();
-
-    toastInfo({
-      title: config?.txSent?.title || "Sending transaction...",
-      subtitle: config?.txSent?.subtitle,
-    });
 
     let receipt: TransactionReceipt;
     if (typeof result === "string") {
@@ -190,11 +186,6 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
       });
     }
 
-    toastSuccess({
-      title: config?.txSuccess?.title || "Transaction sent!",
-      subtitle: config?.txSent?.subtitle,
-    });
-
     return { status: true, receipt: receipt };
     // biome-ignore lint/suspicious/noExplicitAny:
   } catch (error: any) {
@@ -208,17 +199,29 @@ export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
     ) {
       const newReceipt = await pollForTransactionReceipt(hash);
       if (newReceipt) {
-        toastSuccess({
-          title: config?.txSuccess?.title || "Transaction sent!",
-          subtitle: config?.txSent?.subtitle,
-        });
         return { status: true, receipt: newReceipt };
       }
     }
-    toastError({ title: getErrorMessage(error), subtitle: config?.txSent?.subtitle });
 
     return { status: false, error };
   }
+};
+
+export const toastifyTx: ToastifyTxFn = async (contractWrite, config) => {
+  toastInfo({
+    title: config?.txSent?.title || "Sending transaction...",
+    subtitle: config?.txSent?.subtitle,
+  });
+  const result = await handleTx(contractWrite);
+  if (result.status) {
+    toastSuccess({
+      title: config?.txSuccess?.title || "Transaction sent!",
+      subtitle: config?.txSent?.subtitle,
+    });
+  } else {
+    toastError({ title: getErrorMessage(result.error), subtitle: config?.txSent?.subtitle });
+  }
+  return result;
 };
 
 export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig, config) => {
@@ -392,9 +395,10 @@ export const toastifyBatchTxSessionKey = async (
     value?: bigint;
     data: `0x${string}`;
   }[][],
-  messageConfig: { txSent: string; txSuccess: string }
+  messages: string[],
+  onStateChange: (state: string) => void
 ) => {
-  const sessionAccount = await authorizeSessionKey(tradeExecutor);
+  const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
 
   // Create wallet client with session key
   const sessionWallet = createWalletClient({
@@ -403,11 +407,16 @@ export const toastifyBatchTxSessionKey = async (
     transport: http(),
   });
 
+  const data = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
+  const maxGasCost = 15_000_000n * BigInt(batchesOfCalls.length) * data.maxFeePerGas;
+
+  await fundSessionKey(maxGasCost, onStateChange);
+
   let lastReceipt: TransactionReceipt | undefined;
 
   for (let i = 0; i < batchesOfCalls.length; i++) {
     const batch = batchesOfCalls[i];
-
+    onStateChange(messages[i] ?? `Executing batch ${i + 1}`);
     const { request } = await simulateContract(wagmiConfig, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,
@@ -423,20 +432,11 @@ export const toastifyBatchTxSessionKey = async (
       chainId: CHAIN_ID,
       gas: 20_000_000n,
     });
-
-    const result = await toastifyTx(() => sessionWallet.writeContract(request), {
-      txSent: {
-        title: `Sending batch ${i + 1}/${batchesOfCalls.length}`,
-      },
-      txSuccess: {
-        title: i === batchesOfCalls.length - 1 ? messageConfig.txSuccess : `Batch ${i + 1} sent`,
-      },
-    });
+    const result = await handleTx(() => sessionWallet.writeContract(request));
 
     if (!result.status) {
       return { status: false, error: result.error };
     }
-
     lastReceipt = result.receipt;
   }
 

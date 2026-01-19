@@ -1,10 +1,10 @@
-import { config } from "@/config/wagmi";
-import { getBalance, readContract, sendTransaction, writeContract } from "@wagmi/core";
-import { toast } from "react-toastify";
-import { Address, parseEther } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { toastifyTx } from "../toastify";
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
+import { config } from "@/config/wagmi";
+import { isTwoStringsEqual } from "@/utils/common";
+import { getBalance, readContract, sendTransaction, writeContract } from "@wagmi/core";
+import { Address } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { handleTx } from "../toastify";
 
 class SessionKeyManager {
   private static STORAGE_KEY = "trade_executor_session_key";
@@ -32,50 +32,42 @@ class SessionKeyManager {
   }
 }
 
-const fundSessionKey = async () => {
-  const minBalance = parseEther("0.0001");
+export const getSessionAccount = (onStateChange: (state: string) => void) => {
   let sessionPrivateKey = SessionKeyManager.get();
   let sessionAccount = sessionPrivateKey ? privateKeyToAccount(sessionPrivateKey) : null;
-
-  // Check if session key exists and has sufficient balance
-  let balance: bigint = 0n;
-  if (sessionAccount) {
-    const data = await getBalance(config, {
-      address: sessionAccount.address,
-    });
-    balance = data.value;
-    if (balance >= minBalance) {
-      return sessionAccount; // Already funded
-    }
-  }
 
   // Create new session key if doesn't exist
   if (!sessionPrivateKey) {
     sessionPrivateKey = SessionKeyManager.create();
     sessionAccount = privateKeyToAccount(sessionPrivateKey);
-
-    toast.info(
+    onStateChange(
       `Session key created: ${sessionAccount.address.slice(0, 6)}...${sessionAccount.address.slice(
         -4
       )}`
     );
   }
 
-  // Prompt user to fund
-  const fundAmount = parseEther("0.0002");
+  return sessionAccount!;
+};
 
-  const result = await toastifyTx(
-    () =>
-      sendTransaction(config, {
-        to: sessionAccount!.address,
-        value: fundAmount,
-      }),
-    {
-      txSent: { title: "Funding session key..." },
-      txSuccess: {
-        title: `Session key funded! (${sessionAccount!.address.slice(0, 6)}...)`,
-      },
-    }
+export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: string) => void) => {
+  const sessionAccount = getSessionAccount(onStateChange);
+  // Check if session key exists and has sufficient balance
+  const data = await getBalance(config, {
+    address: sessionAccount.address,
+  });
+  const balance = data.value;
+  if (balance >= gasCost) {
+    return sessionAccount;
+  }
+
+  // Prompt user to fund
+  onStateChange("Funding session key...");
+  const result = await handleTx(() =>
+    sendTransaction(config, {
+      to: sessionAccount!.address,
+      value: gasCost - balance,
+    })
   );
 
   if (!result.status) {
@@ -86,29 +78,39 @@ const fundSessionKey = async () => {
   return sessionAccount!;
 };
 
-export const authorizeSessionKey = async (tradeExecutor: Address) => {
-  const sessionAccount = await fundSessionKey();
+export const authorizeSessionKey = async (
+  tradeExecutor: Address,
+  onStateChange: (state: string) => void
+) => {
+  const sessionAccount = getSessionAccount(onStateChange);
   // Set session key in contract
-
-  const currentSessionKey = (await readContract(config, {
-    address: tradeExecutor,
-    abi: TradeExecutorAbi,
-    functionName: "sessionKey",
-  })) as Address;
-
-  if (currentSessionKey.toLowerCase() !== sessionAccount.address.toLowerCase()) {
-    const result = await toastifyTx(
-      () =>
-        writeContract(config, {
-          address: tradeExecutor,
-          abi: TradeExecutorAbi,
-          functionName: "setSessionKey",
-          args: [sessionAccount.address],
-        }),
-      {
-        txSent: { title: "Authorizing session key..." },
-        txSuccess: { title: "Session key authorized!" },
-      }
+  const [currentSessionKey, currentExpiry] = await Promise.all([
+    readContract(config, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "permitted",
+    }),
+    readContract(config, {
+      address: tradeExecutor,
+      abi: TradeExecutorAbi,
+      functionName: "expire",
+    }),
+  ]);
+  const now = Math.floor(new Date().getTime() / 1000);
+  const isPermitted =
+    isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) &&
+    Number(currentExpiry) > now;
+  console.log(currentSessionKey, sessionAccount.address);
+  if (!isPermitted) {
+    const expiry = Math.floor(new Date().getTime() / 1000) + 60 * 15; //15 minutes
+    onStateChange("Authorizing session key...");
+    const result = await handleTx(() =>
+      writeContract(config, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "setTemporaryPermission",
+        args: [sessionAccount.address, BigInt(expiry)],
+      })
     );
 
     if (!result.status) {
