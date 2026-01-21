@@ -1,5 +1,7 @@
 import { L2Row } from "@/types";
+import { downloadCsv } from "@/utils/common";
 import { parseL2CSV } from "@/utils/csvParser";
+import { sampleL2Predictions } from "@/utils/samepleL2Predictions";
 import React, { useCallback } from "react";
 import { useForm } from "react-hook-form";
 
@@ -41,9 +43,34 @@ export const L2CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose })
         });
       }
     },
-    [onDataParsed, setError, clearErrors]
+    [onDataParsed, setError, clearErrors],
   );
-
+  const downloadSampleCsv = () => {
+    downloadCsv(
+      [
+        {
+          key: "dependency",
+          title: "dependency",
+        },
+        {
+          key: "repo",
+          title: "repo",
+        },
+        {
+          key: "weight",
+          title: "weight",
+        },
+      ],
+      sampleL2Predictions.map((row) => {
+        return {
+          repo: row.repo,
+          dependency: row.dependency,
+          weight: row.weight,
+        };
+      }),
+      "l2-predictions",
+    );
+  };
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       {/* Header */}
@@ -72,7 +99,16 @@ export const L2CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose })
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select CSV File</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-gray-700">Select CSV File</label>
+              <button
+                type="button"
+                onClick={() => downloadSampleCsv()}
+                className="hover:underline cursor-pointer text-gray-500 text-sm"
+              >
+                Download Sample CSV
+              </button>
+            </div>
             <input
               {...register("csvFile", { required: "CSV file is required" })}
               type="file"

@@ -69,7 +69,7 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
           weight: row.weight,
         };
       }),
-      "predictions"
+      "l1-predictions"
     );
   };
 
