@@ -119,7 +119,7 @@ export default async () => {
         token0: { id: poolToken0Id },
         token1: { id: poolToken1Id },
       } = pool;
-      const [price0, price1] = tickToTokenPrices(Number(tick));
+      const [price0, price1] = pool.tick === null || pool.tick === undefined ? [0, 0] : tickToTokenPrices(Number(tick));
       const price = isTwoStringsEqual(outcome, token0) ? price0 : price1;
       return {
         liquidity,
