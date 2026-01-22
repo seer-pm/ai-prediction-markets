@@ -32,6 +32,7 @@ import { Address, encodeFunctionData, formatUnits, parseUnits, zeroAddress } fro
 import pLimit from "p-limit";
 import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
 import { erc20Abi } from "@/abis/erc20Abi";
+import { Protocol } from "@uniswap/router-sdk";
 
 function getCurrenciesFromTokens(
   chainId: number,
@@ -121,13 +122,19 @@ export const getUniswapQuote: QuoteTradeFn = async (
   const { currencyAmountIn, currencyOut, maximumSlippage, sellAmount, sellToken, buyToken } =
     await getTradeArgs(chainId, amount, outcomeToken, collateralToken, swapType);
 
-  const trade = await UniswapTrade.getQuote({
-    amount: currencyAmountIn,
-    quoteCurrency: currencyOut,
-    maximumSlippage,
-    recipient: account || zeroAddress,
-    tradeType: TradeType.EXACT_INPUT,
-  });
+  const trade = await UniswapTrade.getQuote(
+    {
+      amount: currencyAmountIn,
+      quoteCurrency: currencyOut,
+      maximumSlippage,
+      recipient: account || zeroAddress,
+      tradeType: TradeType.EXACT_INPUT,
+    },
+    undefined,
+    {
+      protocols: [Protocol.V3],
+    },
+  );
 
   if (!trade) {
     throw new Error("No route found");
@@ -473,7 +480,7 @@ export const getL2Quotes = async ({
   );
 
   const promises = [];
-  const limit = pLimit(5);
+  const limit = pLimit(1);
   for (const marketId of l2MarketsWithData) {
     promises.push(
       limit(() => {
