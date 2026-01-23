@@ -480,7 +480,7 @@ export const getL2Quotes = async ({
   );
 
   const promises = [];
-  const limit = pLimit(1);
+  const limit = pLimit(2);
   for (const marketId of l2MarketsWithData) {
     promises.push(
       limit(() => {
