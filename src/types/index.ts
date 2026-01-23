@@ -1,5 +1,4 @@
 import { SupportedChain } from "@/utils/constants";
-import { UniswapTrade } from "@swapr/sdk";
 import { Address } from "viem";
 
 export interface PredictionRow {
@@ -103,7 +102,8 @@ export interface UniswapQuoteTradeResult {
   sellToken: Address;
   sellAmount: string;
   swapType: "buy" | "sell";
-  trade: UniswapTrade;
+  fee: number; // Uniswap V3 fee tier (100, 500, 3000, 10000)
+  gasEstimate?: bigint;
 }
 
 export interface QuoteProps {

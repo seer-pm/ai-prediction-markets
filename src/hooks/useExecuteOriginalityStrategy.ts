@@ -51,20 +51,16 @@ const getSplitCalls = ({
   ];
 };
 
-export const getQuoteTradeCalls = async (
+export const getQuoteTradeCalls = (
   tradeExecutor: Address,
   quotes: UniswapQuoteTradeResult[]
 ) => {
-  const calls = (
-    await Promise.all(
-      quotes.map(async (quote) => {
-        return [
-          ...getTradeApprovals7702(tradeExecutor, quote.trade),
-          await getUniswapTradeExecution(quote.trade, tradeExecutor),
-        ];
-      })
-    )
-  ).flat();
+  const calls = quotes.map((quote) => {
+    return [
+      ...getTradeApprovals7702(tradeExecutor, quote),
+      getUniswapTradeExecution(quote, tradeExecutor),
+    ];
+  }).flat();
   return calls;
 };
 const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;

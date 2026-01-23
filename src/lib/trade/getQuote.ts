@@ -14,141 +14,17 @@ import {
   CHAIN_ID,
   collateral,
   DECIMALS,
-  NATIVE_TOKEN,
   OTHER_TOKEN_ID,
   UNISWAP_ROUTER_ADDRESSES,
   VOLUME_MIN,
 } from "@/utils/constants";
-import {
-  Currency,
-  CurrencyAmount,
-  Percent,
-  UniswapTrade,
-  Token as SwaprToken,
-  TokenAmount,
-  TradeType,
-} from "@swapr/sdk";
 import { Address, encodeFunctionData, formatUnits, parseUnits, zeroAddress } from "viem";
 import pLimit from "p-limit";
 import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
 import { erc20Abi } from "@/abis/erc20Abi";
-import { Protocol } from "@uniswap/router-sdk";
+import { getUniswapQuoteFast } from "./getQuoteFast";
 
-function getCurrenciesFromTokens(
-  chainId: number,
-  buyToken: Token,
-  sellToken: Token,
-  amount: string,
-): {
-  currencyIn: Currency;
-  currencyOut: Currency;
-  currencyAmountIn: CurrencyAmount;
-} {
-  let currencyIn: Currency;
-  let currencyAmountIn: CurrencyAmount;
-  if (isTwoStringsEqual(sellToken.address, NATIVE_TOKEN)) {
-    currencyIn = SwaprToken.getNative(chainId);
-    currencyAmountIn = CurrencyAmount.nativeCurrency(
-      parseUnits(String(amount), currencyIn.decimals),
-      chainId,
-    );
-  } else {
-    const tokenIn = new SwaprToken(
-      chainId,
-      sellToken.address,
-      sellToken.decimals,
-      sellToken.symbol,
-    );
-    currencyAmountIn = new TokenAmount(tokenIn, parseUnits(String(amount), tokenIn.decimals));
-    currencyIn = tokenIn;
-  }
-
-  let currencyOut: Currency;
-  if (isTwoStringsEqual(buyToken.address, NATIVE_TOKEN)) {
-    currencyOut = SwaprToken.getNative(chainId);
-  } else {
-    currencyOut = new SwaprToken(chainId, buyToken.address, buyToken.decimals, buyToken.symbol);
-  }
-
-  return {
-    currencyIn,
-    currencyOut,
-    currencyAmountIn,
-  };
-}
-
-async function getTradeArgs(
-  chainId: number,
-  amount: string,
-  outcomeToken: Token,
-  collateralToken: Token,
-  swapType: "buy" | "sell",
-) {
-  const [buyToken, sellToken] =
-    swapType === "buy"
-      ? [outcomeToken, collateralToken]
-      : ([collateralToken, outcomeToken] as [Token, Token]);
-
-  const sellAmount = parseUnits(String(amount), sellToken.decimals);
-
-  const { currencyIn, currencyOut, currencyAmountIn } = getCurrenciesFromTokens(
-    chainId,
-    buyToken,
-    sellToken,
-    amount,
-  );
-
-  const maximumSlippage = new Percent("5", "1000");
-
-  return {
-    buyToken,
-    sellToken,
-    sellAmount,
-    currencyIn,
-    currencyOut,
-    currencyAmountIn,
-    maximumSlippage,
-  };
-}
-
-export const getUniswapQuote: QuoteTradeFn = async (
-  chainId: number,
-  account: Address | undefined,
-  amount: string,
-  outcomeToken: Token,
-  collateralToken: Token,
-  swapType: "buy" | "sell",
-) => {
-  const { currencyAmountIn, currencyOut, maximumSlippage, sellAmount, sellToken, buyToken } =
-    await getTradeArgs(chainId, amount, outcomeToken, collateralToken, swapType);
-
-  const trade = await UniswapTrade.getQuote(
-    {
-      amount: currencyAmountIn,
-      quoteCurrency: currencyOut,
-      maximumSlippage,
-      recipient: account || zeroAddress,
-      tradeType: TradeType.EXACT_INPUT,
-    },
-    undefined,
-    {
-      protocols: [Protocol.V3],
-    },
-  );
-
-  if (!trade) {
-    throw new Error("No route found");
-  }
-  return {
-    value: BigInt(trade.outputAmount.raw.toString()),
-    decimals: sellToken.decimals,
-    trade,
-    buyToken: buyToken.address,
-    sellToken: sellToken.address,
-    sellAmount: sellAmount.toString(),
-    swapType,
-  };
-};
+export const getUniswapQuote: QuoteTradeFn = getUniswapQuoteFast;
 
 export const getUniswapTradeData = (
   _chainId: number,
@@ -578,8 +454,10 @@ const compareOriginalityQuotes = async ({
 }) => {
   if (!row.amount) return;
   const amount = row.amount;
-  const complexQuoteResults = await complexBuyOriginalityQuotes({ account, amount, row });
-  const simpleQuoteResults = await simpleBuyOriginalityQuotes({ account, amount, row });
+  const [complexQuoteResults, simpleQuoteResults] = await Promise.all([
+    complexBuyOriginalityQuotes({ account, amount, row }),
+    simpleBuyOriginalityQuotes({ account, amount, row }),
+  ]);
   const complexBuyQuote = complexQuoteResults[1];
   const simpleBuyQuote = simpleQuoteResults[0];
   if (!simpleBuyQuote && !complexBuyQuote) return;
