@@ -81,7 +81,7 @@ export const getUniswapQuoteFast: QuoteTradeFn = async (
 
   return {
     value: bestResult.amountOut,
-    decimals: sellToken.decimals,
+    decimals: buyToken.decimals,
     buyToken: buyToken.address,
     sellToken: sellToken.address,
     sellAmount: sellAmount.toString(),
