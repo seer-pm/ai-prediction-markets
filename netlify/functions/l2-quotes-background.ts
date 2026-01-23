@@ -149,7 +149,11 @@ export default async (req: Request) => {
       .single();
 
     const input = run!.input as L2QuoteProps;
-    const data = await getL2Quotes(input);
+    const tableData = input.tableData.map((row: any) => ({
+      ...row,
+      balance: row.balance ? BigInt(row.balance) : undefined,
+    }));
+    const data = await getL2Quotes({ ...input, tableData });
     await supabase
       .from("l2_quote_runs")
       .update({

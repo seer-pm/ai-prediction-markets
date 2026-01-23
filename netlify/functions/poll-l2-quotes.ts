@@ -19,13 +19,22 @@ export default async (req: Request) => {
     if (error || !data) {
       return Response.json({ error: "Run not found" }, { status: 404 });
     }
-
-    return Response.json({
-      status: data.status, // running | done | error
-      result: data.result ?? [],
-      error: data.error ?? null,
-      done: data.status === "done",
-    });
+    return new Response(
+      JSON.stringify({
+        status: data.status, // running | done | error
+        result: data.result ?? [],
+        error: data.error ?? null,
+        done: data.status === "done",
+      }),
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "http://localhost:5173",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "GET",
+        },
+      },
+    );
   } catch (e: any) {
     return Response.json({ error: e.message ?? "Unknown error" }, { status: 500 });
   }

@@ -151,3 +151,10 @@ export function downloadCsv(
   // Clean up URL
   URL.revokeObjectURL(url);
 }
+
+export const serializeBigInt = (value: any) =>
+  JSON.parse(
+    JSON.stringify(value, (_, v) =>
+      typeof v === "bigint" ? v.toString() : v
+    )
+  );

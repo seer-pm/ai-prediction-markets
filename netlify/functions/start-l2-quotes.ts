@@ -18,6 +18,12 @@ export default async (req: Request) => {
     method: "POST",
     body: JSON.stringify({ runId: data.id }),
   });
-
-  return Response.json({ runId: data.id });
+  return new Response(JSON.stringify({ runId: data.id }), {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "http://localhost:5173",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Methods": "GET",
+    },
+  });
 };
