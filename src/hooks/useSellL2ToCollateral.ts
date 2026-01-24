@@ -3,7 +3,7 @@ import { queryClient } from "@/config/queryClient";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getApprovals7702 } from "@/lib/trade/getApprovals7702";
 import { getSellAllL2Quotes } from "@/lib/trade/getQuote";
-import { L2TableData } from "@/types";
+import { L2BatchesInput, L2TableData } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
 import {
   CHAIN_ID,
@@ -34,7 +34,7 @@ async function sellL2ToCollateral({
   const sellAllQuotes = await getSellAllL2Quotes({
     account: tradeExecutor,
     tableData,
-    onStateChange
+    onStateChange,
   });
   const swapCalls = await getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const collateralTokens = l2MarketOutcomes as Address[];
@@ -70,15 +70,15 @@ async function sellL2ToCollateral({
   }
 
   const BATCH_SIZE = 100;
-  const batches = [];
-  const messages = [];
+  const input: L2BatchesInput = [];
   for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
-    batches.push(swapCalls.slice(i, i + BATCH_SIZE));
-    messages.push(
-      `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
-    );
+    input.push({
+      calls: swapCalls.slice(i, i + BATCH_SIZE),
+      message: `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
+      skipFailCalls: true,
+    });
   }
-  const result = await toastifyBatchTxSessionKey(tradeExecutor, batches, messages, onStateChange);
+  const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange);
   if (!result.status) {
     throw result.error;
   }

@@ -59,8 +59,8 @@ export interface L2TableData {
   outcomeId: string;
   hasPrediction: boolean;
   volumeUntilPrice: number;
-  collateralToken:Address;
-  wrappedTokens: Address[]
+  collateralToken: Address;
+  wrappedTokens: Address[];
   balance?: bigint;
   payout?: number;
 }
@@ -92,7 +92,7 @@ export type QuoteTradeFn = (
   amount: string,
   outcomeToken: Token,
   collateralToken: Token,
-  swapType: "buy" | "sell"
+  swapType: "buy" | "sell",
 ) => Promise<UniswapQuoteTradeResult>;
 
 export interface UniswapQuoteTradeResult {
@@ -152,3 +152,13 @@ export interface ApprovalRequest {
   amounts: bigint | bigint[];
   chainId: SupportedChain;
 }
+
+export type L2BatchesInput = {
+  calls: {
+    to: `0x${string}`;
+    value?: bigint;
+    data: `0x${string}`;
+  }[];
+  message: string;
+  skipFailCalls?: boolean;
+}[];
