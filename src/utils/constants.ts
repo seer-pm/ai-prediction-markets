@@ -62,3 +62,7 @@ export const ROUTER_ADDRESSES = {
 export const UNISWAP_ROUTER_ADDRESSES = {
   [optimism.id]: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
 } as const;
+
+export const QUOTER_V2_ADDRESSES = {
+  [optimism.id]: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+} as const;

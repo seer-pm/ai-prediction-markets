@@ -1,7 +1,7 @@
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
-import { getApprovals7702, getMaximumAmountIn } from "@/lib/trade/getApprovals7702";
+import { getApprovals7702 } from "@/lib/trade/getApprovals7702";
 import { TradeProps, UniswapQuoteTradeResult } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
@@ -11,7 +11,7 @@ import {
   OTHER_MARKET_ID,
   OTHER_TOKEN_ID,
   ROUTER_ADDRESSES,
-  SupportedChain,
+  UNISWAP_ROUTER_ADDRESSES,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
@@ -79,12 +79,12 @@ const checkAndAddApproveCalls = async ({
           },
         ]
       : []),
-    ...sellQuotes.map(({ trade }) => ({
-      tokensAddresses: [trade.executionPrice.baseCurrency.address as `0x${string}`],
+    ...sellQuotes.map((quote) => ({
+      tokensAddresses: [quote.sellToken],
       account: tradeExecutor,
-      spender: trade.approveAddress as `0x${string}`,
-      amounts: getMaximumAmountIn(trade),
-      chainId: trade.chainId as SupportedChain,
+      spender: UNISWAP_ROUTER_ADDRESSES[CHAIN_ID],
+      amounts: BigInt(quote.sellAmount),
+      chainId: CHAIN_ID,
     })),
     ...(otherTokensFromMergeOther > 0n
       ? tableData
@@ -108,13 +108,13 @@ const checkAndAddApproveCalls = async ({
             chainId: CHAIN_ID,
           }))
       : []),
-    {
-      tokensAddresses: [buyQuotes[0].trade.executionPrice.baseCurrency.address as `0x${string}`],
+    ...buyQuotes.map((quote) => ({
+      tokensAddresses: [quote.sellToken],
       account: tradeExecutor,
-      spender: buyQuotes[0].trade.approveAddress as `0x${string}`,
-      amounts: buyQuotes.reduce((acc, curr) => acc + getMaximumAmountIn(curr.trade), 0n),
+      spender: UNISWAP_ROUTER_ADDRESSES[CHAIN_ID],
+      amounts: BigInt(quote.sellAmount),
       chainId: CHAIN_ID,
-    },
+    })),
   ]
     .map((request) => getApprovals7702(request))
     .flat();
@@ -144,11 +144,9 @@ const getTradeExecutorCalls = async ({
     calls.push(splitFromRouter(router, parsedSplitAmount, OTHER_MARKET_ID));
   }
   // push sell trade transactions
-  const sellTradeTransactions = await Promise.all(
-    getQuotesResult!.quotes
-      .filter((quote) => quote.swapType === "sell")
-      .map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
-  );
+  const sellTradeTransactions = getQuotesResult!.quotes
+    .filter((quote) => quote.swapType === "sell")
+    .map((quote) => getUniswapTradeExecution(quote, tradeExecutor));
   calls.push(...sellTradeTransactions);
   console.log({result: getQuotesResult?.quotes, otherTokensFromMergeOther, mergeAmount})
 
@@ -161,11 +159,9 @@ const getTradeExecutorCalls = async ({
   }
 
   // push buy trade transactions
-  const buyTradeTransactions = await Promise.all(
-    getQuotesResult!.quotes
-      .filter((quote) => quote.swapType === "buy")
-      .map(({ trade }) => getUniswapTradeExecution(trade, tradeExecutor))
-  );
+  const buyTradeTransactions = getQuotesResult!.quotes
+    .filter((quote) => quote.swapType === "buy")
+    .map((quote) => getUniswapTradeExecution(quote, tradeExecutor));
   calls.push(...buyTradeTransactions);
   return calls;
 };

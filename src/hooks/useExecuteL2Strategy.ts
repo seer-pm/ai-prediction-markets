@@ -2,7 +2,7 @@ import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
-import { L2TradeProps } from "@/types";
+import { L2BatchesInput, L2TradeProps } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   CHAIN_ID,
@@ -85,12 +85,12 @@ const getTradeExecutorCalls = async ({
   // mint l1
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
-  const batchesOfCalls: Execution[][] = [];
-  const messages: string[] = [];
-  batchesOfCalls.push(
-    splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
-  );
-  messages.push("Minting parent tokens");
+  const input: L2BatchesInput = [];
+  input.push({
+    calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
+    message: "Minting parent tokens",
+  });
+
   // mint l2 markets
   const l2Markets = {} as {
     [key: string]: { marketId: string; collateralToken: string };
@@ -100,10 +100,15 @@ const getTradeExecutorCalls = async ({
   }
   for (let i = 0; i < Object.values(l2Markets).length; i++) {
     const { marketId, collateralToken } = Object.values(l2Markets)[i];
-    batchesOfCalls.push(
-      splitFromRouter(router, parsedSplitAmount, marketId as Address, collateralToken as Address),
-    );
-    messages.push(`Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`);
+    input.push({
+      calls: splitFromRouter(
+        router,
+        parsedSplitAmount,
+        marketId as Address,
+        collateralToken as Address,
+      ),
+      message: `Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`,
+    });
   }
 
   const calls: Execution[] = [];
@@ -128,10 +133,13 @@ const getTradeExecutorCalls = async ({
   }
   // split trade calls into batches of 100
   for (let i = 0; i < calls.length; i += 100) {
-    batchesOfCalls.push(calls.slice(i, i + 100));
-    messages.push(`Swapping tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`);
+    input.push({
+      calls: calls.slice(i, i + 100),
+      message: `Swapping tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`,
+      skipFailCalls: true,
+    });
   }
-  return { batchesOfCalls, messages };
+  return input;
 };
 
 const executeL2StrategyContract = async ({
@@ -148,18 +156,13 @@ const executeL2StrategyContract = async ({
   if (!filteredTableData.length) {
     throw new Error("No token found");
   }
-  const tradeExecutorCalls = await getTradeExecutorCalls({
+  const input = await getTradeExecutorCalls({
     amount,
     getQuotesResults,
     tradeExecutor,
     tableData: filteredTableData,
   });
-  const result = await toastifyBatchTxSessionKey(
-    tradeExecutor,
-    tradeExecutorCalls.batchesOfCalls,
-    tradeExecutorCalls.messages,
-    onStateChange,
-  );
+  const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange);
   if (!result.status) {
     throw result.error;
   }
@@ -176,6 +179,14 @@ export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
       executeL2StrategyContract({ ...tradeProps, onStateChange: setTxState }),
     onSuccess() {
       onSuccess?.();
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["useL2MarketsData"] });
+        queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
+        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
+        queryClient.invalidateQueries({ queryKey: ["useGetL2Quotes"] });
+      }, 3000);
+    },
+    onError() {
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["useL2MarketsData"] });
         queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
