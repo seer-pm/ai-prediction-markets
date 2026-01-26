@@ -88,29 +88,30 @@ const getSellTradeExecutorCalls = async ({
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
   const input: L2BatchesInput = [];
-  input.push({
-    calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
-    message: "Minting parent tokens",
-  });
-
-  // mint l2 markets
-  const l2Markets = {} as {
-    [key: string]: { marketId: string; collateralToken: string };
-  };
-  for (const { marketId, collateralToken } of tableData) {
-    l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken };
-  }
-  for (let i = 0; i < Object.values(l2Markets).length; i++) {
-    const { marketId, collateralToken } = Object.values(l2Markets)[i];
+  if (parsedSplitAmount > 0n) {
     input.push({
-      calls: splitFromRouter(
-        router,
-        parsedSplitAmount,
-        marketId as Address,
-        collateralToken as Address,
-      ),
-      message: `Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`,
+      calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
+      message: "Minting parent tokens",
     });
+    // mint l2 markets
+    const l2Markets = {} as {
+      [key: string]: { marketId: string; collateralToken: string };
+    };
+    for (const { marketId, collateralToken } of tableData) {
+      l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken };
+    }
+    for (let i = 0; i < Object.values(l2Markets).length; i++) {
+      const { marketId, collateralToken } = Object.values(l2Markets)[i];
+      input.push({
+        calls: splitFromRouter(
+          router,
+          parsedSplitAmount,
+          marketId as Address,
+          collateralToken as Address,
+        ),
+        message: `Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`,
+      });
+    }
   }
 
   const calls: Execution[] = [];

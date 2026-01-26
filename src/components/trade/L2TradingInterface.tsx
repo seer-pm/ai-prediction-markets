@@ -219,6 +219,10 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
               className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               disabled={executeTradeMutation.isPending}
             />
+            <p className="text-sm text-gray-600">
+              Note: You can execute this strategy without minting, as long as you already hold {">"}{" "}
+              0.01 overvalued tokens.
+            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0 mb-2">
@@ -239,8 +243,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
                 !!errors.amount ||
                 isLoadingQuotes ||
                 !getQuotesResults ||
-                isErrorGettingQuotes ||
-                !amount
+                isErrorGettingQuotes
               }
             >
               {renderButtonText()}

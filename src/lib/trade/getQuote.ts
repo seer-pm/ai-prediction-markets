@@ -439,6 +439,9 @@ export const getL2SellQuotes = async ({
     quotes: UniswapQuoteTradeResult[];
     mergeAmount: bigint;
   }[];
+  if (!marketsExecution.length) {
+    throw new Error("No quote found");
+  }
   return marketsExecution;
 };
 
