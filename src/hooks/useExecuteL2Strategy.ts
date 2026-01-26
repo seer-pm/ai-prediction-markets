@@ -16,6 +16,7 @@ import { Execution } from "./useCheck7702Support";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { useState } from "react";
 import { getL2BuyQuotes } from "@/lib/trade/getQuote";
+import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -203,6 +204,7 @@ const executeL2StrategyContract = async ({
     18_000_000n,
   );
   if (!sellResult.status) {
+    await withdrawFundSessionKey();
     throw sellResult.error;
   }
   onStateChange("Updating tokens balances");
@@ -215,8 +217,10 @@ const executeL2StrategyContract = async ({
   });
   const buyResult = await toastifyBatchTxSessionKey(tradeExecutor, buyInput, onStateChange, 0n);
   if (!buyResult.status) {
+    await withdrawFundSessionKey();
     throw buyResult.error;
   }
+  await withdrawFundSessionKey();
   toastSuccess({
     title: "Trade executed",
   });

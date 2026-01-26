@@ -467,7 +467,6 @@ export const toastifyBatchTxSessionKey = async (
       if (!skipFailCalls) throw err;
 
       const { good } = await splitAndFilter(calls, simulateBatchExecute);
-      if (!good.length) throw err;
 
       return simulateBatchExecute(good);
     }
@@ -489,11 +488,9 @@ export const toastifyBatchTxSessionKey = async (
 
       lastReceipt = result.receipt;
     }
-  } catch (error) {
-    await withdrawFundSessionKey();
+  } catch (error: any) {
     return { status: false, error };
   }
-  await withdrawFundSessionKey();
   return { status: true, receipt: lastReceipt! };
 };
 

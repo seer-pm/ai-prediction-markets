@@ -84,7 +84,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   // Strategy analysis
   const readyMarkets = Array.from(
-    new Set(rows.filter((row) => row.difference).map((row) => row.marketId))
+    new Set(rows.filter((row) => row.difference).map((row) => row.marketId)),
   );
   const renderButtonText = () => {
     if (executeTradeMutation.isPending) {
@@ -239,7 +239,8 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
                 !!errors.amount ||
                 isLoadingQuotes ||
                 !getQuotesResults ||
-                isErrorGettingQuotes
+                isErrorGettingQuotes ||
+                !amount
               }
             >
               {renderButtonText()}
