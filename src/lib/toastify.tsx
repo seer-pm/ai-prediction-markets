@@ -427,6 +427,7 @@ export const toastifyBatchTxSessionKey = async (
   tradeExecutor: Address,
   input: L2BatchesInput,
   onStateChange: (state: string) => void,
+  gasPerBatch = 10_000_000n,
 ) => {
   const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
 
@@ -438,7 +439,7 @@ export const toastifyBatchTxSessionKey = async (
   });
 
   const data = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
-  const maxGasCost = 10_000_000n * BigInt(input.length) * data.maxFeePerGas;
+  const maxGasCost = gasPerBatch * BigInt(input.length) * data.maxFeePerGas;
 
   await fundSessionKey(maxGasCost, onStateChange);
 
@@ -458,7 +459,7 @@ export const toastifyBatchTxSessionKey = async (
     return request;
   }
   for (let i = 0; i < input.length; i++) {
-    const {calls: batch, message, skipFailCalls} = input[i]
+    const { calls: batch, message, skipFailCalls } = input[i];
     onStateChange(message ?? `Executing batch ${i + 1}`);
     let request: any;
     try {

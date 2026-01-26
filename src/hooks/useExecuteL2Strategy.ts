@@ -15,6 +15,7 @@ import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { useState } from "react";
+import { getL2BuyQuotes } from "@/lib/trade/getQuote";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -76,7 +77,7 @@ function mergeFromRouter(
   ];
 }
 
-const getTradeExecutorCalls = async ({
+const getSellTradeExecutorCalls = async ({
   amount,
   getQuotesResults,
   tradeExecutor,
@@ -113,29 +114,62 @@ const getTradeExecutorCalls = async ({
 
   const calls: Execution[] = [];
   //trade transactions
-  for (const { quotes, mergeAmount } of getQuotesResults) {
+  for (const { quotes } of getQuotesResults) {
     const sellQuotes = quotes.filter((quote) => quote.swapType === "sell");
-    const buyQuotes = quotes.filter((quote) => quote.swapType === "buy");
-    if (!sellQuotes.length || !buyQuotes.length) continue;
+    if (!sellQuotes.length) continue;
     // push sell trade transactions
-    calls.push(...(await getQuoteTradeCalls(tradeExecutor, sellQuotes)));
-    // push merge
-    if (mergeAmount > 0n) {
-      const outcomeId = sellQuotes[0].sellToken;
-      const row = tableData.find((row) => isTwoStringsEqual(row.outcomeId, outcomeId));
-      if (!row) continue;
-      calls.push(
-        ...mergeFromRouter(router, mergeAmount, row.marketId as Address, row.wrappedTokens),
-      );
-    }
-    //push buy trade
-    calls.push(...(await getQuoteTradeCalls(tradeExecutor, buyQuotes)));
+    calls.push(...getQuoteTradeCalls(tradeExecutor, sellQuotes));
   }
   // split trade calls into batches of 100
   for (let i = 0; i < calls.length; i += 100) {
     input.push({
       calls: calls.slice(i, i + 100),
-      message: `Swapping tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`,
+      message: `Selling overvalued tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`,
+      skipFailCalls: true,
+    });
+  }
+  return input;
+};
+
+const getBuyTradeExecutorCalls = async ({
+  amount: _,
+  getQuotesResults,
+  tradeExecutor,
+  tableData,
+}: L2TradeProps) => {
+  // mint l1
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
+  const input: L2BatchesInput = [];
+  const mergeCalls: Execution[] = [];
+  const buyCalls: Execution[] = [];
+  //trade transactions
+  for (const { quotes, mergeAmount } of getQuotesResults) {
+    const buyQuotes = quotes.filter((quote) => quote.swapType === "buy");
+    if (!buyQuotes.length) continue;
+    // push merge
+    if (mergeAmount > 0n) {
+      const outcomeId = buyQuotes[0].buyToken;
+      const row = tableData.find((row) => isTwoStringsEqual(row.outcomeId, outcomeId));
+      if (!row) continue;
+      mergeCalls.push(
+        ...mergeFromRouter(router, mergeAmount, row.marketId as Address, row.wrappedTokens),
+      );
+    }
+    //push buy trade
+    buyCalls.push(...getQuoteTradeCalls(tradeExecutor, buyQuotes));
+  }
+  // split trade calls into batches of 100
+  for (let i = 0; i < mergeCalls.length; i += 100) {
+    input.push({
+      calls: mergeCalls.slice(i, i + 100),
+      message: `Merging tokens batch ${i / 100 + 1}/${Math.ceil(mergeCalls.length / 100)}`,
+      skipFailCalls: false,
+    });
+  }
+  for (let i = 0; i < buyCalls.length; i += 100) {
+    input.push({
+      calls: buyCalls.slice(i, i + 100),
+      message: `Buying undervalued tokens batch ${i / 100 + 1}/${Math.ceil(buyCalls.length / 100)}`,
       skipFailCalls: true,
     });
   }
@@ -156,27 +190,50 @@ const executeL2StrategyContract = async ({
   if (!filteredTableData.length) {
     throw new Error("No token found");
   }
-  const input = await getTradeExecutorCalls({
+  const sellInput = await getSellTradeExecutorCalls({
     amount,
     getQuotesResults,
     tradeExecutor,
     tableData: filteredTableData,
   });
-  const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange);
-  if (!result.status) {
-    throw result.error;
+  const sellResult = await toastifyBatchTxSessionKey(
+    tradeExecutor,
+    sellInput,
+    onStateChange,
+    18_000_000n,
+  );
+  if (!sellResult.status) {
+    throw sellResult.error;
+  }
+  onStateChange("Updating tokens balances");
+  const getBuyQuotesResults = await getL2BuyQuotes({ account: tradeExecutor, amount, tableData });
+  const buyInput = await getBuyTradeExecutorCalls({
+    amount,
+    getQuotesResults: getBuyQuotesResults,
+    tradeExecutor,
+    tableData: filteredTableData,
+  });
+  const buyResult = await toastifyBatchTxSessionKey(tradeExecutor, buyInput, onStateChange, 0n);
+  if (!buyResult.status) {
+    throw buyResult.error;
   }
   toastSuccess({
     title: "Trade executed",
   });
-  return result;
+  return buyResult;
 };
 
 export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
   const [txState, setTxState] = useState("");
   const mutation = useMutation({
     mutationFn: (tradeProps: L2TradeProps) =>
-      executeL2StrategyContract({ ...tradeProps, onStateChange: setTxState }),
+      executeL2StrategyContract({
+        ...tradeProps,
+        onStateChange: (state) => {
+          setTxState(state);
+          console.log(state);
+        },
+      }),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

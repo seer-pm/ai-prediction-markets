@@ -42,8 +42,8 @@ export const getSessionAccount = (onStateChange: (state: string) => void) => {
     sessionAccount = privateKeyToAccount(sessionPrivateKey);
     onStateChange(
       `Session key created: ${sessionAccount.address.slice(0, 6)}...${sessionAccount.address.slice(
-        -4
-      )}`
+        -4,
+      )}`,
     );
   }
 
@@ -67,7 +67,7 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: str
     sendTransaction(config, {
       to: sessionAccount!.address,
       value: gasCost - balance,
-    })
+    }),
   );
 
   if (!result.status) {
@@ -80,7 +80,7 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: str
 
 export const authorizeSessionKey = async (
   tradeExecutor: Address,
-  onStateChange: (state: string) => void
+  onStateChange: (state: string) => void,
 ) => {
   const sessionAccount = getSessionAccount(onStateChange);
   // Set session key in contract
@@ -96,12 +96,12 @@ export const authorizeSessionKey = async (
       functionName: "expire",
     }),
   ]);
-  const now = Math.floor(new Date().getTime() / 1000);
+  // make sure the permission is at least 30 minutes from now
+  const atLeastFromNow = Number(currentExpiry) > Math.floor(new Date().getTime() / 1000) + 60 * 30;
   const isPermitted =
-    isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) &&
-    Number(currentExpiry) > now;
+    isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) && atLeastFromNow;
   if (!isPermitted) {
-    const expiry = Math.floor(new Date().getTime() / 1000) + 60 * 15; //15 minutes
+    const expiry = Math.floor(new Date().getTime() / 1000) + 60 * 60;
     onStateChange("Authorizing session key...");
     const result = await handleTx(() =>
       writeContract(config, {
@@ -109,7 +109,7 @@ export const authorizeSessionKey = async (
         abi: TradeExecutorAbi,
         functionName: "setTemporaryPermission",
         args: [sessionAccount.address, BigInt(expiry)],
-      })
+      }),
     );
 
     if (!result.status) {

@@ -1,4 +1,4 @@
-import { getL2Quotes } from "@/lib/trade/getQuote";
+import { getL2SellQuotes } from "@/lib/trade/getQuote";
 import { L2QuoteProps } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -27,7 +27,7 @@ export const useGetL2Quotes = ({ account, amount, tableData }: L2QuoteProps) => 
     ],
     queryFn: () => {
       setProgress(0);
-      return getL2Quotes({
+      return getL2SellQuotes({
         account,
         amount,
         tableData,

@@ -23,6 +23,8 @@ import pLimit from "p-limit";
 import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
 import { erc20Abi } from "@/abis/erc20Abi";
 import { getUniswapQuoteFast } from "./getQuoteFast";
+import { fetchTokensBalances } from "@/hooks/useTokensBalances";
+import { l2MarketOutcomes, l2OutcomeTokens } from "@/utils/l2MarketOutcomes";
 
 export const getUniswapQuote: QuoteTradeFn = getUniswapQuoteFast;
 
@@ -230,7 +232,7 @@ export const getQuotes = async ({
   };
 };
 
-export const getL2MarketQuotes = async ({
+export const getL2MarketSellQuotes = async ({
   account,
   amount,
   tableData,
@@ -240,13 +242,7 @@ export const getL2MarketQuotes = async ({
   const rowsWithData = tableData.filter(
     (row) => row.hasPrediction && row.difference && isTwoStringsEqual(row.marketId, marketId),
   );
-  const [buyRows, sellRows] = rowsWithData.reduce(
-    (acc, curr) => {
-      acc[curr.difference! > 0 ? 0 : 1].push(curr);
-      return acc;
-    },
-    [[], []] as [L2TableData[], L2TableData[]],
-  );
+  const sellRows = rowsWithData.filter((row) => row.difference! < 0);
   const sellPromises = sellRows.reduce((promises, row) => {
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
@@ -272,26 +268,46 @@ export const getL2MarketQuotes = async ({
   if (!sellPromises.length) {
     return null;
   }
-  const sellTokenMapping: { [key: string]: bigint } = {};
   const sellQuoteResults = await Promise.allSettled(sellPromises);
   const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
     if (result.status === "fulfilled") {
       quotes.push(result.value);
-      sellTokenMapping[result.value.sellToken.toLowerCase()] = BigInt(result.value.sellAmount);
     }
     return quotes;
   }, [] as UniswapQuoteTradeResult[]);
-  const collateralFromSell = sellQuotes.reduce((acc, curr) => acc + BigInt(curr!.value), 0n);
-  const newBalances = tableData
-    .filter((row) => isTwoStringsEqual(row.marketId, marketId))
-    .map((row) => {
-      return (
-        (row.balance ?? 0n) +
-        parseUnits(amount, DECIMALS) -
-        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n)
-      );
-    });
-  const collateralFromMerge = minBigIntArray(newBalances);
+  return {
+    quotes: [...sellQuotes],
+    mergeAmount: 0n,
+  };
+};
+
+export const getL2MarketBuyQuotes = async ({
+  account,
+  amount: _,
+  tableData,
+  marketId,
+  tokensBalancesMapping,
+  collateralsBalancesMapping,
+}: L2QuoteProps & {
+  marketId: string;
+  tokensBalancesMapping: { [key: Address]: bigint };
+  collateralsBalancesMapping: { [key: Address]: bigint };
+}) => {
+  const chainId = CHAIN_ID;
+  const rowsWithData = tableData.filter(
+    (row) => row.hasPrediction && row.difference && isTwoStringsEqual(row.marketId, marketId),
+  );
+  const buyRows = rowsWithData.filter((row) => row.difference! > 0);
+  const marketRows = tableData.filter((row) => isTwoStringsEqual(row.marketId, marketId));
+  if (!marketRows) return null;
+  const collateralFromSell =
+    collateralsBalancesMapping[marketRows[0].collateralToken.toLowerCase() as Address] ?? 0n;
+
+  const collateralFromMerge = minBigIntArray(
+    marketRows[0].wrappedTokens.map(
+      (token) => tokensBalancesMapping[token.toLowerCase() as Address] ?? 0n,
+    ),
+  );
   const totalCollateral = collateralFromSell + collateralFromMerge;
   if (!totalCollateral) {
     return null;
@@ -337,12 +353,65 @@ export const getL2MarketQuotes = async ({
     return null;
   }
   return {
-    quotes: [...sellQuotes, ...buyQuotes],
+    quotes: [...buyQuotes],
     mergeAmount: collateralFromMerge,
   };
 };
 
-export const getL2Quotes = async ({
+export const getL2BuyQuotes = async ({
+  account,
+  amount,
+  tableData,
+  onProgress,
+}: L2QuoteProps & { onProgress?: ProgressCallback }) => {
+  let currentProgress = 0;
+  const l2MarketsWithData = Array.from(
+    new Set(
+      tableData.filter((row) => row.hasPrediction && row.difference).map((row) => row.marketId),
+    ),
+  );
+  const balances = await fetchTokensBalances(account, l2OutcomeTokens);
+  const tokensBalancesMapping = l2OutcomeTokens.reduce(
+    (acc, curr, index) => {
+      acc[curr.toLowerCase() as Address] = balances[index] ?? 0n;
+      return acc;
+    },
+    {} as { [key: Address]: bigint },
+  );
+  const collateralBalances = await fetchTokensBalances(account, l2MarketOutcomes);
+  const collateralsBalancesMapping = l2MarketOutcomes.reduce(
+    (acc, curr, index) => {
+      acc[curr.toLowerCase() as Address] = collateralBalances[index] ?? 0n;
+      return acc;
+    },
+    {} as { [key: Address]: bigint },
+  );
+  const promises = [];
+  const limit = pLimit(2);
+  for (const marketId of l2MarketsWithData) {
+    promises.push(
+      limit(() => {
+        currentProgress++;
+        onProgress?.(currentProgress);
+        return getL2MarketBuyQuotes({
+          account,
+          amount,
+          tableData,
+          marketId,
+          tokensBalancesMapping,
+          collateralsBalancesMapping,
+        });
+      }),
+    );
+  }
+  const marketsExecution = (await Promise.all(promises)).filter((x) => x) as {
+    quotes: UniswapQuoteTradeResult[];
+    mergeAmount: bigint;
+  }[];
+  return marketsExecution;
+};
+
+export const getL2SellQuotes = async ({
   account,
   amount,
   tableData,
@@ -362,7 +431,7 @@ export const getL2Quotes = async ({
       limit(() => {
         currentProgress++;
         onProgress?.(currentProgress);
-        return getL2MarketQuotes({ account, amount, tableData, marketId });
+        return getL2MarketSellQuotes({ account, amount, tableData, marketId });
       }),
     );
   }
