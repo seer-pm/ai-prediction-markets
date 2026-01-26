@@ -26,7 +26,7 @@ import {
 } from "viem";
 import { optimism } from "viem/chains";
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
-import { authorizeSessionKey, fundSessionKey } from "./on-chain/sessionKey";
+import { authorizeSessionKey, fundSessionKey, withdrawFundSessionKey } from "./on-chain/sessionKey";
 import { L2BatchesInput } from "@/types";
 
 export const DEFAULT_TOAST_OPTIONS = {
@@ -431,87 +431,69 @@ export const toastifyBatchTxSessionKey = async (
 ) => {
   const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
 
-  // Create wallet client with session key
   const sessionWallet = createWalletClient({
     account: sessionAccount,
     chain: optimism,
     transport: http(),
   });
 
-  const data = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
-  const maxGasCost = gasPerBatch * BigInt(input.length) * data.maxFeePerGas;
+  const feeData = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
+  const maxGasCost = gasPerBatch * BigInt(input.length) * feeData.maxFeePerGas;
 
   await fundSessionKey(maxGasCost, onStateChange);
 
   let lastReceipt: TransactionReceipt | undefined;
 
-  async function simulateBatch(calls: Execution[]) {
+  const buildBatchArgs = (calls: Execution[]) => calls.map(({ to, data }) => ({ to, data }));
+
+  const simulateBatchExecute = async (calls: Execution[]) => {
     const { request } = await simulateContract(wagmiConfig, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,
       functionName: "batchExecute",
-      args: [calls.map((c) => ({ to: c.to, data: c.data }))],
+      args: [buildBatchArgs(calls)],
       account: sessionAccount,
       chainId: CHAIN_ID,
       gas: 20_000_000n,
     });
 
     return request;
-  }
-  for (let i = 0; i < input.length; i++) {
-    const { calls: batch, message, skipFailCalls } = input[i];
-    onStateChange(message ?? `Executing batch ${i + 1}`);
-    let request: any;
+  };
+
+  const executeBatch = async (calls: Execution[], skipFailCalls?: boolean) => {
     try {
-      const data = await simulateContract(wagmiConfig, {
-        address: tradeExecutor,
-        abi: TradeExecutorAbi,
-        functionName: "batchExecute",
-        args: [
-          batch.map((call) => ({
-            to: call.to,
-            data: call.data,
-          })),
-        ],
-        account: sessionAccount,
-        value: 0n,
-        chainId: CHAIN_ID,
-        gas: 20_000_000n,
-      });
-      request = data.request;
-    } catch (e) {
-      if (!skipFailCalls) {
-        throw e;
-      }
-      const { good } = await splitAndFilter(batch as Execution[], simulateBatch);
-      if (!good.length) {
-        throw e;
-      }
-      const data = await simulateContract(wagmiConfig, {
-        address: tradeExecutor,
-        abi: TradeExecutorAbi,
-        functionName: "batchExecute",
-        args: [
-          good.map((call) => ({
-            to: call.to,
-            data: call.data,
-          })),
-        ],
-        account: sessionAccount,
-        value: 0n,
-        chainId: CHAIN_ID,
-        gas: 20_000_000n,
-      });
-      request = data.request;
-    }
-    const result = await handleTx(() => sessionWallet.writeContract(request));
+      return await simulateBatchExecute(calls);
+    } catch (err) {
+      if (!skipFailCalls) throw err;
 
-    if (!result.status) {
-      return { status: false, error: result.error };
+      const { good } = await splitAndFilter(calls, simulateBatchExecute);
+      if (!good.length) throw err;
+
+      return simulateBatchExecute(good);
     }
-    lastReceipt = result.receipt;
+  };
+
+  try {
+    for (let i = 0; i < input.length; i++) {
+      const { calls, message, skipFailCalls } = input[i];
+
+      onStateChange(message ?? `Executing batch ${i + 1}`);
+
+      const request = await executeBatch(calls as Execution[], skipFailCalls);
+
+      const result = await handleTx(() => sessionWallet.writeContract(request));
+
+      if (!result.status) {
+        throw result.error;
+      }
+
+      lastReceipt = result.receipt;
+    }
+  } catch (error) {
+    await withdrawFundSessionKey();
+    return { status: false, error };
   }
-
+  await withdrawFundSessionKey();
   return { status: true, receipt: lastReceipt! };
 };
 

@@ -1,10 +1,19 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config } from "@/config/wagmi";
 import { isTwoStringsEqual } from "@/utils/common";
-import { getBalance, readContract, sendTransaction, writeContract } from "@wagmi/core";
-import { Address } from "viem";
+import {
+  estimateFeesPerGas,
+  getAccount,
+  getBalance,
+  readContract,
+  sendTransaction,
+  writeContract,
+} from "@wagmi/core";
+import { Address, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { handleTx } from "../toastify";
+import { CHAIN_ID } from "@/utils/constants";
+import { optimism } from "viem/chains";
 
 class SessionKeyManager {
   private static STORAGE_KEY = "trade_executor_session_key";
@@ -76,6 +85,29 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: str
   }
 
   return sessionAccount!;
+};
+
+export const withdrawFundSessionKey = async () => {
+  const sessionAccount = getSessionAccount(() => {});
+  const data = await getBalance(config, {
+    address: sessionAccount.address,
+  });
+  const balance = data.value;
+  const { maxFeePerGas } = await estimateFeesPerGas(config, { chainId: CHAIN_ID });
+  const sendTxGasCost = 30_000n * maxFeePerGas;
+  if (balance > sendTxGasCost) {
+    const sessionWallet = createWalletClient({
+      account: sessionAccount,
+      chain: optimism,
+      transport: http(),
+    });
+    await handleTx(() =>
+      sessionWallet.sendTransaction({
+        to: getAccount(config).address,
+        value: balance - sendTxGasCost,
+      }),
+    );
+  }
 };
 
 export const authorizeSessionKey = async (
