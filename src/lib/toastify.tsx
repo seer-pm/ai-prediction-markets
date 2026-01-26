@@ -1,6 +1,7 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config as wagmiConfig } from "@/config/wagmi";
 import { Execution } from "@/hooks/useCheck7702Support";
+import { L2BatchesInput } from "@/types";
 import { CHAIN_ID } from "@/utils/constants";
 import {
   Config,
@@ -26,8 +27,7 @@ import {
 } from "viem";
 import { optimism } from "viem/chains";
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
-import { authorizeSessionKey, fundSessionKey, withdrawFundSessionKey } from "./on-chain/sessionKey";
-import { L2BatchesInput } from "@/types";
+import { authorizeSessionKey, fundSessionKey } from "./on-chain/sessionKey";
 
 export const DEFAULT_TOAST_OPTIONS = {
   position: "top-center" as ToastPosition,
