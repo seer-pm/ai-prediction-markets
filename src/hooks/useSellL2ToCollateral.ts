@@ -17,6 +17,7 @@ import { Address, encodeFunctionData } from "viem";
 import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { fetchTokensBalances } from "./useTokensBalances";
 import { useState } from "react";
+import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 
 interface SellAllProps {
   tradeExecutor: Address;
@@ -80,8 +81,10 @@ async function sellL2ToCollateral({
   }
   const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange);
   if (!result.status) {
+    await withdrawFundSessionKey();
     throw result.error;
   }
+  await withdrawFundSessionKey();
   return result;
 }
 

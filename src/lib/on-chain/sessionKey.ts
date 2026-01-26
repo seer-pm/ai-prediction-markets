@@ -88,25 +88,29 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: str
 };
 
 export const withdrawFundSessionKey = async () => {
-  const sessionAccount = getSessionAccount(() => {});
-  const data = await getBalance(config, {
-    address: sessionAccount.address,
-  });
-  const balance = data.value;
-  const { maxFeePerGas } = await estimateFeesPerGas(config, { chainId: CHAIN_ID });
-  const sendTxGasCost = 30_000n * maxFeePerGas;
-  if (balance > sendTxGasCost) {
-    const sessionWallet = createWalletClient({
-      account: sessionAccount,
-      chain: optimism,
-      transport: http(),
+  try {
+    const sessionAccount = getSessionAccount(() => {});
+    const data = await getBalance(config, {
+      address: sessionAccount.address,
     });
-    await handleTx(() =>
-      sessionWallet.sendTransaction({
-        to: getAccount(config).address,
-        value: balance - sendTxGasCost,
-      }),
-    );
+    const balance = data.value;
+    const { maxFeePerGas } = await estimateFeesPerGas(config, { chainId: CHAIN_ID });
+    const sendTxGasCost = 30_000n * maxFeePerGas;
+    if (balance > sendTxGasCost) {
+      const sessionWallet = createWalletClient({
+        account: sessionAccount,
+        chain: optimism,
+        transport: http(),
+      });
+      await handleTx(() =>
+        sessionWallet.sendTransaction({
+          to: getAccount(config).address,
+          value: balance - sendTxGasCost,
+        }),
+      );
+    }
+  } catch (e) {
+    console.log("Cannot refund session key ", e);
   }
 };
 
