@@ -158,18 +158,18 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
         <div className="px-4 py-2 bg-gray-50 rounded-lg">
           <h4 className="font-medium text-gray-800 mb-2">Strategy Overview</h4>
           <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 marker:font-semibold">
-            <li>Mint complete sets of the Level 1 market using sUSDS inputs.</li>
+            <li>Mint complete sets of the parent market using sUSDS inputs.</li>
             <li>
-              For each Level 2 dependency market, the strategy will:
+              For each child market, the strategy will:
               <ol className="list-[lower-alpha] list-inside ml-6 space-y-1">
-                <li>Mint complete sets of the Level 2 market using Level 1 collateral.</li>
+                <li>Mint complete sets of the child market using parent collateral.</li>
                 <li>
                   Use both minted and existing tokens, sell overvalued outcomes down to the
                   predicted price.
                 </li>
-                <li>Merge complete sets to Level 1 collateral (if possible).</li>
+                <li>Merge complete sets to parent collateral (if possible).</li>
                 <li>
-                  Use the available Level 1 collateral to buy undervalued outcomes up to the
+                  Use the available parent collateral to buy undervalued outcomes up to the
                   predicted price.
                 </li>
               </ol>

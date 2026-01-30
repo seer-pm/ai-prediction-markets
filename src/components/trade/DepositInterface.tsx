@@ -86,6 +86,18 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
           </svg>
         </button>
       </div>
+      <p className="px-6 pt-4 text-sm">
+        If you do not have sUSDS you can{" "}
+        <a
+          href="https://app.sky.money/?network=OP&widget=savings&flow=supply&source_token=USDC"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:underline hover:opacity-80 text-[#0b4c8c]"
+        >
+          turn USDS or USDC into sUSDS
+        </a>{" "}
+        (it will generate some yield).
+      </p>
 
       <div className="px-6 py-4 space-y-4">
         {/* Error Display */}
