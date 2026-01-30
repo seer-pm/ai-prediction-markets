@@ -48,7 +48,7 @@ function splitFromRouter(
   ];
 }
 
-function mergeFromRouter(
+export function mergeFromRouter(
   router: Address,
   amount: bigint,
   marketId: Address,
@@ -216,7 +216,12 @@ const executeL2StrategyContract = async ({
     tradeExecutor,
     tableData: filteredTableData,
   });
-  const buyResult = await toastifyBatchTxSessionKey(tradeExecutor, buyInput, onStateChange, 0n);
+  const buyResult = await toastifyBatchTxSessionKey(
+    tradeExecutor,
+    buyInput,
+    onStateChange,
+    10_000_000n,
+  );
   if (!buyResult.status) {
     await withdrawFundSessionKey();
     throw buyResult.error;

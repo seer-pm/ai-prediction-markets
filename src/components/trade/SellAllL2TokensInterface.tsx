@@ -34,7 +34,7 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
     Array.from(new Set(rows?.map((x) => x.collateralToken) ?? [])),
   );
   const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
-  const hasTokens = !!rows?.filter((x) => x.balance)?.length || hasMergeAmount;
+  const hasTokens = rows && (!!rows?.filter((x) => x.balance)?.length || hasMergeAmount);
 
   return (
     <div className="max-h-[90vh] overflow-y-auto">
