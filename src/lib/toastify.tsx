@@ -470,7 +470,7 @@ export const toastifyBatchTxSessionKey = async (
       }
 
       const { good } = await splitAndFilter(calls, simulateBatchExecute);
-      console.log("keep good calls ", calls.length);
+      console.log("keep good calls ", good.length);
       return await simulateBatchExecute(good);
     }
   };

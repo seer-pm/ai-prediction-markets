@@ -11,12 +11,14 @@ interface SellAllTokensInterfaceProps {
   onClose: () => void;
   tradeExecutor: Address;
   rows: L2TableData[] | undefined;
+  isLoadingTable: boolean;
 }
 
 export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   tradeExecutor,
   onClose,
   rows,
+  isLoadingTable,
 }) => {
   const sellAllFromTradeExecutor = useSellL2ToCollateral(() => {
     onClose();
@@ -34,8 +36,7 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
     Array.from(new Set(rows?.map((x) => x.collateralToken) ?? [])),
   );
   const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
-  const hasTokens = rows && (!!rows?.filter((x) => x.balance)?.length || hasMergeAmount);
-
+  const hasTokens = !!rows?.filter((x) => x.balance)?.length || hasMergeAmount;
   return (
     <div className="max-h-[90vh] overflow-y-auto">
       {/* Header with Close Button */}
@@ -71,7 +72,7 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
         {sellAllFromTradeExecutor.isPending && (
           <LoadingPanel title="Selling tokens" description={sellAllFromTradeExecutor.txState} />
         )}
-        {isLoadingBalances ? (
+        {isLoadingBalances || isLoadingTable ? (
           <p>Checking balances...</p>
         ) : !hasTokens ? (
           <p>Nothing to sell</p>
@@ -88,7 +89,7 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
               type="button"
               onClick={() => handleSellAll()}
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={sellAllFromTradeExecutor.isPending}
+              disabled={sellAllFromTradeExecutor.isPending || isLoadingTable}
             >
               {sellAllFromTradeExecutor.isPending ? "Executing..." : "Sell"}
             </button>

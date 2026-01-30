@@ -71,8 +71,9 @@ export const L2Markets = () => {
           {checkTradeExecutorResult?.isCreated && (
             <>
               <button
+                disabled={!tableData || isLoading || !account}
                 onClick={() => setIsSellAllDialogOpen(true)}
-                className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
+                className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Sell all to sUSDS
               </button>
@@ -132,6 +133,7 @@ export const L2Markets = () => {
               rows={tableData}
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               onClose={() => setIsSellAllDialogOpen(false)}
+              isLoadingTable={isLoading || isLoadingBalances}
             />
           </div>
         </div>
