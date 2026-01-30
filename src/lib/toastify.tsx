@@ -437,8 +437,8 @@ export const toastifyBatchTxSessionKey = async (
     transport: http(),
   });
 
-  const feeData = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
-  const maxGasCost = gasPerBatch * BigInt(input.length) * feeData.maxFeePerGas;
+  const { maxFeePerGas } = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
+  const maxGasCost = gasPerBatch * BigInt(input.length) * maxFeePerGas;
 
   await fundSessionKey(maxGasCost, onStateChange);
 
@@ -463,12 +463,15 @@ export const toastifyBatchTxSessionKey = async (
   const executeBatch = async (calls: Execution[], skipFailCalls?: boolean) => {
     try {
       return await simulateBatchExecute(calls);
-    } catch (err) {
-      if (!skipFailCalls) throw err;
+    } catch (err: any) {
+      if (!skipFailCalls) {
+        console.log("not skip calls ", calls.length, err.message);
+        throw err;
+      }
 
       const { good } = await splitAndFilter(calls, simulateBatchExecute);
-
-      return simulateBatchExecute(good);
+      console.log("keep good calls ", calls.length);
+      return await simulateBatchExecute(good);
     }
   };
 
@@ -483,6 +486,23 @@ export const toastifyBatchTxSessionKey = async (
       const result = await handleTx(() => sessionWallet.writeContract(request));
 
       if (!result.status) {
+        if (
+          result.error.message.includes(
+            "The total cost (gas * gas fee + value) of executing this transaction exceeds the balance of the account.",
+          )
+        ) {
+          await fundSessionKey(30_000_000n * maxFeePerGas, onStateChange);
+          onStateChange(message ?? `Executing batch ${i + 1}`);
+          const newResult = await handleTx(() => sessionWallet.writeContract(request));
+          if (!newResult.status) {
+            throw newResult.error;
+          }
+          lastReceipt = newResult.receipt;
+          continue;
+        }
+        if (skipFailCalls) {
+          continue;
+        }
         throw result.error;
       }
 
