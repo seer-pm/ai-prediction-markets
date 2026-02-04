@@ -1,10 +1,5 @@
-import { UniswapGraphQLClient } from "@/config/apollo";
 import {
-  GetPoolsDocument,
-  GetPoolsQuery,
-  GetPoolsQueryVariables,
-  OrderDirection,
-  Pool_OrderBy,
+  GetPoolsQuery
 } from "@/gql/graphql";
 import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
@@ -14,46 +9,25 @@ import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
-export async function getPools(tokenPairs: { token0: Address; token1: Address }[]) {
-  const maxAttempts = 10;
-  let attempt = 0;
-  let id = undefined;
-  let total: GetPoolsQuery["pools"] = [];
-  while (attempt < maxAttempts) {
-    const queryResult: { data: GetPoolsQuery | undefined } = await UniswapGraphQLClient.query<
-      GetPoolsQuery,
-      GetPoolsQueryVariables
-    >({
-      query: GetPoolsDocument,
-      variables: {
-        first: 1000,
-        where: {
-          and: [
-            {
-              or: tokenPairs,
-            },
-            { id_lt: id },
-          ],
-        },
-        orderBy: Pool_OrderBy.Id,
-        orderDirection: OrderDirection.Desc,
-      },
-    });
-    if (!queryResult.data) {
-      throw { message: "No pool found" };
-    }
-    const pools = queryResult.data.pools;
-    total = total.concat(pools);
-    if (pools[pools.length - 1]?.id === id) {
-      break;
-    }
-    if (pools.length < 1000) {
-      break;
-    }
-    id = pools[pools.length - 1]?.id;
-    attempt++;
+export async function getPools() {
+  const pageSize = 1000;
+  let from = 0;
+  let to = pageSize - 1;
+  let allRows: any[] = [];
+
+  while (true) {
+    const { data, error } = await supabase.from("l2_pools").select("data").range(from, to);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    allRows.push(...data);
+
+    from += pageSize;
+    to += pageSize;
   }
-  return total;
+
+  return allRows.map((row) => row.data);
 }
 
 export default async () => {
@@ -72,7 +46,7 @@ export default async () => {
     let { data, error } = await supabase
       .from("markets")
       .select(
-        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome"
+        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome",
       )
       .eq("subgraph_data->parentMarket->>id", L2_PARENT_MARKET_ID)
       .eq("chain_id", CHAIN_ID);
@@ -91,21 +65,19 @@ export default async () => {
     }[];
 
     //get pools for all the markets
-    const pools = await getPools(
-      markets.flatMap(
-        ({ wrappedTokens, collateralToken }) =>
-          wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)) ?? []
-      )
-    );
+    const pools = await getPools();
     //we only use the pool with highest liquidity for each pair
-    const tokenPairToPoolMapping = pools.reduce((acc, pool) => {
-      const numLiquidity = Number(pool.liquidity);
-      const mappingKey = `${pool.token0.id}-${pool.token1.id}`;
-      if (!acc[mappingKey] || numLiquidity > Number(acc[mappingKey].liquidity)) {
-        acc[mappingKey] = pool;
-      }
-      return acc;
-    }, {} as { [key: string]: GetPoolsQuery["pools"][0] });
+    const tokenPairToPoolMapping = pools.reduce(
+      (acc, pool) => {
+        const numLiquidity = Number(pool.liquidity);
+        const mappingKey = `${pool.token0.id}-${pool.token1.id}`;
+        if (!acc[mappingKey] || numLiquidity > Number(acc[mappingKey].liquidity)) {
+          acc[mappingKey] = pool;
+        }
+        return acc;
+      },
+      {} as { [key: string]: GetPoolsQuery["pools"][0] },
+    );
 
     const getPoolByTokenPair = (outcome: Address, collateral: Address) => {
       const { token0, token1 } = getToken0Token1(outcome, collateral);
@@ -119,7 +91,8 @@ export default async () => {
         token0: { id: poolToken0Id },
         token1: { id: poolToken1Id },
       } = pool;
-      const [price0, price1] = pool.tick === null || pool.tick === undefined ? [0, 0] : tickToTokenPrices(Number(tick));
+      const [price0, price1] =
+        pool.tick === null || pool.tick === undefined ? [0, 0] : tickToTokenPrices(Number(tick));
       const price = isTwoStringsEqual(outcome, token0) ? price0 : price1;
       return {
         liquidity,
@@ -132,19 +105,24 @@ export default async () => {
     };
 
     // return ticks data and current price
-    const repoToPriceMapping = markets.reduce((mapping, market) => {
-      const pools = market.wrappedTokens
-        .slice(0, -1)
-        .map((token) => getPoolByTokenPair(token, market.collateralToken));
-      const repo = (parentMarket.outcomes as string[])[market.parentOutcome];
+    const repoToPriceMapping = markets.reduce(
+      (mapping, market) => {
+        const pools = market.wrappedTokens
+          .slice(0, -1)
+          .map((token) => getPoolByTokenPair(token, market.collateralToken));
+        const repo = (parentMarket.outcomes as string[])[market.parentOutcome];
 
-      mapping[repo] = {
-        id: market.id,
-        pools,
-        prices: pools.map((pool) => pool?.price ?? null),
-      };
-      return mapping;
-    }, {} as { [key: string]: { id: Address; pools: (PoolInfo | null)[]; prices: (number | null)[] } });
+        mapping[repo] = {
+          id: market.id,
+          pools,
+          prices: pools.map((pool) => pool?.price ?? null),
+        };
+        return mapping;
+      },
+      {} as {
+        [key: string]: { id: Address; pools: (PoolInfo | null)[]; prices: (number | null)[] };
+      },
+    );
     return new Response(JSON.stringify({ marketsData: repoToPriceMapping, markets }), {
       status: 200,
       headers: {

@@ -19,11 +19,15 @@ interface GetL2MarketsDataApiResult {
   }[];
 }
 
-const fetchL2MarketsData = async (): Promise<GetL2MarketsDataApiResult> => {
+const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiResult> => {
   try {
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-l2-markets-data`);
     return await response.json();
   } catch {
+    // retry once
+    if (retryCount) {
+      return await fetchL2MarketsData(retryCount - 1);
+    }
     return { marketsData: {}, markets: [] };
   }
 };
@@ -38,6 +42,6 @@ export const useL2MarketsData = () => {
     staleTime: 24 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["fetchL2MarketsData"],
-    queryFn: fetchL2MarketsData,
+    queryFn: () => fetchL2MarketsData(),
   });
 };
