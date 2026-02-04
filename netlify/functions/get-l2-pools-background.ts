@@ -98,7 +98,7 @@ export default async () => {
     );
     const { error: writeError } = await supabase
       .from("l2_pools")
-      .upsert(pools.map((pool) => ({ id: pool.id, data: pool })));
+      .upsert(pools.map((pool) => ({ id: pool.id, data: pool, updated_at: new Date() })));
     if (writeError) {
       throw writeError;
     }
