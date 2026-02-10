@@ -14,17 +14,19 @@ export default async () => {
       .from("markets")
       .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
       .eq("id", ORIGINALITY_PARENT_MARKET_ID)
+      .eq("chain_id", CHAIN_ID)
       .single();
-    if (!parentMarket) {
-      throw new Error("Parent market not found");
-    }
     if (parentMarketError) {
       throw parentMarketError;
     }
+    if (!parentMarket) {
+      throw new Error("Parent market not found");
+    }
+
     let { data, error } = await supabase
       .from("markets")
       .select(
-        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome"
+        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome",
       )
       .eq("subgraph_data->parentMarket->>id", ORIGINALITY_PARENT_MARKET_ID)
       .eq("chain_id", CHAIN_ID);
@@ -50,7 +52,7 @@ export default async () => {
           or: markets.flatMap(
             ({ wrappedTokens, collateralToken }) =>
               wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)) ??
-              []
+              [],
           ),
         },
       },
@@ -61,14 +63,17 @@ export default async () => {
     }
     const pools = queryResult.data.pools;
     //we only use the pool with highest liquidity for each pair
-    const tokenPairToPoolMapping = pools.reduce((acc, pool) => {
-      const numLiquidity = Number(pool.liquidity);
-      const mappingKey = `${pool.token0.id}-${pool.token1.id}`;
-      if (!acc[mappingKey] || numLiquidity > Number(acc[mappingKey].liquidity)) {
-        acc[mappingKey] = pool;
-      }
-      return acc;
-    }, {} as { [key: string]: GetPoolsQuery["pools"][0] });
+    const tokenPairToPoolMapping = pools.reduce(
+      (acc, pool) => {
+        const numLiquidity = Number(pool.liquidity);
+        const mappingKey = `${pool.token0.id}-${pool.token1.id}`;
+        if (!acc[mappingKey] || numLiquidity > Number(acc[mappingKey].liquidity)) {
+          acc[mappingKey] = pool;
+        }
+        return acc;
+      },
+      {} as { [key: string]: GetPoolsQuery["pools"][0] },
+    );
 
     const getPoolByTokenPair = (outcome: Address, collateral: Address) => {
       const { token0, token1 } = getToken0Token1(outcome, collateral);
@@ -95,22 +100,33 @@ export default async () => {
     };
 
     // return ticks data and current down/up price
-    const repoToPriceMapping = markets.reduce((mapping, market) => {
-      const downPool = getPoolByTokenPair(market.wrappedTokens[0], market.collateralToken);
-      const upPool = getPoolByTokenPair(market.wrappedTokens[1], market.collateralToken);
-      const repo = (parentMarket.outcomes as string[])[market.parentOutcome];
-      if(mapping[repo]?.upPool || mapping[repo]?.downPool){
-        return mapping
-      }
-      mapping[repo] = {
-        id: market.id,
-        upPrice: upPool?.price ?? null,
-        upPool,
-        downPrice: downPool?.price ?? null,
-        downPool,
-      };
-      return mapping;
-    }, {} as { [key: string]: { id: Address; upPrice: number | null; downPrice: number | null; upPool: PoolInfo | null; downPool: PoolInfo | null } });
+    const repoToPriceMapping = markets.reduce(
+      (mapping, market) => {
+        const downPool = getPoolByTokenPair(market.wrappedTokens[0], market.collateralToken);
+        const upPool = getPoolByTokenPair(market.wrappedTokens[1], market.collateralToken);
+        const repo = (parentMarket.outcomes as string[])[market.parentOutcome];
+        if (mapping[repo]?.upPool || mapping[repo]?.downPool) {
+          return mapping;
+        }
+        mapping[repo] = {
+          id: market.id,
+          upPrice: upPool?.price ?? null,
+          upPool,
+          downPrice: downPool?.price ?? null,
+          downPool,
+        };
+        return mapping;
+      },
+      {} as {
+        [key: string]: {
+          id: Address;
+          upPrice: number | null;
+          downPrice: number | null;
+          upPool: PoolInfo | null;
+          downPool: PoolInfo | null;
+        };
+      },
+    );
     return new Response(JSON.stringify({ marketsData: repoToPriceMapping, markets }), {
       status: 200,
       headers: {

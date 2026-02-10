@@ -1,6 +1,4 @@
-import {
-  GetPoolsQuery
-} from "@/gql/graphql";
+import { GetPoolsQuery } from "@/gql/graphql";
 import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { CHAIN_ID, L2_PARENT_MARKET_ID } from "@/utils/constants";
@@ -36,13 +34,15 @@ export default async () => {
       .from("markets")
       .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
       .eq("id", L2_PARENT_MARKET_ID)
+      .eq("chain_id", CHAIN_ID)
       .single();
-    if (!parentMarket) {
-      throw new Error("Parent market not found");
-    }
     if (parentMarketError) {
       throw parentMarketError;
     }
+    if (!parentMarket) {
+      throw new Error("Parent market not found");
+    }
+
     let { data, error } = await supabase
       .from("markets")
       .select(
@@ -50,12 +50,13 @@ export default async () => {
       )
       .eq("subgraph_data->parentMarket->>id", L2_PARENT_MARKET_ID)
       .eq("chain_id", CHAIN_ID);
-    if (!data) {
-      throw new Error("Markets not found");
-    }
     if (error) {
       throw error;
     }
+    if (!data) {
+      throw new Error("Markets not found");
+    }
+
     const markets = data as {
       wrappedTokens: Address[];
       collateralToken: Address;
