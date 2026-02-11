@@ -48,7 +48,7 @@ export default async () => {
       .map((outcome) => ({ outcome, marketId: L1_MARKET_ID }))
       .concat(
         (otherMarketData.outcomes as string[]).map((outcome) => ({
-          outcome,
+          outcome: outcome === "Invalid result" ? "Other Invalid result" : outcome,
           marketId: otherMarketData.id,
         })),
       );
