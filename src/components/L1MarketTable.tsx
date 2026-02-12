@@ -67,10 +67,17 @@ export const L1MarketTable: React.FC<MarketTableProps> = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 text-sm">
             {rows.map((row) => {
-              const { outcomeId, repo, parent, currentPrice, predictedWeight, difference, balance } =
-                row;
+              const {
+                outcomeId,
+                repo,
+                parent,
+                currentPrice,
+                predictedWeight,
+                difference,
+                balance,
+              } = row;
 
-              if (repo === "Invalid result" || repo.includes("Other repositories")) return null;
+              if (repo.includes("Other repositories")) return null;
 
               return (
                 <tr key={outcomeId} className="hover:bg-gray-50">
