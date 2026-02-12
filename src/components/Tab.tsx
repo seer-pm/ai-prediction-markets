@@ -2,13 +2,13 @@ import { useState } from "react";
 import { AiMarkets } from "./tabs/AiMarkets";
 import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 import { L1Markets } from "./tabs/L1Markets";
-import { L2Markets } from "./tabs/L2Markets";
+// import { L2Markets } from "./tabs/L2Markets";
 
 export const Tab = () => {
-  const [activeTab, setActiveTab] = useState("round2-l2");
+  const [activeTab, setActiveTab] = useState("round2-l1");
 
   const tabs = [
-    { id: "round2-l2", label: "Round 2 L2", component: <L2Markets /> },
+    // { id: "round2-l2", label: "Round 2 L2", component: <L2Markets /> },
     { id: "round2-l1", label: "Round 2 L1", component: <L1Markets /> },
     { id: "round2", label: "Round 2 Originality", component: <OriginalityMarkets /> },
     { id: "round1", label: "Round 1", component: <AiMarkets /> },
