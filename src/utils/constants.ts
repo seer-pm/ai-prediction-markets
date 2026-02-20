@@ -66,3 +66,7 @@ export const UNISWAP_ROUTER_ADDRESSES = {
 export const QUOTER_V2_ADDRESSES = {
   [optimism.id]: "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
 } as const;
+
+export const PSM3_ADDRESSES = {
+  [optimism.id]: "0xe0F9978b907853F354d79188A3dEfbD41978af62",
+} as const;

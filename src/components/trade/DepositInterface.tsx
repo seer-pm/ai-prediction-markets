@@ -1,10 +1,11 @@
 import { useDepositToTradeExecutor } from "@/hooks/useDepositToTradeExecutor";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { collateral, DECIMALS } from "@/utils/constants";
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Address, formatUnits, parseUnits } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
+import { ConvertInterface } from "../ConvertInterface";
 
 interface DepositInterfaceProps {
   onClose: () => void;
@@ -21,6 +22,7 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
   tradeExecutor,
   onClose,
 }) => {
+  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const {
     register,
     handleSubmit,
@@ -88,14 +90,12 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
       </div>
       <p className="px-6 pt-4 text-sm">
         If you do not have sUSDS you can{" "}
-        <a
-          href="https://app.sky.money/?network=OP&widget=savings&flow=supply&source_token=USDC"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={() => setIsConvertDialogOpen(true)}
           className="hover:underline hover:opacity-80 text-[#0b4c8c]"
         >
           turn USDS or USDC into sUSDS
-        </a>{" "}
+        </button>{" "}
         (it will generate some yield).
       </p>
 
@@ -168,6 +168,13 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
           </div>
         </form>
       </div>
+      {isConvertDialogOpen && (
+        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
+            <ConvertInterface onClose={() => setIsConvertDialogOpen(false)} account={account} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
