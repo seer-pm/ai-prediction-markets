@@ -39,6 +39,7 @@ export const ConvertInterface: React.FC<ConvertInterfaceProps> = ({ onClose, acc
     reset: _,
     watch,
     setValue,
+    setError,
   } = useForm<ConvertFormData>({
     mode: "all",
     defaultValues: {
@@ -159,7 +160,13 @@ export const ConvertInterface: React.FC<ConvertInterfaceProps> = ({ onClose, acc
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id !== activeTab) {
+                  setValue("amount", "");
+                  setError("amount", {});
+                }
+              }}
               className={`cursor-pointer flex-1 py-2 text-center font-medium whitespace-nowrap
               ${
                 activeTab === tab.id
@@ -267,7 +274,7 @@ export const ConvertInterface: React.FC<ConvertInterfaceProps> = ({ onClose, acc
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={mutation.isPending || !!errors.amount || !amount}
             >
-              {tabs.find((tab) => tab.id === activeTab)?.label ?? ""}
+              {errors.amount?.message ?? tabs.find((tab) => tab.id === activeTab)?.label ?? ""}
             </button>
           </div>
         </form>
