@@ -49,6 +49,7 @@ export default async () => {
         "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome",
       )
       .eq("subgraph_data->parentMarket->>id", L2_PARENT_MARKET_ID)
+      .ilike("subgraph_data->>marketName", "%What will be the average weight of%")
       .eq("chain_id", CHAIN_ID);
     if (error) {
       throw error;
@@ -64,7 +65,6 @@ export default async () => {
       outcomes: string[];
       parentOutcome: number;
     }[];
-
     //get pools for all the markets
     const pools = await getPools();
     //we only use the pool with highest liquidity for each pair
