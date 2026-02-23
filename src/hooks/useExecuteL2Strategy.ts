@@ -2,7 +2,7 @@ import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
-import { L2BatchesInput, L2TradeProps } from "@/types";
+import { CallBatchesInput, L2TradeProps } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   CHAIN_ID,
@@ -13,14 +13,14 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { useState } from "react";
 import { getL2BuyQuotes } from "@/lib/trade/getQuote";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { getQuoteTradeCalls } from "@/utils/trade";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
-function splitFromRouter(
+export function splitFromRouter(
   router: Address,
   amount: bigint,
   marketId: Address,
@@ -87,7 +87,7 @@ const getSellTradeExecutorCalls = async ({
   // mint l1
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
-  const input: L2BatchesInput = [];
+  const input: CallBatchesInput = [];
   if (parsedSplitAmount > 0n) {
     input.push({
       calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
@@ -141,7 +141,7 @@ const getBuyTradeExecutorCalls = async ({
 }: L2TradeProps) => {
   // mint l1
   const router = ROUTER_ADDRESSES[CHAIN_ID];
-  const input: L2BatchesInput = [];
+  const input: CallBatchesInput = [];
   const mergeCalls: Execution[] = [];
   const buyCalls: Execution[] = [];
   //trade transactions

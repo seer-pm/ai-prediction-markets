@@ -1,9 +1,9 @@
-import { getQuotes } from "@/lib/trade/getQuote";
+import { getL1SellQuotes } from "@/lib/trade/getQuote";
 import { QuoteProps } from "@/types";
 import { DECIMALS, VOLUME_MIN } from "@/utils/constants";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { parseUnits, formatUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 
 export const useGetQuotes = ({ account, amount, tableData }: QuoteProps) => {
   const [progress, setProgress] = useState(0);
@@ -12,9 +12,9 @@ export const useGetQuotes = ({ account, amount, tableData }: QuoteProps) => {
     if (!isSellable) return false;
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableSellVolume
         ? formatUnits(availableSellVolume, DECIMALS)
-        : row.volumeUntilPrice.toString();
+        : row.volumeUntilPrice.toFixed(15);
     if (Number(volume) < VOLUME_MIN) {
       return false;
     }
@@ -23,6 +23,12 @@ export const useGetQuotes = ({ account, amount, tableData }: QuoteProps) => {
   const query = useQuery({
     enabled: !!account && tableData.length > 0 && isEnabled,
     retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    refetchInterval: false,
+    staleTime: 24 * 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: [
       "useGetQuotes",
       account,
@@ -31,7 +37,7 @@ export const useGetQuotes = ({ account, amount, tableData }: QuoteProps) => {
     ],
     queryFn: () => {
       setProgress(0);
-      return getQuotes({
+      return getL1SellQuotes({
         account,
         amount,
         tableData,

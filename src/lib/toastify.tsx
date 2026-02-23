@@ -1,7 +1,7 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config as wagmiConfig } from "@/config/wagmi";
 import { Execution } from "@/hooks/useCheck7702Support";
-import { L2BatchesInput } from "@/types";
+import { CallBatchesInput } from "@/types";
 import { CHAIN_ID } from "@/utils/constants";
 import {
   Config,
@@ -425,7 +425,7 @@ async function splitAndFilter(
 
 export const toastifyBatchTxSessionKey = async (
   tradeExecutor: Address,
-  input: L2BatchesInput,
+  input: CallBatchesInput,
   onStateChange: (state: string) => void,
   gasPerBatch = 10_000_000n,
 ) => {

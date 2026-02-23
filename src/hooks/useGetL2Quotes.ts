@@ -12,9 +12,9 @@ export const useGetL2Quotes = ({ account, amount, tableData }: L2QuoteProps) => 
     if (!isSellable) return false;
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableSellVolume
         ? formatUnits(availableSellVolume, DECIMALS)
-        : row.volumeUntilPrice.toString();
+        : row.volumeUntilPrice.toFixed(15);
     if (Number(volume) < VOLUME_MIN) {
       return false;
     }

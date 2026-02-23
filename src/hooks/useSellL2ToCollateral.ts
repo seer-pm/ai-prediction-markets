@@ -2,20 +2,16 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllL2Quotes } from "@/lib/trade/getQuote";
-import { L2BatchesInput, L2TableData } from "@/types";
+import { CallBatchesInput, L2TableData } from "@/types";
 import { minBigIntArray } from "@/utils/common";
-import {
-  CHAIN_ID,
-  L2_PARENT_MARKET_ID,
-  ROUTER_ADDRESSES
-} from "@/utils/constants";
+import { CHAIN_ID, L2_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Address } from "viem";
 import { mergeFromRouter } from "./useExecuteL2Strategy";
-import { getQuoteTradeCalls } from "./useExecuteOriginalityStrategy";
 import { fetchTokensBalances } from "./useTokensBalances";
+import { getQuoteTradeCalls } from "@/utils/trade";
 
 interface SellAllProps {
   tradeExecutor: Address;
@@ -36,7 +32,7 @@ async function sellL2ToCollateral({
   });
   const swapCalls = getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const BATCH_SIZE = 100;
-  const sellInput: L2BatchesInput = [];
+  const sellInput: CallBatchesInput = [];
   for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
     sellInput.push({
       calls: swapCalls.slice(i, i + BATCH_SIZE),
@@ -62,7 +58,7 @@ async function sellL2ToCollateral({
     const mergeCalls = [
       ...mergeFromRouter(router, mergeAmount, L2_PARENT_MARKET_ID, collateralTokens),
     ];
-    const mergeInput: L2BatchesInput = [];
+    const mergeInput: CallBatchesInput = [];
     for (let i = 0; i < mergeCalls.length; i += BATCH_SIZE) {
       mergeInput.push({
         calls: mergeCalls.slice(i, i + BATCH_SIZE),

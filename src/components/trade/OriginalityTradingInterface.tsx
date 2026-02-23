@@ -67,7 +67,6 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   };
 
   // Strategy analysis
-  const readyMarkets = markets.filter((m) => m.upDifference || m.downDifference);
   const renderButtonText = () => {
     if (executeTradeMutation.isPending) {
       return (
@@ -121,8 +120,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
         {executeTradeMutation.isPending && (
           <LoadingPanel
             title="Executing Trade Strategy"
-            description={`Processing transactions across ${readyMarkets.length} markets.
-                  This may take a few moments...`}
+            description={executeTradeMutation.txState}
           />
         )}
 

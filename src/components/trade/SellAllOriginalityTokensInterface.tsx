@@ -11,12 +11,14 @@ interface SellAllTokensInterfaceProps {
   onClose: () => void;
   tradeExecutor: Address;
   markets: OriginalityTableData[] | undefined;
+  isLoadingTable: boolean;
 }
 
 export const SellAllOriginalityTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   tradeExecutor,
   onClose,
   markets,
+  isLoadingTable,
 }) => {
   const sellAllFromTradeExecutor = useSellToCollateral(() => {
     onClose();
@@ -69,9 +71,9 @@ export const SellAllOriginalityTokensInterface: React.FC<SellAllTokensInterfaceP
           />
         )}
         {sellAllFromTradeExecutor.isPending && (
-          <LoadingPanel title="Selling tokens" description={""} />
+          <LoadingPanel title="Selling tokens" description={sellAllFromTradeExecutor.txState} />
         )}
-        {isLoadingBalances ? (
+        {isLoadingBalances || isLoadingTable ? (
           <p>Checking balances...</p>
         ) : !hasTokens ? (
           <p>Nothing to sell</p>
@@ -88,9 +90,9 @@ export const SellAllOriginalityTokensInterface: React.FC<SellAllTokensInterfaceP
               type="button"
               onClick={() => handleSellAll()}
               className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={sellAllFromTradeExecutor.isPending}
+              disabled={sellAllFromTradeExecutor.isPending || isLoadingTable}
             >
-              Sell
+              {sellAllFromTradeExecutor.isPending ? "Executing..." : "Sell"}
             </button>
           </div>
         )}

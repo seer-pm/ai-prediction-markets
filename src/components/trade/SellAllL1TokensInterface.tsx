@@ -9,12 +9,14 @@ interface SellAllTokensInterfaceProps {
   onClose: () => void;
   tradeExecutor: Address;
   rows: TableData[] | undefined;
+  isLoadingTable: boolean;
 }
 
 export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   tradeExecutor,
   onClose,
   rows,
+  isLoadingTable,
 }) => {
   const sellAllFromTradeExecutor = useSellL1ToCollateral(() => {
     onClose();
@@ -62,9 +64,11 @@ export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
           />
         )}
         {sellAllFromTradeExecutor.isPending && (
-          <LoadingPanel title="Selling tokens" description={""} />
+          <LoadingPanel title="Selling tokens" description={sellAllFromTradeExecutor.txState} />
         )}
-        {!hasTokens ? (
+        {isLoadingTable ? (
+          <p>Checking balances...</p>
+        ) : !hasTokens ? (
           <p>Nothing to sell</p>
         ) : (
           <div className="flex space-x-4 mb-2">

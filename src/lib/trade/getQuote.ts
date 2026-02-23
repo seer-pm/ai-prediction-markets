@@ -73,7 +73,7 @@ export const getUniswapTradeData = (
 };
 
 type ProgressCallback = (current: number) => void;
-export const getQuotes = async ({
+export const getL1SellQuotes = async ({
   account,
   amount,
   tableData,
@@ -83,23 +83,17 @@ export const getQuotes = async ({
   let currentProgress = 0;
   const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
 
-  const [buyMarkets, sellMarkets] = marketsWithData.reduce(
-    (acc, curr) => {
-      acc[curr.difference! > 0 ? 0 : 1].push(curr);
-      return acc;
-    },
-    [[], []] as [TableData[], TableData[]],
-  );
-  //get sell quotes first
+  const sellMarkets = marketsWithData.filter((row) => row.difference! < 0);
+
   const sellPromises = sellMarkets.reduce((promises, row) => {
     if (isTwoStringsEqual(row.outcomeId, OTHER_TOKEN_ID)) {
       return promises;
     }
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableSellVolume
         ? formatUnits(availableSellVolume, DECIMALS)
-        : row.volumeUntilPrice.toString();
+        : row.volumeUntilPrice.toFixed(15);
     if (Number(volume) < VOLUME_MIN) {
       return promises;
     }
@@ -139,33 +133,41 @@ export const getQuotes = async ({
     }
     return quotes;
   }, [] as UniswapQuoteTradeResult[]);
+  if (!sellQuotes.length) {
+    throw new Error("No quote found");
+  }
+  return {
+    quotes: sellQuotes,
+    mergeAmount: 0n,
+    otherTokensFromMergeOther: 0n,
+  };
+};
 
-  const collateralFromSell = sellQuotes.reduce((acc, curr) => acc + BigInt(curr!.value), 0n);
+export const getL1BuyQuotes = async ({
+  account,
+  amount: _,
+  tableData,
+  collateralFromSell,
+  onProgress,
+}: QuoteProps & { onProgress?: ProgressCallback; collateralFromSell: bigint }) => {
+  const chainId = CHAIN_ID;
+  let currentProgress = 0;
+  const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
+  const buyMarkets = marketsWithData.filter((row) => row.difference! > 0);
 
   //get collateral from merge: we merge other tokens first, then we merge the rest
-  const newOtherBalances = tableData
-    .filter((row) => row.isOther)
-    .map(
-      (row) =>
-        (row.balance ?? 0n) +
-        parseUnits(amount, DECIMALS) -
-        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n),
-    );
-  const otherTokensFromMergeOther = minBigIntArray(newOtherBalances);
+  const otherBalances = await fetchTokensBalances(
+    account,
+    tableData.filter((row) => row.isOther).map((row) => row.outcomeId as Address),
+  );
 
-  const newBalances = tableData
-    .filter((row) => !row.isOther)
-    .map((row) => {
-      if (isTwoStringsEqual(row.outcomeId, OTHER_TOKEN_ID)) {
-        return (row.balance ?? 0n) + otherTokensFromMergeOther;
-      }
-      return (
-        (row.balance ?? 0n) +
-        parseUnits(amount, DECIMALS) -
-        (sellTokenMapping[row.outcomeId.toLowerCase()] ?? 0n)
-      );
-    });
-  const collateralFromMerge = minBigIntArray(newBalances);
+  const otherTokensFromMergeOther = minBigIntArray(otherBalances);
+
+  const newBalances = await fetchTokensBalances(
+    account,
+    tableData.filter((row) => !row.isOther).map((row) => row.outcomeId as Address),
+  );
+  const collateralFromMerge = minBigIntArray([...newBalances, otherTokensFromMergeOther]);
 
   const totalCollateral = collateralFromSell + collateralFromMerge;
 
@@ -180,9 +182,9 @@ export const getQuotes = async ({
       (parseUnits(row.difference!.toFixed(15), DECIMALS) * totalCollateral) /
       parseUnits(sumBuyDifference!.toFixed(15), DECIMALS);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableBuyVolume
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableBuyVolume
         ? formatUnits(availableBuyVolume, DECIMALS)
-        : row.volumeUntilPrice.toString();
+        : row.volumeUntilPrice.toFixed(15);
     if (Number(volume) < VOLUME_MIN) {
       return promises;
     }
@@ -226,7 +228,7 @@ export const getQuotes = async ({
   }
   // sell first, then buy
   return {
-    quotes: [...sellQuotes, ...buyQuotes],
+    quotes: buyQuotes,
     mergeAmount: collateralFromMerge,
     otherTokensFromMergeOther,
   };
@@ -246,9 +248,9 @@ export const getL2MarketSellQuotes = async ({
   const sellPromises = sellRows.reduce((promises, row) => {
     const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableSellVolume
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableSellVolume
         ? formatUnits(availableSellVolume, DECIMALS)
-        : row.volumeUntilPrice.toString();
+        : row.volumeUntilPrice.toFixed(15);
     if (Number(volume) < VOLUME_MIN) {
       return promises;
     }
@@ -319,9 +321,9 @@ export const getL2MarketBuyQuotes = async ({
       (parseUnits(row.difference!.toFixed(15), DECIMALS) * totalCollateral) /
       parseUnits(sumBuyDifference!.toFixed(15), DECIMALS);
     const volume =
-      parseUnits(row.volumeUntilPrice.toString(), DECIMALS) > availableBuyVolume
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableBuyVolume
         ? formatUnits(availableBuyVolume, DECIMALS)
-        : row.volumeUntilPrice.toString();
+        : row.volumeUntilPrice.toFixed(15);
     if (Number(volume) < VOLUME_MIN) {
       return promises;
     }

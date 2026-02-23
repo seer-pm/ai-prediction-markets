@@ -1,11 +1,15 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
-import { toastifyBatchTx } from "@/lib/toastify";
-import { getUniswapTradeExecution } from "@/lib/trade/executeUniswapTrade";
-import { getTradeApprovals7702 } from "@/lib/trade/getApprovals7702";
+import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
-import { OriginalityTableData, OriginalityTradeProps, UniswapQuoteTradeResult } from "@/types";
+import {
+  CallBatchesInput,
+  OriginalityTableData,
+  OriginalityTradeProps,
+  UniswapQuoteTradeResult,
+} from "@/types";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -13,7 +17,9 @@ import {
   ORIGINALITY_PARENT_MARKET_ID,
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
+import { getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { Address, encodeFunctionData, formatUnits, parseUnits } from "viem";
 
 const getSplitCalls = ({
@@ -51,21 +57,10 @@ const getSplitCalls = ({
   ];
 };
 
-export const getQuoteTradeCalls = (
-  tradeExecutor: Address,
-  quotes: UniswapQuoteTradeResult[]
-) => {
-  const calls = quotes.map((quote) => {
-    return [
-      ...getTradeApprovals7702(tradeExecutor, quote),
-      getUniswapTradeExecution(quote, tradeExecutor),
-    ];
-  }).flat();
-  return calls;
-};
+
 const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
 
-const getTradeExecutorCalls = async ({
+const getTradeExecutorCalls = ({
   quoteResults,
   tradeExecutor,
 }: {
@@ -76,23 +71,21 @@ const getTradeExecutorCalls = async ({
     row: OriginalityTableData;
   }[];
 }) => {
-  const calls = (
-    await Promise.all(
-      quoteResults!.map(async ({ quotes, quoteType, row }) => {
-        const tradeCalls = await getQuoteTradeCalls(tradeExecutor, quotes);
-        if (quoteType === "simple") {
-          return tradeCalls;
-        }
-        const splitCalls = getSplitCalls({
-          amount: row.amount!,
-          collateral: row.collateralToken,
-          mainCollateral,
-          market: row.marketId as Address,
-        });
-        return [...splitCalls, ...tradeCalls];
-      })
-    )
-  ).flat();
+  const calls = quoteResults!
+    .map(({ quotes, quoteType, row }) => {
+      const tradeCalls = getQuoteTradeCalls(tradeExecutor, quotes);
+      if (quoteType === "simple") {
+        return tradeCalls;
+      }
+      const splitCalls = getSplitCalls({
+        amount: row.amount!,
+        collateral: row.collateralToken,
+        mainCollateral,
+        market: row.marketId as Address,
+      });
+      return [...splitCalls, ...tradeCalls];
+    })
+    .flat();
 
   return [...calls];
 };
@@ -101,7 +94,8 @@ const executeOriginalityStrategy = async ({
   amount,
   tableData,
   tradeExecutor,
-}: OriginalityTradeProps) => {
+  onStateChange,
+}: OriginalityTradeProps & { onStateChange: (state: string) => void }) => {
   if (!tableData?.length) {
     throw new Error("No prediction data");
   }
@@ -111,23 +105,36 @@ const executeOriginalityStrategy = async ({
     tableData,
   });
 
-  const sellTokenMapping = sellFromBalanceQuotes.reduce((acc, result) => {
-    acc[result.sellToken.toLowerCase()] = {
-      sellAmount: BigInt(result.sellAmount),
-      value: BigInt(result.value),
-    };
-    return acc;
-  }, {} as { [key: string]: { sellAmount: bigint; value: bigint } });
-
+  const sellTokenMapping = sellFromBalanceQuotes.reduce(
+    (acc, result) => {
+      acc[result.sellToken.toLowerCase()] = {
+        sellAmount: BigInt(result.sellAmount),
+        value: BigInt(result.value),
+      };
+      return acc;
+    },
+    {} as { [key: string]: { sellAmount: bigint; value: bigint } },
+  );
   // we execute sellFromBalance trades first to update main quotes
   if (sellFromBalanceQuotes.length) {
-    const sellFromBalanceCalls = await getQuoteTradeCalls(tradeExecutor, sellFromBalanceQuotes);
-    const result = await toastifyBatchTx(tradeExecutor, sellFromBalanceCalls, {
-      txSent: "Selling overvalued tokens from balance...",
-      txSuccess: "Tokens sold!",
-    });
-    if (!result.status) {
-      throw result.error;
+    const sellFromBalanceCalls = getQuoteTradeCalls(tradeExecutor, sellFromBalanceQuotes);
+    const sellInput: CallBatchesInput = [];
+    for (let i = 0; i < sellFromBalanceCalls.length; i += 100) {
+      sellInput.push({
+        calls: sellFromBalanceCalls.slice(i, i + 100),
+        message: `Selling overvalued tokens from balance batch ${i / 100 + 1}/${Math.ceil(sellFromBalanceCalls.length / 100)}`,
+        skipFailCalls: true,
+      });
+    }
+    const sellResult = await toastifyBatchTxSessionKey(
+      tradeExecutor,
+      sellInput,
+      onStateChange,
+      18_000_000n,
+    );
+    if (!sellResult.status) {
+      await withdrawFundSessionKey();
+      throw sellResult.error;
     }
   }
   const mainSplitCalls = getSplitCalls({
@@ -136,6 +143,7 @@ const executeOriginalityStrategy = async ({
     amount,
     market: ORIGINALITY_PARENT_MARKET_ID,
   });
+
   const newTableData = tableData.map((initialRow) => {
     const row = { ...initialRow };
     //update volumeUntilPrice
@@ -163,28 +171,47 @@ const executeOriginalityStrategy = async ({
   if (!originalityQuoteResults.length) {
     throw new Error("No quote found");
   }
-  const tradeExecutorCalls = await getTradeExecutorCalls({
+  const tradeExecutorCalls = getTradeExecutorCalls({
     quoteResults: originalityQuoteResults,
     tradeExecutor,
   });
-  const result = await toastifyBatchTx(
-    tradeExecutor,
-    [...mainSplitCalls, ...tradeExecutorCalls].map((call) => ({ data: call.data, to: call.to })),
-    {
-      txSent: "Executing trade...",
-      txSuccess: "Trade executed!",
-    }
-  );
-
+  const input: CallBatchesInput = [];
+  input.push({
+    calls: mainSplitCalls,
+    message: "Minting tokens",
+    skipFailCalls: false,
+  });
+  for (let i = 0; i < tradeExecutorCalls.length; i += 100) {
+    input.push({
+      calls: tradeExecutorCalls.slice(i, i + 100),
+      message: `Executing trade batch ${i / 100 + 1}/${Math.ceil(tradeExecutorCalls.length / 100)}`,
+      skipFailCalls: true,
+    });
+  }
+  const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange, 10_000_000n);
   if (!result.status) {
+    await withdrawFundSessionKey();
     throw result.error;
   }
+
+  await withdrawFundSessionKey();
+  toastSuccess({
+    title: "Trade executed",
+  });
   return result;
 };
 
 export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
-  return useMutation({
-    mutationFn: (tradeProps: OriginalityTradeProps) => executeOriginalityStrategy(tradeProps),
+  const [txState, setTxState] = useState("");
+  const mutation = useMutation({
+    mutationFn: (tradeProps: OriginalityTradeProps) =>
+      executeOriginalityStrategy({
+        ...tradeProps,
+        onStateChange: (state) => {
+          setTxState(state);
+          console.log(state);
+        },
+      }),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
@@ -194,5 +221,17 @@ export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
         queryClient.invalidateQueries({ queryKey: ["useGetOriginalityQuotes"] });
       }, 3000);
     },
+    onError() {
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["useOriginalityMarketsData"] });
+        queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
+        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
+        queryClient.invalidateQueries({ queryKey: ["useGetOriginalityQuotes"] });
+      }, 3000);
+    },
   });
+  return {
+    ...mutation,
+    txState,
+  };
 };

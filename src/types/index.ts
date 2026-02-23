@@ -153,7 +153,7 @@ export interface ApprovalRequest {
   chainId: SupportedChain;
 }
 
-export type L2BatchesInput = {
+export type CallBatchesInput = {
   calls: {
     to: `0x${string}`;
     value?: bigint;

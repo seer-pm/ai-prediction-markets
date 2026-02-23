@@ -15,7 +15,7 @@ export const OriginalityMarkets = () => {
   const { address: account } = useAccount();
   const [predictions, setPredictions] = useLocalStorage<OriginalityRow[]>(
     "originality-default",
-    []
+    [],
   );
 
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
@@ -150,6 +150,7 @@ export const OriginalityMarkets = () => {
               markets={tableData}
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               onClose={() => setIsSellAllDialogOpen(false)}
+              isLoadingTable={isLoading || isLoadingBalances}
             />
           </div>
         </div>
