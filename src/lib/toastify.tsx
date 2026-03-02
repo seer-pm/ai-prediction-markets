@@ -491,7 +491,7 @@ export const toastifyBatchTxSessionKey = async (
             "The total cost (gas * gas fee + value) of executing this transaction exceeds the balance of the account.",
           )
         ) {
-          await fundSessionKey(30_000_000n * maxFeePerGas, onStateChange);
+          await fundSessionKey(50_000_000n * maxFeePerGas, onStateChange);
           onStateChange(message ?? `Executing batch ${i + 1}`);
           const newResult = await handleTx(() => sessionWallet.writeContract(request));
           if (!newResult.status) {

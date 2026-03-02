@@ -57,7 +57,6 @@ const getSplitCalls = ({
   ];
 };
 
-
 const mainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
 
 const getTradeExecutorCalls = ({
@@ -130,7 +129,7 @@ const executeOriginalityStrategy = async ({
       tradeExecutor,
       sellInput,
       onStateChange,
-      18_000_000n,
+      sellInput.length === 1 ? 30_000_000n : 15_000_000n,
     );
     if (!sellResult.status) {
       await withdrawFundSessionKey();
@@ -188,7 +187,7 @@ const executeOriginalityStrategy = async ({
       skipFailCalls: true,
     });
   }
-  const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange, 10_000_000n);
+  const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange, 15_000_000n);
   if (!result.status) {
     await withdrawFundSessionKey();
     throw result.error;

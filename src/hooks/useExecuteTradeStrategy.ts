@@ -150,6 +150,7 @@ const executeTradeStrategyContract = async ({
     await withdrawFundSessionKey();
     throw new Error("Cannot sell overvalued tokens, execution terminated early");
   }
+  console.log({ balanceAfter, balanceBefore });
   const getBuyQuotesResults = await getL1BuyQuotes({
     account: tradeExecutor,
     amount,
