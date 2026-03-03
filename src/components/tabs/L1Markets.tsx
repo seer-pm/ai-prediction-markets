@@ -9,6 +9,8 @@ import { CSVUpload } from "../CSVUpload";
 import { L1MarketTable } from "../L1MarketTable";
 import { SellAllL1TokensInterface } from "../trade/SellAllL1TokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
+import { DownloadIcon } from "@/lib/icons";
+import { downloadCsv } from "@/utils/common";
 
 export const L1Markets = () => {
   const { address: account } = useAccount();
@@ -37,6 +39,37 @@ export const L1Markets = () => {
 
   const handleLoadPredictions = () => {
     setIsCsvDialogOpen(true);
+  };
+  const exportWeight = () => {
+    if (!tableData) return;
+    downloadCsv(
+      [
+        {
+          key: "repo",
+          title: "repo",
+        },
+        {
+          key: "parent",
+          title: "parent",
+        },
+        {
+          key: "weight",
+          title: "weight",
+        },
+      ],
+      tableData
+        .filter(
+          (row) => !row.repo.includes("Other repositories") && !row.repo.includes("Invalid result"),
+        )
+        .map((row) => {
+          return {
+            repo: row.repo,
+            parent: "ethereum",
+            weight: row.currentPrice ?? 0,
+          };
+        }),
+      "l1-weights",
+    );
   };
   if (error) {
     return (
@@ -91,7 +124,18 @@ export const L1Markets = () => {
           )}
         </div>
       </div>
-      <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+      <div className="flex justify-between">
+        <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+        {tableData && (
+          <button
+            className="hover:underline hover:opacity-70 cursor-pointer flex gap-1"
+            onClick={() => exportWeight()}
+          >
+            <DownloadIcon />
+            <p>Export current weight</p>
+          </button>
+        )}
+      </div>
 
       <L1MarketTable
         rows={tableData || []}

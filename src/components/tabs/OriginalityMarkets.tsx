@@ -10,6 +10,8 @@ import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 import { SellAllOriginalityTokensInterface } from "../trade/SellAllOriginalityTokensInterface";
 import { WithdrawOriginalityTokensInterface } from "../trade/WithdrawOriginalityTokensInterface";
+import { downloadCsv } from "@/utils/common";
+import { DownloadIcon } from "@/lib/icons";
 
 export const OriginalityMarkets = () => {
   const { address: account } = useAccount();
@@ -42,6 +44,30 @@ export const OriginalityMarkets = () => {
 
   const handleLoadPredictions = () => {
     setIsCsvDialogOpen(true);
+  };
+  const exportWeight = () => {
+    if (!tableData) return;
+    downloadCsv(
+      [
+        {
+          key: "repo",
+          title: "repo",
+        },
+        {
+          key: "originality",
+          title: "originality",
+        },
+      ],
+      tableData
+        .filter((row) => !row.repo.includes("Invalid result"))
+        .map((row) => {
+          return {
+            repo: row.repo,
+            originality: row.upPrice ?? 0,
+          };
+        }),
+      "originality-weights",
+    );
   };
   if (error) {
     return (
@@ -101,7 +127,18 @@ export const OriginalityMarkets = () => {
           )}
         </div>
       </div>
-      <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+      <div className="flex justify-between">
+        <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+        {tableData && (
+          <button
+            className="hover:underline hover:opacity-70 cursor-pointer flex gap-1"
+            onClick={() => exportWeight()}
+          >
+            <DownloadIcon />
+            <p>Export current weight</p>
+          </button>
+        )}
+      </div>
 
       <OriginalityMarketTable
         markets={tableData || []}

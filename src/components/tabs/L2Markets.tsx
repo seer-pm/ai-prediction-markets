@@ -9,6 +9,8 @@ import { L2CSVUpload } from "../L2CSVUpload";
 import { L2MarketTable } from "../L2MarketTable";
 import { L2TradingInterface } from "../trade/L2TradingInterface";
 import { SellAllL2TokensInterface } from "../trade/SellAllL2TokensInterface";
+import { downloadCsv } from "@/utils/common";
+import { DownloadIcon } from "@/lib/icons";
 
 export const L2Markets = () => {
   const { address: account } = useAccount();
@@ -37,6 +39,35 @@ export const L2Markets = () => {
 
   const handleLoadPredictions = () => {
     setIsCsvDialogOpen(true);
+  };
+  const exportWeight = () => {
+    if (!tableData) return;
+    downloadCsv(
+      [
+        {
+          key: "dependency",
+          title: "dependency",
+        },
+        {
+          key: "repo",
+          title: "repo",
+        },
+        {
+          key: "weight",
+          title: "weight",
+        },
+      ],
+      tableData
+        .filter((row) => !row.dependency.includes("Invalid result"))
+        .map((row) => {
+          return {
+            repo: row.repo,
+            dependency: row.dependency,
+            weight: row.currentPrice ?? 0,
+          };
+        }),
+      "l2-weights",
+    );
   };
   if (error) {
     return (
@@ -94,7 +125,18 @@ export const L2Markets = () => {
           )}
         </div>
       </div>
-      <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+      <div className="flex justify-between">
+        <h2 className="text-xl font-semibold">Loaded {predictions.length} predictions</h2>
+        {tableData && (
+          <button
+            className="hover:underline hover:opacity-70 cursor-pointer flex gap-1"
+            onClick={() => exportWeight()}
+          >
+            <DownloadIcon />
+            <p>Export current weight</p>
+          </button>
+        )}
+      </div>
 
       <L2MarketTable
         rows={tableData || []}
