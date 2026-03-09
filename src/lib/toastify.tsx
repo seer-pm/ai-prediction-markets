@@ -390,37 +390,23 @@ export const toastifyBatchTx = async (
   return { status: true, receipt: lastReceipt! };
 };
 
-async function splitAndFilter(
+async function buildExecutableBatch(
   calls: Execution[],
   simulateBatch: (calls: Execution[]) => Promise<any>,
-  good: Execution[] = [],
-  bad: Execution[] = [],
 ): Promise<{ good: Execution[]; bad: Execution[] }> {
-  if (!calls.length) return { good, bad };
+  const good: Execution[] = [];
+  const bad: Execution[] = [];
 
-  if (calls.length === 1) {
+  for (const call of calls) {
     try {
-      await simulateBatch(calls);
-      good.push(calls[0]);
+      await simulateBatch([...good, call]);
+      good.push(call);
     } catch {
-      bad.push(calls[0]);
+      bad.push(call);
     }
-    return { good, bad };
   }
 
-  try {
-    await simulateBatch(calls);
-    good.push(...calls);
-    return { good, bad };
-  } catch {
-    const mid = Math.floor(calls.length / 2);
-    const left = calls.slice(0, mid);
-    const right = calls.slice(mid);
-
-    await splitAndFilter(left, simulateBatch, good, bad);
-    await splitAndFilter(right, simulateBatch, good, bad);
-    return { good, bad };
-  }
+  return { good, bad };
 }
 
 export const toastifyBatchTxSessionKey = async (
@@ -469,9 +455,14 @@ export const toastifyBatchTxSessionKey = async (
         throw err;
       }
 
-      const { good } = await splitAndFilter(calls, simulateBatchExecute);
+      const { good } = await buildExecutableBatch(calls, simulateBatchExecute);
       console.log("keep good calls ", good.length);
-      return await simulateBatchExecute(good);
+      try {
+        return await simulateBatchExecute(good);
+      } catch (err2: any) {
+        console.log("final batch still failed", err2.message);
+        return await simulateBatchExecute([]);
+      }
     }
   };
 

@@ -1,5 +1,5 @@
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import React from "react";
+import React, { useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { WagmiProvider } from "wagmi";
@@ -10,6 +10,7 @@ import { localStoragePersister, queryClient } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { Tab } from "./components/Tab";
 import { OldTradeWallet } from "./components/trade/OldTradeWallet";
+import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
 
 const AppContent: React.FC = () => {
   return (
@@ -50,6 +51,45 @@ const AppContent: React.FC = () => {
 };
 
 function App() {
+  useEffect(() => {
+    const init = async () => {
+      // 1️⃣ Try refund before registering this tab
+      const session = SessionKeyManager.getData();
+      if (session) {
+        if (session.stale && session.activeTabs.length === 0) {
+          try {
+            console.log("Attempting refund...");
+            await withdrawFundSessionKey();
+            SessionKeyManager.clear();
+            console.log("Refund successful");
+          } catch (e) {
+            console.log("Refund failed, will retry later", e);
+          }
+        } else {
+          console.log("Session active or other tabs still active");
+        }
+      }
+
+      // 2️⃣ Now register this tab
+      const tabId = crypto.randomUUID();
+      SessionKeyManager.addActiveTab(tabId);
+
+      // 3️⃣ Setup unload listener
+      const handleBeforeUnload = () => {
+        SessionKeyManager.removeActiveTab(tabId);
+      };
+      window.addEventListener("beforeunload", handleBeforeUnload);
+
+      // 4️⃣ Cleanup on unmount
+      return () => {
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        SessionKeyManager.removeActiveTab(tabId);
+      };
+    };
+
+    // call the async init
+    init();
+  }, []);
   return (
     <WagmiProvider config={config}>
       <PersistQueryClientProvider

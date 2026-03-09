@@ -15,21 +15,79 @@ import { handleTx } from "../toastify";
 import { CHAIN_ID } from "@/utils/constants";
 import { optimism } from "viem/chains";
 
-class SessionKeyManager {
+type SessionKeyData = {
+  privateKey: `0x${string}`;
+  address: `0x${string}`;
+  stale: boolean;
+  createdAt: number;
+  activeTabs: string[];
+};
+
+export class SessionKeyManager {
   private static STORAGE_KEY = "trade_executor_session_key";
 
   static create(): `0x${string}` {
-    const sessionKey = `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)))
+    const privateKey = `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("")}` as `0x${string}`;
 
-    // Ephemeral - cleared when browser closes
-    sessionStorage.setItem(this.STORAGE_KEY, sessionKey);
-    return sessionKey;
+    const account = privateKeyToAccount(privateKey);
+
+    const data: SessionKeyData = {
+      privateKey,
+      address: account.address,
+      stale: false,
+      createdAt: Date.now(),
+      activeTabs: [],
+    };
+
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+    return data.privateKey;
   }
 
   static get(): `0x${string}` | null {
-    return sessionStorage.getItem(this.STORAGE_KEY) as `0x${string}` | null;
+    const raw = localStorage.getItem(this.STORAGE_KEY);
+    return raw ? JSON.parse(raw).privateKey : null;
+  }
+
+  static getData(): SessionKeyData | null {
+    const raw = localStorage.getItem(this.STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }
+
+  static setData(data: SessionKeyData) {
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+  }
+
+  static addActiveTab(tabId: string) {
+    const data = this.getData();
+    if (!data) return;
+
+    if (!data.activeTabs.includes(tabId)) {
+      data.activeTabs.push(tabId);
+      this.setData(data);
+    }
+  }
+
+  static removeActiveTab(tabId: string) {
+    const data = this.getData();
+    if (!data) return;
+
+    data.activeTabs = data.activeTabs.filter((t) => t !== tabId);
+
+    if (data.activeTabs.length === 0) {
+      data.stale = true;
+    }
+
+    this.setData(data);
+  }
+
+  static markStale() {
+    const raw = localStorage.getItem(this.STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    data.stale = true;
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
   }
 
   static clear() {
