@@ -1,10 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
-import { Address } from "viem";
 import { UniswapGraphQLClient } from "@/config/apollo";
 import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
-import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { PoolInfo } from "@/types";
-import { L1_MARKET_ID, CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
+import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
+import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID } from "@/utils/constants";
+import { createClient } from "@supabase/supabase-js";
+import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
@@ -29,7 +29,7 @@ export default async () => {
     const { data: otherMarketData, error: otherMarketError } = await supabase
       .from("markets")
       .select(
-        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators",
+        "id,subgraph_data->wrappedTokens,subgraph_data->blockTimestamp,subgraph_data->outcomes,subgraph_data->payoutNumerators",
       )
       .eq("subgraph_data->parentMarket->>id", L1_MARKET_ID)
       .eq("chain_id", CHAIN_ID)
@@ -40,9 +40,18 @@ export default async () => {
     if (!otherMarketData) {
       throw { message: "Other market not found" };
     }
-
+    const { data: chartData, error: chartError } = await supabase
+      .from("key_value")
+      .select("value")
+      .eq("key", `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`)
+      .single();
+    const charts = chartError
+      ? null
+      : {
+          [L1_MARKET_ID]: chartData.value.chartData,
+        };
     const wrappedTokens = (data.wrappedTokens as Address[]).concat(
-      otherMarketData.wrappedTokens as Address,
+      otherMarketData.wrappedTokens as Address[],
     );
     const outcomesByMarket = (data.outcomes as string[])
       .map((outcome) => ({ outcome, marketId: L1_MARKET_ID }))
@@ -129,6 +138,7 @@ export default async () => {
     return new Response(
       JSON.stringify({
         marketsData: repoToPriceMapping,
+        charts,
         wrappedTokens,
         payoutNumerators: data.payoutNumerators,
       }),

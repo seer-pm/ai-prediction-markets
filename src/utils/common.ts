@@ -1,3 +1,4 @@
+import { PoolHourDatasSets } from "@/types";
 import { TickMath } from "@uniswap/v3-sdk";
 import { Address, encodePacked, formatUnits, Hex, keccak256 } from "viem";
 
@@ -24,7 +25,7 @@ export function getToken0Token1(token0: Address, token1: Address): Token0Token1 
 
 export function isTwoStringsEqual(
   str1: string | undefined | null,
-  str2: string | undefined | null
+  str2: string | undefined | null,
 ) {
   return !!str1?.trim() && str2?.trim()?.toLocaleLowerCase() === str1?.trim()?.toLocaleLowerCase();
 }
@@ -95,7 +96,7 @@ interface CsvData {
 export function downloadCsv(
   headers: HeaderConfig[],
   data: CsvData[],
-  filename = "download.csv"
+  filename = "download.csv",
 ): void {
   // Create CSV header row with display titles
   const headerRow = headers
@@ -153,8 +154,46 @@ export function downloadCsv(
 }
 
 export const serializeBigInt = (value: any) =>
-  JSON.parse(
-    JSON.stringify(value, (_, v) =>
-      typeof v === "bigint" ? v.toString() : v
-    )
+  JSON.parse(JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
+
+const CHUNK_SIZE = 10;
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+export async function fetchCharts(ids?: Address[]): Promise<Record<Address, PoolHourDatasSets>> {
+  const baseUrl = "https://app.seer.pm/.netlify/functions/markets-charts";
+
+  // no ids → original behavior
+  if (!ids?.length) {
+    const response = await fetch(baseUrl, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    return await response.json();
+  }
+
+  const batches = chunkArray(ids, CHUNK_SIZE);
+
+  const results = await Promise.all(
+    batches.map(async (batch) => {
+      const url = new URL(baseUrl);
+      url.searchParams.set("ids", batch.join(","));
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      return response.json() as Promise<Record<Address, PoolHourDatasSets>>;
+    }),
   );
+
+  // merge results (same output shape as before)
+  return Object.assign({}, ...results);
+}

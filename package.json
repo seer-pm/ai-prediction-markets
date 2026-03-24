@@ -15,6 +15,8 @@
     "@netlify/functions": "^4.2.5",
     "@reown/appkit": "^1.8.4",
     "@reown/appkit-adapter-wagmi": "^1.8.4",
+    "@seer-pm/react": "^0.0.9",
+    "@seer-pm/sdk": "^0.0.9",
     "@supabase/supabase-js": "^2.57.4",
     "@swapr/sdk": "https://github.com/seer-pm/swapr-sdk#4a521db50bcdfafc89ef838356791e02ebc609cd",
     "@tailwindcss/vite": "^4.1.13",
@@ -31,7 +33,8 @@
     "react-paginate": "^8.3.0",
     "react-toastify": "^11.0.5",
     "viem": "^2.37.5",
-    "wagmi": "^2.16.9"
+    "wagmi": "^2.16.9",
+    "graphql-combine-query": "https://github.com/xyzseer/graphql-combine-query#ab552af27b3badb975f7dcad88b140bdb017a6fe"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

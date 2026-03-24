@@ -1,4 +1,5 @@
 import { SupportedChain } from "@/utils/constants";
+import { GetPoolHourDatasQuery } from "@seer-pm/sdk/subgraph/swapr";
 import { Address } from "viem";
 
 export interface PredictionRow {
@@ -162,3 +163,5 @@ export type CallBatchesInput = {
   message: string;
   skipFailCalls?: boolean;
 }[];
+
+export type PoolHourDatasSets = GetPoolHourDatasQuery["poolHourDatas"][];

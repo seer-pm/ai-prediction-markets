@@ -43,6 +43,20 @@ export default async () => {
       outcomes: string[];
       parentOutcome: number;
     }[];
+    const { data: chartData, error: chartError } = await supabase
+      .from("key_value")
+      .select("value")
+      .in(
+        "key",
+        markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`),
+      );
+    const charts = chartError
+      ? null
+      : (chartData?.reduce<Record<string, any>>((acc, row) => {
+          acc[row.value.marketId] = row.value.chartData;
+          return acc;
+        }, {}) ?? {});
+
     //get pools for all the markets
     const queryResult = await UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
       query: GetPoolsDocument,
@@ -127,7 +141,7 @@ export default async () => {
         };
       },
     );
-    return new Response(JSON.stringify({ marketsData: repoToPriceMapping, markets }), {
+    return new Response(JSON.stringify({ marketsData: repoToPriceMapping, markets, charts }), {
       status: 200,
       headers: {
         "Access-Control-Allow-Origin": "http://localhost:5173",
