@@ -18,13 +18,7 @@ export async function getChartData(
   poolsPairs: Token0Token1[],
   firstTimestamp: number,
 ): Promise<PoolHourDatasSets> {
-  try {
-    return await getPoolHourDatas(poolsPairs, CHAIN_ID, firstTimestamp);
-  } catch (e) {
-    console.log("Error getting chart");
-    console.log(e);
-    return [];
-  }
+  return await getPoolHourDatas(poolsPairs, CHAIN_ID, firstTimestamp);
 }
 
 async function getPoolHourDatasByTokenPair(
