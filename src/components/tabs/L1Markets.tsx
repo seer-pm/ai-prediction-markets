@@ -1,16 +1,17 @@
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
+import { DownloadIcon } from "@/lib/icons";
 import { PredictionRow } from "@/types";
+import { downloadCsv, isUndefined } from "@/utils/common";
 import { useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 import { CSVUpload } from "../CSVUpload";
 import { L1MarketTable } from "../L1MarketTable";
+import MarketChart from "../MarketChart";
 import { SellAllL1TokensInterface } from "../trade/SellAllL1TokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
-import { DownloadIcon } from "@/lib/icons";
-import { downloadCsv } from "@/utils/common";
 
 export const L1Markets = () => {
   const { address: account } = useAccount();
@@ -27,6 +28,7 @@ export const L1Markets = () => {
     isLoading,
     isLoadingBalances,
     error,
+    charts,
   } = useProcessL1Predictions(predictions);
 
   const handleDataParsed = (data: PredictionRow[]) => {
@@ -83,6 +85,13 @@ export const L1Markets = () => {
 
   return (
     <>
+      <div className="p-5 drop-shadow bg-white">
+        {!isUndefined(charts) ? (
+          <MarketChart data={Object.values(charts)[0]} />
+        ) : (
+          <p>{isLoading ? "Getting Chart..." : "No Chart Data"}</p>
+        )}
+      </div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
           {predictions.length > 0 && (

@@ -164,4 +164,25 @@ export type CallBatchesInput = {
   skipFailCalls?: boolean;
 }[];
 
+export type PoolHourData = {
+  token0Price: string;
+  token1Price: string;
+  periodStartUnix: number;
+  sqrtPrice: string;
+  liquidity: string;
+  pool: {
+    id: string;
+    token0: { id: string; name: string };
+    token1: { id: string; name: string };
+  };
+};
+
 export type PoolHourDatasSets = GetPoolHourDatasQuery["poolHourDatas"][];
+
+export type ChartWithMarketData = {
+  poolHourDatas: PoolHourData[];
+  marketId: string;
+  outcomeName: string;
+  outcomeId: Address;
+  collateral: Address;
+}[];

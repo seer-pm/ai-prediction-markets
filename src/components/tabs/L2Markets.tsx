@@ -1,7 +1,9 @@
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessL2Predictions } from "@/hooks/useProcessL2Predictions";
+import { DownloadIcon } from "@/lib/icons";
 import { L2Row } from "@/types";
+import { downloadCsv, isUndefined } from "@/utils/common";
 import { useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
@@ -9,8 +11,7 @@ import { L2CSVUpload } from "../L2CSVUpload";
 import { L2MarketTable } from "../L2MarketTable";
 import { L2TradingInterface } from "../trade/L2TradingInterface";
 import { SellAllL2TokensInterface } from "../trade/SellAllL2TokensInterface";
-import { downloadCsv } from "@/utils/common";
-import { DownloadIcon } from "@/lib/icons";
+import L2Charts from "./L2Charts";
 
 export const L2Markets = () => {
   const { address: account } = useAccount();
@@ -27,7 +28,15 @@ export const L2Markets = () => {
     isLoading,
     isLoadingBalances,
     error,
+    charts,
   } = useProcessL2Predictions(predictions);
+  const repoOptions = tableData
+    ? Array.from(
+        new Map(tableData.map((x) => [x.repo, { text: x.repo, id: x.marketId }])).values(),
+      ).sort((a, b) => {
+        return a.text.toLowerCase() > b.text.toLowerCase() ? 1 : -1;
+      })
+    : [];
 
   const handleDataParsed = (data: L2Row[]) => {
     setPredictions(data);
@@ -81,6 +90,14 @@ export const L2Markets = () => {
 
   return (
     <>
+      <div className="p-5 drop-shadow bg-white">
+        {!isUndefined(charts) ? (
+          <L2Charts repoOptions={repoOptions} charts={charts} />
+        ) : (
+          <p>{isLoading ? "Getting Chart..." : "No Chart Data"}</p>
+        )}
+      </div>
+
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
           {predictions.length > 0 && (
@@ -137,7 +154,6 @@ export const L2Markets = () => {
           </button>
         )}
       </div>
-
       <L2MarketTable
         rows={tableData || []}
         isLoading={isLoading}
@@ -154,7 +170,6 @@ export const L2Markets = () => {
           </div>
         </div>
       )}
-
       {/* Trading Dialog */}
       {isTradeDialogOpen && tableData && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
@@ -167,7 +182,6 @@ export const L2Markets = () => {
           </div>
         </div>
       )}
-
       {isSellAllDialogOpen && (
         <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">

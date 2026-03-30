@@ -1,4 +1,4 @@
-import { PoolInfo } from "@/types";
+import { ChartWithMarketData, PoolInfo } from "@/types";
 import { getAppUrl } from "@/utils/common";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
@@ -14,10 +14,13 @@ interface GetOriginalityMarketsDataApiResult {
     };
   };
   markets: {
-    id: Address
-    wrappedTokens: Address[]
-    collateralToken: Address
-  }[]
+    id: Address;
+    wrappedTokens: Address[];
+    collateralToken: Address;
+  }[];
+  charts: {
+    [key: string]: ChartWithMarketData;
+  } | null;
 }
 
 const fetchOriginalityMarketsData = async (): Promise<GetOriginalityMarketsDataApiResult> => {
@@ -25,7 +28,7 @@ const fetchOriginalityMarketsData = async (): Promise<GetOriginalityMarketsDataA
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-originality-markets-data`);
     return await response.json();
   } catch {
-    return { marketsData: {}, markets: [] };
+    return { marketsData: {}, markets: [], charts: null };
   }
 };
 

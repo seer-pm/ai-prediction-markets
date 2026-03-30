@@ -1,4 +1,4 @@
-import { PoolInfo } from "@/types";
+import { ChartWithMarketData, PoolInfo } from "@/types";
 import { getAppUrl } from "@/utils/common";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
@@ -17,6 +17,9 @@ interface GetL2MarketsDataApiResult {
     collateralToken: Address;
     outcomes: string[];
   }[];
+  charts: {
+    [key: string]: ChartWithMarketData;
+  } | null;
 }
 
 const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiResult> => {
@@ -28,7 +31,7 @@ const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiRe
     if (retryCount) {
       return await fetchL2MarketsData(retryCount - 1);
     }
-    return { marketsData: {}, markets: [] };
+    return { marketsData: {}, markets: [], charts: null };
   }
 };
 

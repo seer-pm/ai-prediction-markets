@@ -14,16 +14,19 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
   const tokens = data?.markets?.map((market) => market.wrappedTokens)?.flat();
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
-    data?.markets?.map((market) => market.wrappedTokens)?.flat()
+    data?.markets?.map((market) => market.wrappedTokens)?.flat(),
   );
-  const balanceMapping = balances?.reduce((acc, curr, index) => {
-    const token = tokens?.[index];
-    if (!token) {
+  const balanceMapping = balances?.reduce(
+    (acc, curr, index) => {
+      const token = tokens?.[index];
+      if (!token) {
+        return acc;
+      }
+      acc[token] = curr;
       return acc;
-    }
-    acc[token] = curr;
-    return acc;
-  }, {} as { [key: string]: bigint });
+    },
+    {} as { [key: string]: bigint },
+  );
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
@@ -33,12 +36,15 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
     };
   }
 
-  const dependencyToPredictionMapping = predictions.reduce((acc, curr) => {
-    const dependency = curr.dependency.replace("https://github.com/", "").toLowerCase();
-    const repo = curr.repo.replace("https://github.com/", "").toLowerCase();
-    acc[`${dependency}-${repo}`] = curr;
-    return acc;
-  }, {} as { [key: string]: L2Row });
+  const dependencyToPredictionMapping = predictions.reduce(
+    (acc, curr) => {
+      const dependency = curr.dependency.replace("https://github.com/", "").toLowerCase();
+      const repo = curr.repo.replace("https://github.com/", "").toLowerCase();
+      acc[`${dependency}-${repo}`] = curr;
+      return acc;
+    },
+    {} as { [key: string]: L2Row },
+  );
 
   const processedData: L2TableData[] = Object.entries(data.marketsData)
     .reduce((acc, [marketRepo, marketPoolData]) => {
@@ -76,7 +82,7 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
                 pool,
                 Math.max(prediction.weight, MIN_PRICE), //cannot sell to 0 so we set a min price
                 outcomeId,
-                difference > 0 ? "buy" : "sell"
+                difference > 0 ? "buy" : "sell",
               )
             : 0;
         acc.push({
@@ -101,5 +107,5 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
       return a.repo.toLowerCase() > b.repo.toLowerCase() ? 1 : -1;
     });
 
-  return { data: processedData, isLoading, isLoadingBalances, error };
+  return { data: processedData, isLoading, isLoadingBalances, error, charts: data.charts };
 };

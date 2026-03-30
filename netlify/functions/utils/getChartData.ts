@@ -9,10 +9,7 @@ import {
   tickToPrice,
   uniswapGraphQLClient,
 } from "@seer-pm/sdk";
-import {
-  GetPoolHourDatasQuery,
-  GetSwapsQuery
-} from "@seer-pm/sdk/subgraph/swapr";
+import { GetPoolHourDatasQuery, GetSwapsQuery } from "@seer-pm/sdk/subgraph/swapr";
 import { TickMath } from "@uniswap/v3-sdk";
 import pLimit from "p-limit";
 import { gnosis, mainnet } from "viem/chains";
@@ -94,7 +91,7 @@ async function getPoolHourDatasByTokenPair(
 
         const json = await results.json();
         if (json.errors?.length) {
-          throw json.errors[0]
+          throw json.errors[0];
         }
         poolHourDatas = json?.data?.poolHourDatas ?? [];
         success = true;
@@ -267,10 +264,10 @@ export async function getPoolHourDatas(
   if (!graphQLClient) {
     throw new Error("Subgraph not available");
   }
-  const limit = pLimit(20);
+  const limit = pLimit(30);
 
   return await Promise.all(
-    poolsPairs.map((poolPairs) =>
+    poolsPairs.map((poolPairs, index) =>
       limit(async () => {
         const start = startTime;
         const [poolHourDatas, swaps] = await Promise.all([

@@ -197,3 +197,8 @@ export async function fetchCharts(ids?: Address[]): Promise<Record<Address, Pool
   // merge results (same output shape as before)
   return Object.assign({}, ...results);
 }
+
+// biome-ignore lint/suspicious/noExplicitAny:
+export const isUndefined = (maybeObject: any): maybeObject is undefined | null => {
+  return typeof maybeObject === "undefined" || maybeObject === null;
+};

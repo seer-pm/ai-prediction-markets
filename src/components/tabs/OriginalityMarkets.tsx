@@ -10,8 +10,9 @@ import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 import { SellAllOriginalityTokensInterface } from "../trade/SellAllOriginalityTokensInterface";
 import { WithdrawOriginalityTokensInterface } from "../trade/WithdrawOriginalityTokensInterface";
-import { downloadCsv } from "@/utils/common";
+import { downloadCsv, isUndefined } from "@/utils/common";
 import { DownloadIcon } from "@/lib/icons";
+import MarketChart from "../MarketChart";
 
 export const OriginalityMarkets = () => {
   const { address: account } = useAccount();
@@ -32,8 +33,24 @@ export const OriginalityMarkets = () => {
     isLoading,
     isLoadingBalances,
     error,
+    charts,
+    marketIdToRepo,
   } = useProcessOriginalityPredictions(predictions);
 
+  const parseOriginalityChartData = () => {
+    if (!charts) return null;
+    return Object.entries(charts).map(([marketId, chartWithMarketData]) => {
+      const { poolHourDatas, collateral, outcomeId } = chartWithMarketData[1]; //outcome UP
+      return {
+        poolHourDatas,
+        outcomeName: marketIdToRepo[marketId],
+        collateral,
+        marketId,
+        outcomeId,
+      };
+    });
+  };
+  const parsedData = parseOriginalityChartData();
   const handleDataParsed = (data: OriginalityRow[]) => {
     setPredictions(data);
   };
@@ -81,6 +98,13 @@ export const OriginalityMarkets = () => {
 
   return (
     <>
+      <div className="p-5 drop-shadow bg-white">
+        {!isUndefined(parsedData) ? (
+          <MarketChart data={parsedData} />
+        ) : (
+          <p>{isLoading ? "Getting Chart..." : "No Chart Data"}</p>
+        )}
+      </div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
           {predictions.length > 0 && (

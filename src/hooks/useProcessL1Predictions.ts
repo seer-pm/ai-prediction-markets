@@ -15,16 +15,19 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
   const { data, isLoading, error } = useL1MarketsData();
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
-    data?.wrappedTokens
+    data?.wrappedTokens,
   );
-  const balanceMapping = balances?.reduce((acc, curr, index) => {
-    const token = data?.wrappedTokens?.[index];
-    if (!token) {
+  const balanceMapping = balances?.reduce(
+    (acc, curr, index) => {
+      const token = data?.wrappedTokens?.[index];
+      if (!token) {
+        return acc;
+      }
+      acc[token] = curr;
       return acc;
-    }
-    acc[token] = curr;
-    return acc;
-  }, {} as { [key: string]: bigint });
+    },
+    {} as { [key: string]: bigint },
+  );
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
@@ -34,16 +37,18 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
     };
   }
 
-  const repoToPredictionMapping = predictions.reduce((acc, curr) => {
-    acc[curr.repo.replace("https://github.com/", "").toLowerCase()] = curr;
-    return acc;
-  }, {} as { [key: string]: PredictionRow });
+  const repoToPredictionMapping = predictions.reduce(
+    (acc, curr) => {
+      acc[curr.repo.replace("https://github.com/", "").toLowerCase()] = curr;
+      return acc;
+    },
+    {} as { [key: string]: PredictionRow },
+  );
 
   const processedData: TableData[] = Object.entries(data.marketsData)
     .map(([outcomeRepo, outcome]) => {
       const prediction = repoToPredictionMapping[outcomeRepo.replace("\\t", "").toLowerCase()];
       const { id: outcomeId, pool, price: currentPrice } = outcome;
-
       if (!prediction) {
         return {
           repo: outcomeRepo,
@@ -65,7 +70,7 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
               pool,
               Math.max(prediction.weight, MIN_PRICE), //cannot sell to 0 so we set a min price
               outcomeId,
-              difference > 0 ? "buy" : "sell"
+              difference > 0 ? "buy" : "sell",
             )
           : 0;
       return {
@@ -87,5 +92,11 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
       if (b.currentPrice === null) return -1;
       return b.currentPrice - a.currentPrice;
     });
-  return { data: processedData, isLoading, isLoadingBalances, error };
+  return {
+    data: processedData,
+    isLoading,
+    isLoadingBalances,
+    error,
+    charts: data.charts,
+  };
 };
