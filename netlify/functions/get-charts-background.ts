@@ -43,17 +43,26 @@ const getL1Pairs = async () => {
   const wrappedTokens = (data.wrappedTokens as Address[]).concat(
     otherMarketData.wrappedTokens as Address[],
   );
+  const outcomes = (data.outcomes as string[]).concat(otherMarketData.outcomes as string[]);
   const chartData = await getChartData(
     wrappedTokens.map((x) => getToken0Token1(x, collateral)),
     otherMarketData.blockTimestamp
       ? Number(otherMarketData.blockTimestamp)
       : Math.floor(new Date("2025-09-01").getTime() / 1000),
   );
-
+  const chartWithMarketData = chartData.map((poolHourDatas, outcomeIndex) => {
+    return {
+      poolHourDatas,
+      outcomeName: outcomes[outcomeIndex],
+      outcomeId: wrappedTokens[outcomeIndex],
+      collateral,
+      marketId: L1_MARKET_ID,
+    };
+  });
   const { error: upsertError } = await supabase.from("key_value").upsert(
     {
       key: `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`,
-      value: { chartData, timestamp: Date.now(), marketId: L1_MARKET_ID },
+      value: { chartData: chartWithMarketData, timestamp: Date.now(), marketId: L1_MARKET_ID },
     },
     { onConflict: "key" },
   );
@@ -116,10 +125,19 @@ const getOriginalityPairs = async () => {
       });
       return poolHourDatas;
     });
+    const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
+      return {
+        poolHourDatas,
+        outcomeName: market.outcomes[outcomeIndex],
+        outcomeId: market.wrappedTokens[outcomeIndex],
+        collateral: market.collateralToken,
+        marketId: market.id,
+      };
+    });
     const { error: upsertError } = await supabase.from("key_value").upsert(
       {
         key: `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`,
-        value: { chartData: chartDataMarket, timestamp: Date.now(), marketId: market.id },
+        value: { chartData: chartWithMarketData, timestamp: Date.now(), marketId: market.id },
       },
       { onConflict: "key" },
     );
@@ -185,10 +203,19 @@ const getL2Pairs = async () => {
       });
       return poolHourDatas;
     });
+    const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
+      return {
+        poolHourDatas,
+        outcomeName: market.outcomes[outcomeIndex],
+        outcomeId: market.wrappedTokens[outcomeIndex],
+        collateral: market.collateralToken,
+        marketId: market.id,
+      };
+    });
     const { error: upsertError } = await supabase.from("key_value").upsert(
       {
         key: `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`,
-        value: { chartData: chartDataMarket, timestamp: Date.now(), marketId: market.id },
+        value: { chartData: chartWithMarketData, timestamp: Date.now(), marketId: market.id },
       },
       { onConflict: "key" },
     );
@@ -204,11 +231,11 @@ export default async () => {
     await getL1Pairs();
   } catch {}
   try {
-    console.log('getting originality chart')
+    console.log("getting originality chart");
     await getOriginalityPairs();
   } catch {}
   try {
-    console.log('getting l2 chart')
+    console.log("getting l2 chart");
     await getL2Pairs();
   } catch {}
 };
