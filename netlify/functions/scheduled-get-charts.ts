@@ -8,10 +8,10 @@ export default async (req: Request) => {
   try {
     const { next_run } = await req.json();
     console.log("Received event! Next invocation at:", next_run);
-    await fetch(
-      process.env.GET_CHARTS_URL ??
-        "http://deep.seer.pm/.netlify/functions/get-charts-background",
-    );
+    // await fetch(
+    //   process.env.GET_CHARTS_URL ??
+    //     "http://deep.seer.pm/.netlify/functions/get-charts-background",
+    // );
   } catch (e) {
     console.log(e);
   }
