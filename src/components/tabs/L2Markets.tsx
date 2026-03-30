@@ -90,11 +90,19 @@ export const L2Markets = () => {
 
   return (
     <>
-      <div className="p-5 drop-shadow bg-white">
+      <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(charts) ? (
           <L2Charts repoOptions={repoOptions} charts={charts} />
         ) : (
-          <p>{isLoading ? "Getting Chart..." : "No Chart Data"}</p>
+          <>
+            {isLoading ? (
+              <div className="animate-pulse">
+                <div className="h-40 bg-gray-300 rounded"></div>
+              </div>
+            ) : (
+              <p>No Chart Data</p>
+            )}
+          </>
         )}
       </div>
 

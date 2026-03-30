@@ -85,11 +85,19 @@ export const L1Markets = () => {
 
   return (
     <>
-      <div className="p-5 drop-shadow bg-white">
+      <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(charts) ? (
           <MarketChart data={Object.values(charts)[0]} />
         ) : (
-          <p>{isLoading ? "Getting Chart..." : "No Chart Data"}</p>
+          <>
+            {isLoading ? (
+              <div className="animate-pulse">
+                <div className="h-40 bg-gray-300 rounded"></div>
+              </div>
+            ) : (
+              <p>No Chart Data</p>
+            )}
+          </>
         )}
       </div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
