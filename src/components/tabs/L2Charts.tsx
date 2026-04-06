@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DropdownSelect from "../DropdownSelect";
 import { ChartWithMarketData } from "@/types";
 import MarketChart from "../MarketChart";
@@ -17,6 +17,11 @@ export default function L2Charts({
 }) {
   const [repoSelected, setRepoSelected] = useState<string | undefined>(repoOptions[0].id ?? "");
   const chartData = repoSelected ? charts[repoSelected] : undefined;
+  useEffect(() => {
+    if (repoOptions && !repoSelected) {
+      setRepoSelected(repoOptions[0].id ?? "");
+    }
+  }, [repoOptions]);
   return (
     <>
       <div className="flex items-center gap-2">

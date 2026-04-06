@@ -154,7 +154,13 @@ function buildTimeline(all: ChartWithMarketData) {
 
   return timeline;
 }
+function truncateOutcomeName(name: string, maxLength = 14) {
+  if (!name) return "";
 
+  if (name.length <= maxLength) return name;
+
+  return name.slice(0, maxLength - 2) + "…";
+}
 /* ================================
    COMPONENT
 ================================ */
@@ -203,7 +209,7 @@ export default function MarketChart({ data }: Props) {
       const series = chart.addSeries(LineSeries, {
         color: COLORS[i % COLORS.length],
         lineWidth: 2,
-        title: outcomeData.outcomeName,
+        title: truncateOutcomeName(outcomeData.outcomeName),
         lastValueVisible: true,
         priceLineVisible: false,
       });
