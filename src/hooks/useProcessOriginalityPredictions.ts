@@ -5,8 +5,7 @@ import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useOriginalityMarketsData } from "./useOriginalityMarketsData";
 import { useTokensBalances } from "./useTokensBalances";
 import { zeroAddress } from "viem";
-
-const MIN_PRICE = 0.0001;
+import { MIN_PRICE } from "@/utils/constants";
 
 export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) => {
   const { address: account } = useAccount();
@@ -108,5 +107,12 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     },
   );
 
-  return { data: processedData, isLoading, isLoadingBalances, error, charts: data.charts, marketIdToRepo };
+  return {
+    data: processedData,
+    isLoading,
+    isLoadingBalances,
+    error,
+    charts: data.charts,
+    marketIdToRepo,
+  };
 };

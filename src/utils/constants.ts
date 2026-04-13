@@ -21,6 +21,8 @@ export const SALT_KEY = "TradeExecutorV1";
 
 export const VOLUME_MIN = 0.01;
 
+export const MIN_PRICE = 0.00000001;
+
 type CollateralTokensMap = Record<
   SupportedChain,
   { primary: Token; secondary: Token | undefined; swap?: Token[] }

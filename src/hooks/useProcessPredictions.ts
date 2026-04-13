@@ -4,8 +4,7 @@ import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useMarketsData } from "./useMarketsData";
 import { useTokensBalances } from "./useTokensBalances";
-
-const MIN_PRICE = 0.0001;
+import { MIN_PRICE } from "@/utils/constants";
 
 export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
@@ -14,21 +13,27 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
   const payoutNumerators = data?.payoutNumerators;
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
-    data?.wrappedTokens
+    data?.wrappedTokens,
   );
-  const balanceMapping = balances?.reduce((acc, curr, index) => {
-    const token = data?.wrappedTokens?.[index];
-    if (!token) {
+  const balanceMapping = balances?.reduce(
+    (acc, curr, index) => {
+      const token = data?.wrappedTokens?.[index];
+      if (!token) {
+        return acc;
+      }
+      acc[token] = curr;
       return acc;
-    }
-    acc[token] = curr;
-    return acc;
-  }, {} as { [key: string]: bigint });
+    },
+    {} as { [key: string]: bigint },
+  );
   const sumPayout = payoutNumerators?.reduce((acc, curr) => acc + Number(curr), 0);
-  const payoutMapping = data?.wrappedTokens?.reduce((acc, curr, index) => {
-    acc[curr] = sumPayout && payoutNumerators ? Number(payoutNumerators[index]) / sumPayout : 0;
-    return acc;
-  }, {} as { [key: string]: number });
+  const payoutMapping = data?.wrappedTokens?.reduce(
+    (acc, curr, index) => {
+      acc[curr] = sumPayout && payoutNumerators ? Number(payoutNumerators[index]) / sumPayout : 0;
+      return acc;
+    },
+    {} as { [key: string]: number },
+  );
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {
       data: undefined,
@@ -38,10 +43,13 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
     };
   }
 
-  const repoToPredictionMapping = predictions.reduce((acc, curr) => {
-    acc[curr.repo.replace("https://github.com/", "")] = curr;
-    return acc;
-  }, {} as { [key: string]: PredictionRow });
+  const repoToPredictionMapping = predictions.reduce(
+    (acc, curr) => {
+      acc[curr.repo.replace("https://github.com/", "")] = curr;
+      return acc;
+    },
+    {} as { [key: string]: PredictionRow },
+  );
 
   const processedData: TableData[] = Object.entries(data.marketsData)
     .map(([outcomeRepo, outcome]) => {
@@ -70,7 +78,7 @@ export const useProcessPredictions = (predictions: PredictionRow[]) => {
               pool,
               Math.max(prediction.weight, MIN_PRICE), //cannot sell to 0 so we set a min price
               outcomeId,
-              difference > 0 ? "buy" : "sell"
+              difference > 0 ? "buy" : "sell",
             )
           : 0;
       return {

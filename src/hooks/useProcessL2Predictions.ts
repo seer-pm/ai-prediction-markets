@@ -4,8 +4,7 @@ import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useL2MarketsData } from "./useL2MarketsData";
 import { useTokensBalances } from "./useTokensBalances";
-
-const MIN_PRICE = 0.0001;
+import { MIN_PRICE } from "@/utils/constants";
 
 export const useProcessL2Predictions = (predictions: L2Row[]) => {
   const { address: account } = useAccount();
@@ -55,9 +54,16 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
         const dependency = market.outcomes[i];
         const prediction =
           dependencyToPredictionMapping[`${dependency.toLowerCase()}-${marketRepo.toLowerCase()}`];
+
         const outcomeId = market.wrappedTokens[i];
         const currentPrice = prices[i];
         const pool = pools[i];
+        if (
+          dependency.toLowerCase().includes("go-winio") &&
+          marketRepo.toLowerCase().includes("aestus-relay/mev-boost-relay")
+        ) {
+          console.log(pool);
+        }
         if (!prediction) {
           acc.push({
             marketId,

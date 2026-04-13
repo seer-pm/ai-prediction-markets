@@ -4,10 +4,8 @@ import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useL1MarketsData } from "./useL1MarketsData";
 import { useTokensBalances } from "./useTokensBalances";
-import { OTHER_MARKET_ID } from "@/utils/constants";
+import { MIN_PRICE, OTHER_MARKET_ID } from "@/utils/constants";
 import { isTwoStringsEqual } from "@/utils/common";
-
-const MIN_PRICE = 0.0001;
 
 export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
