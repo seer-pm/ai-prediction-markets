@@ -137,14 +137,17 @@ export default async () => {
         [key: string]: { id: Address; pools: (PoolInfo | null)[]; prices: (number | null)[] };
       },
     );
-    return new Response(JSON.stringify({ marketsData: repoToPriceMapping, markets, charts }), {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "http://localhost:5173",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET",
+    return new Response(
+      JSON.stringify({ marketsData: repoToPriceMapping, markets, charts, chartError }),
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "http://localhost:5173",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "GET",
+        },
       },
-    });
+    );
   } catch (e: any) {
     console.log(e);
     return new Response(JSON.stringify({ error: e.message || "Internal server error" }), {
