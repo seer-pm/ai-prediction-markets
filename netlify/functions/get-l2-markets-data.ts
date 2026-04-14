@@ -4,6 +4,7 @@ import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/c
 import { CHAIN_ID, L2_PARENT_MARKET_ID } from "@/utils/constants";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
+import pLimit from "p-limit";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
@@ -26,6 +27,46 @@ export async function getPools() {
   }
 
   return allRows.map((row) => row.data);
+}
+
+async function getCharts(keys: string[]) {
+  try {
+    const chunkSize = 10;
+    const concurrency = 5;
+
+    function chunkArray(arr: any[], size: number) {
+      const res = [];
+      for (let i = 0; i < arr.length; i += size) {
+        res.push(arr.slice(i, i + size));
+      }
+      return res;
+    }
+
+    const chunks = chunkArray(keys, chunkSize);
+    const limit = pLimit(concurrency);
+
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        limit(async () => {
+          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
+
+          if (error) throw error;
+          return data || [];
+        }),
+      ),
+    );
+
+    const allData = results.flat();
+
+    return {
+      data: allData,
+    };
+  } catch (e) {
+    return {
+      data: null,
+      error: e,
+    };
+  }
 }
 
 export default async () => {
@@ -65,13 +106,11 @@ export default async () => {
       outcomes: string[];
       parentOutcome: number;
     }[];
-    const { data: chartData, error: chartError } = await supabase
-      .from("key_value")
-      .select("value")
-      .in(
-        "key",
-        markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`),
-      );
+    console.time("get chart");
+    const { data: chartData, error: chartError } = await getCharts(
+      markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`),
+    );
+    console.timeEnd("get chart");
     const charts = chartError
       ? null
       : (chartData?.reduce<Record<string, any>>((acc, row) => {
