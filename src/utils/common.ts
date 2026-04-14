@@ -53,12 +53,36 @@ export function sqrtPriceX96ToTokenPrices(sqrtPriceX96: bigint, decimals = 18) {
 }
 
 export function decimalToFraction(x: number): [string, string] {
-  const str = x.toString();
-  if (!str.includes(".")) return [String(x), "1"];
-  const decimals = str.split(".")[1].length;
-  const numerator = Math.round(x * 10 ** decimals);
-  const denominator = 10 ** decimals;
-  return [String(numerator), String(denominator)];
+  const str = x.toString().toLowerCase();
+
+  function normalize(numStr: string) {
+    const stripped = numStr.replace(/^0+/, "");
+    return stripped === "" ? "0" : stripped;
+  }
+
+  if (str.includes("e")) {
+    const [base, exp] = str.split("e");
+    const exponent = parseInt(exp, 10);
+
+    const [intPart, fracPart = ""] = base.split(".");
+    const digits = normalize(intPart + fracPart);
+
+    if (exponent < 0) {
+      const denominator = "1" + "0".repeat(fracPart.length + Math.abs(exponent));
+      return [digits, denominator];
+    } else {
+      const numerator = normalize(digits + "0".repeat(exponent));
+      return [numerator, "1"];
+    }
+  }
+
+  if (!str.includes(".")) return [normalize(str), "1"];
+
+  const [intPart, fracPart] = str.split(".");
+  const numerator = normalize(intPart + fracPart);
+  const denominator = "1" + "0".repeat(fracPart.length);
+
+  return [numerator, denominator];
 }
 
 export function generateSalt(ownerAddress: Hex): Hex {

@@ -58,12 +58,6 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
         const outcomeId = market.wrappedTokens[i];
         const currentPrice = prices[i];
         const pool = pools[i];
-        if (
-          dependency.toLowerCase().includes("go-winio") &&
-          marketRepo.toLowerCase().includes("aestus-relay/mev-boost-relay")
-        ) {
-          console.log(pool);
-        }
         if (!prediction) {
           acc.push({
             marketId,
