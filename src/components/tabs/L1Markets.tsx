@@ -12,6 +12,7 @@ import { L1MarketTable } from "../L1MarketTable";
 import MarketChart from "../MarketChart";
 import { SellAllL1TokensInterface } from "../trade/SellAllL1TokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
+import { useWalletStore } from "@/stores/walletStore";
 
 export const L1Markets = () => {
   const { address: account } = useAccount();
@@ -22,7 +23,7 @@ export const L1Markets = () => {
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-
+  const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
   const {
     data: tableData,
     isLoading,
@@ -118,26 +119,30 @@ export const L1Markets = () => {
             {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
           </button>
 
-          <button
-            onClick={() => setIsSellAllDialogOpen(true)}
-            className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
-          >
-            Sell all to sUSDS
-          </button>
-          {checkTradeExecutorResult?.isCreated && (
-            <button
-              onClick={handleStartTrading}
-              disabled={
-                !tableData ||
-                tableData.filter((x) => x.difference).length === 0 ||
-                isLoading ||
-                !account ||
-                !checkTradeExecutorResult?.isCreated
-              }
-              className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium w-full sm:w-auto text-center"
-            >
-              🚀 Start Trading
-            </button>
+          {checkTradeExecutorResult?.isCreated && !isUseOldWallet && (
+            <>
+              <button
+                onClick={() => setIsSellAllDialogOpen(true)}
+                className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
+              >
+                Sell all to sUSDS
+              </button>
+              (
+              <button
+                onClick={handleStartTrading}
+                disabled={
+                  !tableData ||
+                  tableData.filter((x) => x.difference).length === 0 ||
+                  isLoading ||
+                  !account ||
+                  !checkTradeExecutorResult?.isCreated
+                }
+                className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium w-full sm:w-auto text-center"
+              >
+                🚀 Start Trading
+              </button>
+              )
+            </>
           )}
         </div>
       </div>

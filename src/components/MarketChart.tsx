@@ -144,8 +144,10 @@ function buildTimeline(all: ChartWithMarketData) {
     max = Math.max(max, arr[arr.length - 1].periodStartUnix);
   });
 
+  const now = Math.floor(Date.now() / 1000); // 👈 current time
+
   const start = Math.floor(min / INTERVAL) * INTERVAL;
-  const end = Math.ceil(max / INTERVAL) * INTERVAL;
+  const end = Math.ceil(Math.max(max, now) / INTERVAL) * INTERVAL; // 👈 extend to now
 
   const timeline: number[] = [];
   for (let t = start; t <= end; t += INTERVAL) {
@@ -197,7 +199,7 @@ export default function MarketChart({ data }: Props) {
           style: LineStyle.SparseDotted,
         },
       },
-      timeScale: { timeVisible: true },
+      timeScale: { timeVisible: true, rightOffset: 250 },
       rightPriceScale: { borderVisible: false },
     });
 
@@ -220,18 +222,25 @@ export default function MarketChart({ data }: Props) {
 
       const lineData: LineData[] = [];
 
+      let lastPrice: number | null = null;
+
       timeline.forEach((t) => {
         const idx = findClosestLessThanOrEqualToTimestamp(timestamps, t);
 
-        if (idx === -1) return;
+        if (idx !== -1) {
+          const price = resolveOutcomePrice(outcomeData.poolHourDatas[idx], outcomeData.collateral);
 
-        const price = resolveOutcomePrice(outcomeData.poolHourDatas[idx], outcomeData.collateral);
-        if (price == null) return;
+          if (price != null) {
+            lastPrice = price; //update latest known price
+          }
+        }
 
-        lineData.push({
-          time: t as any,
-          value: price,
-        });
+        if (lastPrice != null) {
+          lineData.push({
+            time: t as any,
+            value: lastPrice, //reuse last price → flat line
+          });
+        }
       });
 
       series.setData(lineData);

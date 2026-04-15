@@ -12,6 +12,7 @@ import { L2MarketTable } from "../L2MarketTable";
 import { L2TradingInterface } from "../trade/L2TradingInterface";
 import { SellAllL2TokensInterface } from "../trade/SellAllL2TokensInterface";
 import L2Charts from "./L2Charts";
+import { useWalletStore } from "@/stores/walletStore";
 
 export const L2Markets = () => {
   const { address: account } = useAccount();
@@ -22,7 +23,7 @@ export const L2Markets = () => {
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
-
+  const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
   const {
     data: tableData,
     isLoading,
@@ -124,7 +125,7 @@ export const L2Markets = () => {
             {predictions.length > 0 ? "Change Predictions" : "Upload Predictions"}
           </button>
 
-          {checkTradeExecutorResult?.isCreated && (
+          {checkTradeExecutorResult?.isCreated && !isUseOldWallet && (
             <>
               <button
                 disabled={!tableData || isLoading || !account}

@@ -2,10 +2,12 @@ import {
   checkOldTradeExecutorCreated,
   checkTradeExecutorCreated,
 } from "@/lib/on-chain/deployTradeExecutor";
+import { useWalletStore } from "@/stores/walletStore";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 
 export const useCheckTradeExecutorCreated = (account: Address | undefined) => {
+  const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
   return useQuery({
     enabled: !!account,
     retry: false,
@@ -15,8 +17,9 @@ export const useCheckTradeExecutorCreated = (account: Address | undefined) => {
     refetchInterval: false,
     staleTime: 24 * 60 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    queryKey: ["useCheckTradeExecutorCreated", account],
-    queryFn: () => checkTradeExecutorCreated(account!),
+    queryKey: ["useCheckTradeExecutorCreated", account, isUseOldWallet],
+    queryFn: () =>
+      isUseOldWallet ? checkOldTradeExecutorCreated(account!) : checkTradeExecutorCreated(account!),
   });
 };
 

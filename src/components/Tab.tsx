@@ -17,7 +17,7 @@ export const Tab = () => {
   return (
     <div className="w-full">
       {/* Tabs Header */}
-      <div className="w-[300px] flex gap-10 border-b border-gray-300">
+      <div className="w-fit flex gap-10 border-b border-gray-300">
         {tabs.map((tab) => (
           <button
             key={tab.id}
