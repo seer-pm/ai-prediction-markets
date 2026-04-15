@@ -31,7 +31,7 @@ export async function getPools() {
 
 async function getCharts(keys: string[]) {
   try {
-    const chunkSize = 10;
+    const chunkSize = 4;
     const concurrency = 5;
 
     function chunkArray(arr: any[], size: number) {
@@ -48,7 +48,10 @@ async function getCharts(keys: string[]) {
     const results = await Promise.all(
       chunks.map((chunk) =>
         limit(async () => {
-          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
+          const { data, error } = await supabase
+            .from("key_value")
+            .select("value")
+            .eq("key", chunk[0]);
 
           if (error) throw error;
           return data || [];
