@@ -31,7 +31,7 @@ async function getCharts(keys: string[]) {
           const { data, error } = await supabase
             .from("key_value")
             .select("value")
-            .eq("key", chunk[0]);
+            .in("key", chunk);
 
           if (error) throw error;
           return data || [];

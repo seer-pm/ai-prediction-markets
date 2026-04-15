@@ -48,10 +48,7 @@ async function getCharts(keys: string[]) {
     const results = await Promise.all(
       chunks.map((chunk) =>
         limit(async () => {
-          const { data, error } = await supabase
-            .from("key_value")
-            .select("value")
-            .eq("key", chunk[0]);
+          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
 
           if (error) throw error;
           return data || [];

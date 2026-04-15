@@ -133,7 +133,6 @@ export const OriginalityMarkets = () => {
           </button>
           {checkTradeExecutorResult?.isCreated && !isUseOldWallet && (
             <>
-              {" "}
               <button
                 onClick={() => setIsWithdrawTokensDialogOpen(true)}
                 className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
@@ -146,7 +145,7 @@ export const OriginalityMarkets = () => {
               >
                 Sell all to sUSDS
               </button>
-              (
+
               <button
                 onClick={handleStartTrading}
                 disabled={
@@ -160,7 +159,6 @@ export const OriginalityMarkets = () => {
               >
                 🚀 Start Trading
               </button>
-              )
             </>
           )}
         </div>

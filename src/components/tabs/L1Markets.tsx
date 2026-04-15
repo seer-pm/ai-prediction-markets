@@ -127,7 +127,7 @@ export const L1Markets = () => {
               >
                 Sell all to sUSDS
               </button>
-              (
+
               <button
                 onClick={handleStartTrading}
                 disabled={
@@ -141,7 +141,6 @@ export const L1Markets = () => {
               >
                 🚀 Start Trading
               </button>
-              )
             </>
           )}
         </div>
