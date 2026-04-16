@@ -11,6 +11,7 @@ import { config } from "./config/wagmi";
 import { Tab } from "./components/Tab";
 import { OldTradeWallet } from "./components/trade/OldTradeWallet";
 import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
+import { BookIcon } from "./lib/icons";
 
 const AppContent: React.FC = () => {
   return (
@@ -19,7 +20,17 @@ const AppContent: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900">AI Prediction Markets</h1>
-            <WalletConnect />
+            <div className="flex gap-4 items-center">
+              <a
+                className="hover:opacity-60 cursor-pointer text-blue-600 font-semibold flex items-center gap-1"
+                href="https://deep-pm.gitbook.io/seer-docs"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BookIcon /> User Guide
+              </a>
+              <WalletConnect />
+            </div>
           </div>
         </div>
       </header>
