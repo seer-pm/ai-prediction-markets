@@ -73,7 +73,7 @@ const getTradeExecutorCalls = ({
   const calls = quoteResults!
     .map(({ quotes, quoteType, row }) => {
       const tradeCalls = getQuoteTradeCalls(tradeExecutor, quotes);
-      if (quoteType === "simple") {
+      if (quoteType === "simple" || quoteType === "dual-buy") {
         return tradeCalls;
       }
       const splitCalls = getSplitCalls({
