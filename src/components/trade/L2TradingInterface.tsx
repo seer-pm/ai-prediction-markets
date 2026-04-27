@@ -14,6 +14,7 @@ interface TradingInterfaceProps {
   rows: L2TableData[];
   onClose: () => void;
   tradeExecutor: Address;
+  isLoadingBalances: boolean;
 }
 
 interface TradeFormData {
@@ -24,6 +25,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
   tradeExecutor,
   rows,
   onClose,
+  isLoadingBalances,
 }) => {
   const {
     register,
@@ -87,6 +89,9 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
     new Set(rows.filter((row) => row.difference).map((row) => row.marketId)),
   );
   const renderButtonText = () => {
+    if (isLoadingBalances) {
+      return "Getting balances...";
+    }
     if (executeTradeMutation.isPending) {
       return (
         <div className="flex items-center justify-center">
@@ -148,10 +153,18 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
           />
         )}
 
-        {isLoadingQuotes && (
+        {(isLoadingQuotes || isLoadingBalances) && (
           <LoadingPanel
-            title={`Getting quotes: ${progress}/${readyMarkets.length} markets`}
-            description="Obtaining quotes to construct and execute trades. This may take a while..."
+            title={
+              isLoadingBalances
+                ? "Getting current balances"
+                : `Getting quotes: ${progress}/${readyMarkets.length} markets`
+            }
+            description={
+              isLoadingBalances
+                ? "This may take a while..."
+                : "Obtaining quotes to construct and execute trades. This may take a while..."
+            }
           />
         )}
 
@@ -200,8 +213,8 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
                 <button
                   type="button"
                   onClick={handleMaxClick}
-                  className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  disabled={executeTradeMutation.isPending}
+                  className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={executeTradeMutation.isPending || isLoadingBalances}
                 >
                   Max
                 </button>
@@ -217,7 +230,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
               step="any"
               placeholder="Enter amount to mint"
               className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-              disabled={executeTradeMutation.isPending}
+              disabled={executeTradeMutation.isPending || isLoadingBalances}
             />
             <p className="text-sm text-gray-600">
               Note: You can execute this strategy without minting, as long as you already hold {">"}{" "}
@@ -243,7 +256,8 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
                 !!errors.amount ||
                 isLoadingQuotes ||
                 !getQuotesResults ||
-                isErrorGettingQuotes
+                isErrorGettingQuotes ||
+                isLoadingBalances
               }
             >
               {renderButtonText()}

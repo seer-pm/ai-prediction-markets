@@ -187,6 +187,7 @@ export const L2Markets = () => {
               tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
               rows={tableData}
               onClose={() => setIsTradeDialogOpen(false)}
+              isLoadingBalances={isLoadingBalances}
             />
           </div>
         </div>
