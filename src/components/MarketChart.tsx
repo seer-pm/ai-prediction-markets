@@ -170,7 +170,6 @@ export default function MarketChart({ data }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
-
   // visibility state ONLY for legend UI
   const [visible, setVisible] = useState<boolean[]>(() => data.map(() => true));
   const accentColor = "#999";
@@ -214,6 +213,11 @@ export default function MarketChart({ data }: Props) {
         title: truncateOutcomeName(outcomeData.outcomeName),
         lastValueVisible: true,
         priceLineVisible: false,
+        priceFormat: {
+          type: "price",
+          precision: 4,
+          minMove: 0.0001, // should match precision
+        },
       });
 
       seriesRef.current.push(series);

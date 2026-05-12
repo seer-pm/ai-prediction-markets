@@ -88,7 +88,14 @@ export const L1Markets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(charts) ? (
-          <MarketChart data={Object.values(charts)[0]} />
+          <MarketChart
+            data={Object.values(charts)[0].filter(
+              (x) =>
+                !["invalid result", "other repositories"].some((name) =>
+                  x.outcomeName.toLowerCase().includes(name),
+                ),
+            )}
+          />
         ) : (
           <>
             {isLoading ? (
