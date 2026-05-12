@@ -172,6 +172,7 @@ export default function MarketChart({ data }: Props) {
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
   // visibility state ONLY for legend UI
   const [visible, setVisible] = useState<boolean[]>(() => data.map(() => true));
+  const hasVisibleSeries = visible.some(Boolean);
   const accentColor = "#999";
   const gridLinesColor = "#e5e5e5";
   /* ============================
@@ -288,6 +289,35 @@ export default function MarketChart({ data }: Props) {
             marginBottom: 8,
           }}
         >
+          <button
+            onClick={() => {
+              const next = visible.map(() => !hasVisibleSeries);
+
+              setVisible(next);
+
+              seriesRef.current.forEach((series, index) => {
+                series.applyOptions({
+                  visible: next[index],
+                  lastValueVisible: next[index],
+                });
+              });
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              marginRight: 16,
+              padding: "4px 10px",
+              borderRadius: 999,
+              border: "1px solid #334155",
+              background: "transparent",
+              color: "#999",
+              cursor: "pointer",
+              fontSize: 12,
+              userSelect: "none",
+            }}
+          >
+            {hasVisibleSeries ? "Clear all" : "Show all"}
+          </button>
           {data.map((outcomeData, i) => {
             const isVisible = visible[i];
 
