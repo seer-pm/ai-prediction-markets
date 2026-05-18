@@ -107,5 +107,12 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
       return a.repo.toLowerCase() > b.repo.toLowerCase() ? 1 : -1;
     });
 
-  return { data: processedData, isLoading, isLoadingBalances, error, charts: data.charts };
+  return {
+    data: processedData,
+    isLoading,
+    isLoadingBalances,
+    error,
+    charts: data.charts,
+    totalVolumeMapping: data.totalVolumeMapping
+  };
 };

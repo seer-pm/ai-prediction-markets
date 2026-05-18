@@ -20,6 +20,9 @@ interface GetL2MarketsDataApiResult {
   charts: {
     [key: string]: ChartWithMarketData;
   } | null;
+  totalVolumeMapping: {
+    [key: string]: string;
+  } | null;
 }
 
 const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiResult> => {
@@ -31,7 +34,7 @@ const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiRe
     if (retryCount) {
       return await fetchL2MarketsData(retryCount - 1);
     }
-    return { marketsData: {}, markets: [], charts: null };
+    return { marketsData: {}, markets: [], charts: null,totalVolumeMapping: null };
   }
 };
 

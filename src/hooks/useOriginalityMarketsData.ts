@@ -21,6 +21,9 @@ interface GetOriginalityMarketsDataApiResult {
   charts: {
     [key: string]: ChartWithMarketData;
   } | null;
+  totalVolumeMapping: {
+    [key: string]: string;
+  } | null;
 }
 
 const fetchOriginalityMarketsData = async (): Promise<GetOriginalityMarketsDataApiResult> => {
@@ -28,7 +31,7 @@ const fetchOriginalityMarketsData = async (): Promise<GetOriginalityMarketsDataA
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-originality-markets-data`);
     return await response.json();
   } catch {
-    return { marketsData: {}, markets: [], charts: null };
+    return { marketsData: {}, markets: [], charts: null, totalVolumeMapping: null };
   }
 };
 

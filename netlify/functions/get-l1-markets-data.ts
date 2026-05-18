@@ -50,6 +50,11 @@ export default async () => {
       : {
           [L1_MARKET_ID]: chartData.value.chartData,
         };
+    const totalVolumeMapping = chartError
+      ? null
+      : {
+          [L1_MARKET_ID]: chartData.value.totalVolumeMarket,
+        };
     const wrappedTokens = (data.wrappedTokens as Address[]).concat(
       otherMarketData.wrappedTokens as Address[],
     );
@@ -141,6 +146,7 @@ export default async () => {
         charts,
         wrappedTokens,
         payoutNumerators: data.payoutNumerators,
+        totalVolumeMapping,
       }),
       {
         status: 200,

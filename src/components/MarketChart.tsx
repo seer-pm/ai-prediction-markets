@@ -80,6 +80,7 @@ const COLORS = [
 
 type Props = {
   data: ChartWithMarketData;
+  totalVolumeMarket?: string;
 };
 
 function findClosestLessThanOrEqualToTimestamp(
@@ -166,7 +167,7 @@ function truncateOutcomeName(name: string, maxLength = 14) {
 /* ================================
    COMPONENT
 ================================ */
-export default function MarketChart({ data }: Props) {
+export default function MarketChart({ data, totalVolumeMarket }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
@@ -278,6 +279,10 @@ export default function MarketChart({ data }: Props) {
 
   return (
     <ErrorBoundary fallback={(error) => <p>Render chart error: {error.message}</p>}>
+      {totalVolumeMarket && (
+        <p className="text-sm text-gray-700 my-4">{totalVolumeMarket}</p>
+      )}
+
       <div style={{ width: "100%" }}>
         {/* Legend */}
         <div

@@ -114,5 +114,6 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     error,
     charts: data.charts,
     marketIdToRepo,
+    totalVolumeMapping: data.totalVolumeMapping
   };
 };

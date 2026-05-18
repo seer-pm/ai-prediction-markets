@@ -1,5 +1,5 @@
 import { PoolHourData } from "@/types";
-import { getToken0Token1 } from "@/utils/common";
+import { getToken0Token1, isTwoStringsEqual } from "@/utils/common";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -10,6 +10,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 import { getChartData } from "./utils/getChartData";
+import { GetSwapsQuery } from "@seer-pm/sdk/subgraph/swapr";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 function pairKey(token: Address, collateral: Address) {
@@ -17,7 +18,10 @@ function pairKey(token: Address, collateral: Address) {
   return `${token0.toLowerCase()}_${token1.toLowerCase()}`;
 }
 
-const getL1Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
+const getL1Pairs = async (
+  poolIndex: Map<string, PoolHourData[]>,
+  volumeIndex: Map<string, PoolVolumeData>,
+) => {
   const { data, error } = await supabase
     .from("markets")
     .select("subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators")
@@ -52,6 +56,16 @@ const getL1Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
   const chartDataMarket = wrappedTokens.map((token) => {
     return poolIndex.get(pairKey(token, collateral)) ?? [];
   });
+  const totalVolumeMarket = wrappedTokens.reduce((acc, token) => {
+    const volumeByPair = volumeIndex.get(pairKey(token, collateral));
+    if (!volumeByPair) return acc;
+    const { totalVolume0, totalVolume1, token0 } = volumeByPair;
+    return (acc += isTwoStringsEqual(collateral, token0) ? totalVolume0 : totalVolume1);
+  }, 0);
+  const poolData = volumeIndex.get(pairKey(wrappedTokens[0], collateral));
+  const collateralSymbol = poolData ? isTwoStringsEqual(collateral, poolData.token0)
+    ? poolData.token0Name
+    : poolData.token1Name: "";
   const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
     return {
       poolHourDatas,
@@ -64,7 +78,12 @@ const getL1Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
   const { error: upsertError } = await supabase.from("key_value").upsert(
     {
       key: `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`,
-      value: { chartData: chartWithMarketData, timestamp: Date.now(), marketId: L1_MARKET_ID },
+      value: {
+        chartData: chartWithMarketData,
+        timestamp: Date.now(),
+        marketId: L1_MARKET_ID,
+        totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
+      },
     },
     { onConflict: "key" },
   );
@@ -73,7 +92,10 @@ const getL1Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
   }
 };
 
-const getOriginalityPairs = async (poolIndex: Map<string, PoolHourData[]>) => {
+const getOriginalityPairs = async (
+  poolIndex: Map<string, PoolHourData[]>,
+  volumeIndex: Map<string, PoolVolumeData>,
+) => {
   let { data, error } = await supabase
     .from("markets")
     .select(
@@ -96,6 +118,18 @@ const getOriginalityPairs = async (poolIndex: Map<string, PoolHourData[]>) => {
     blockTimestamp: string;
   }[];
   for (const market of markets) {
+    const totalVolumeMarket = market.wrappedTokens.reduce((acc, token) => {
+      const volumeByPair = volumeIndex.get(pairKey(token, market.collateralToken));
+      if (!volumeByPair) return acc;
+      const { totalVolume0, totalVolume1, token0 } = volumeByPair;
+      return (acc += isTwoStringsEqual(market.collateralToken, token0)
+        ? totalVolume0
+        : totalVolume1);
+    }, 0);
+    const poolData = volumeIndex.get(pairKey(market.wrappedTokens[0], market.collateralToken));
+    const collateralSymbol = poolData ? isTwoStringsEqual(market.collateralToken, poolData.token0)
+      ? poolData.token0Name
+      : poolData.token1Name : "";
     const chartDataMarket = market.wrappedTokens.map((token) => {
       return poolIndex.get(pairKey(token, market.collateralToken)) ?? [];
     });
@@ -111,7 +145,12 @@ const getOriginalityPairs = async (poolIndex: Map<string, PoolHourData[]>) => {
     const { error: upsertError } = await supabase.from("key_value").upsert(
       {
         key: `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`,
-        value: { chartData: chartWithMarketData, timestamp: Date.now(), marketId: market.id },
+        value: {
+          chartData: chartWithMarketData,
+          timestamp: Date.now(),
+          marketId: market.id,
+          totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
+        },
       },
       { onConflict: "key" },
     );
@@ -121,7 +160,10 @@ const getOriginalityPairs = async (poolIndex: Map<string, PoolHourData[]>) => {
   }
 };
 
-const getL2Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
+const getL2Pairs = async (
+  poolIndex: Map<string, PoolHourData[]>,
+  volumeIndex: Map<string, PoolVolumeData>,
+) => {
   let { data, error } = await supabase
     .from("markets")
     .select(
@@ -146,6 +188,20 @@ const getL2Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
     blockTimestamp: string;
   }[];
   for (const market of markets) {
+    const totalVolumeMarket = market.wrappedTokens.reduce((acc, token) => {
+      const volumeByPair = volumeIndex.get(pairKey(token, market.collateralToken));
+      if (!volumeByPair) return acc;
+      const { totalVolume0, totalVolume1, token0 } = volumeByPair;
+      return (acc += isTwoStringsEqual(market.collateralToken, token0)
+        ? totalVolume0
+        : totalVolume1);
+    }, 0);
+    const poolData = volumeIndex.get(pairKey(market.wrappedTokens[0], market.collateralToken));
+    const collateralSymbol = poolData
+      ? isTwoStringsEqual(market.collateralToken, poolData.token0)
+        ? poolData.token0Name
+        : poolData.token1Name
+      : "";
     const chartDataMarket = market.wrappedTokens.map((token) => {
       return poolIndex.get(pairKey(token, market.collateralToken)) ?? [];
     });
@@ -161,7 +217,12 @@ const getL2Pairs = async (poolIndex: Map<string, PoolHourData[]>) => {
     const { error: upsertError } = await supabase.from("key_value").upsert(
       {
         key: `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`,
-        value: { chartData: chartWithMarketData, timestamp: Date.now(), marketId: market.id },
+        value: {
+          chartData: chartWithMarketData,
+          timestamp: Date.now(),
+          marketId: market.id,
+          totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
+        },
       },
       { onConflict: "key" },
     );
@@ -190,6 +251,76 @@ function buildPoolIndex(chartData: PoolHourData[]) {
   return map;
 }
 
+type PoolVolumeData = {
+  poolId: string;
+
+  token0: Address;
+  token1: Address;
+
+  token0Name: string;
+  token1Name: string;
+
+  totalVolume0: number;
+  totalVolume1: number;
+
+  swapCount: number;
+
+  firstTimestamp: number;
+  lastTimestamp: number;
+};
+
+function buildVolumeIndex(swaps: GetSwapsQuery["swaps"]) {
+  const map = new Map<string, PoolVolumeData>();
+
+  for (const swap of swaps) {
+    const poolId = swap.pool.id.toLowerCase();
+
+    const token0 = swap.pool.token0.id.toLowerCase() as Address;
+    const token1 = swap.pool.token1.id.toLowerCase() as Address;
+
+    const amount0 = Math.abs(Number(swap.amount0));
+    const amount1 = Math.abs(Number(swap.amount1));
+
+    const timestamp = Number(swap.timestamp);
+    const key = `${token0}_${token1}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        poolId,
+
+        token0,
+        token1,
+
+        totalVolume0: 0,
+        totalVolume1: 0,
+
+        swapCount: 0,
+
+        firstTimestamp: timestamp,
+        lastTimestamp: timestamp,
+        token0Name: swap.pool.token0.name,
+        token1Name: swap.pool.token1.name,
+      });
+    }
+
+    const current = map.get(key)!;
+
+    current.totalVolume0 += amount0;
+    current.totalVolume1 += amount1;
+
+    current.swapCount += 1;
+
+    if (timestamp < current.firstTimestamp) {
+      current.firstTimestamp = timestamp;
+    }
+
+    if (timestamp > current.lastTimestamp) {
+      current.lastTimestamp = timestamp;
+    }
+  }
+
+  return map;
+}
+
 export default async () => {
   const { data: poolIdsData } = await supabase
     .from("key_value")
@@ -202,25 +333,26 @@ export default async () => {
   }
   console.log(poolIds.length);
   console.time("get chart");
-  const chartData = await getChartData(poolIds);
+  const { chartData, swapsData } = await getChartData(poolIds);
   console.timeEnd("get chart");
   console.log(chartData.length);
   const poolIndex = buildPoolIndex(chartData);
+  const volumeIndex = buildVolumeIndex(swapsData);
   try {
     console.log("getting l1 chart");
-    await getL1Pairs(poolIndex);
+    await getL1Pairs(poolIndex, volumeIndex);
   } catch (e) {
     console.log(e);
   }
   try {
     console.log("getting originality chart");
-    await getOriginalityPairs(poolIndex);
+    await getOriginalityPairs(poolIndex, volumeIndex);
   } catch (e) {
     console.log(e);
   }
   try {
     console.log("getting l2 chart");
-    await getL2Pairs(poolIndex);
+    await getL2Pairs(poolIndex, volumeIndex);
   } catch (e) {
     console.log(e);
   }

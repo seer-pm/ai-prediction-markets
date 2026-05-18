@@ -6,6 +6,7 @@ import MarketChart from "../MarketChart";
 export default function L2Charts({
   repoOptions,
   charts,
+  totalVolumeMapping,
 }: {
   repoOptions: {
     id: string;
@@ -14,9 +15,13 @@ export default function L2Charts({
   charts: {
     [key: string]: ChartWithMarketData;
   };
+  totalVolumeMapping: {
+    [key: string]: string;
+  };
 }) {
   const [repoSelected, setRepoSelected] = useState<string | undefined>(repoOptions[0].id ?? "");
   const chartData = repoSelected ? charts[repoSelected] : undefined;
+  const totalVolumeMarket = repoSelected ? totalVolumeMapping[repoSelected] : undefined;
   useEffect(() => {
     if (repoOptions && !repoSelected) {
       setRepoSelected(repoOptions[0].id ?? "");
@@ -33,7 +38,14 @@ export default function L2Charts({
           onChange={setRepoSelected}
         />
       </div>
-      {chartData ? <MarketChart data={chartData} /> : <p>No chart data</p>}
+      {chartData ? (
+        <MarketChart
+          data={chartData}
+          totalVolumeMarket={totalVolumeMarket ? `Total volume: ${totalVolumeMarket}` : ""}
+        />
+      ) : (
+        <p>No chart data</p>
+      )}
     </>
   );
 }

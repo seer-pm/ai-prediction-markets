@@ -199,6 +199,8 @@ async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[]) {
                     }) {
                     id
                     tick
+                    amount0
+                    amount1
                     timestamp
                     pool {
                         id
@@ -250,7 +252,6 @@ async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[]) {
         await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** retries));
       }
     }
-
     allData = allData.concat(swaps);
 
     // Break conditions
@@ -269,13 +270,10 @@ async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[]) {
   return allData;
 }
 
-async function getSwapsByTokenPairsAsPoolHourDatas(
-  chainId: SupportedChain,
-  poolIds: string[],
-): Promise<GetPoolHourDatasQuery["poolHourDatas"]> {
+async function getSwapsByTokenPairsAsPoolHourDatas(chainId: SupportedChain, poolIds: string[]) {
   try {
     const swaps = await getSwapsByPoolIds(chainId, poolIds);
-    return swaps.map((swap) => {
+    const swapsAsPoolHourDatas = swaps.map((swap) => {
       const [token1Price, token0Price] = tickToPrice(Number(swap.tick));
       return {
         token0Price,
@@ -285,14 +283,18 @@ async function getSwapsByTokenPairsAsPoolHourDatas(
         pool: swap.pool,
       };
     }) as GetPoolHourDatasQuery["poolHourDatas"];
+    return { swaps, swapsAsPoolHourDatas };
   } catch (e) {
-    return [];
+    return {
+      swaps: [],
+      swapsAsPoolHourDatas: [],
+    };
   }
 }
 
 export async function getPoolHourDatas(chainId: SupportedChain, poolIds: string[]) {
   if (poolIds.length === 0) {
-    return [];
+    return { chartData: [], swapsData: [] };
   }
   const graphQLClient =
     chainId === gnosis.id ? swaprGraphQLClient(chainId, "algebra") : uniswapGraphQLClient(chainId);
@@ -305,19 +307,22 @@ export async function getPoolHourDatas(chainId: SupportedChain, poolIds: string[
   const batches = chunk(poolIds, BATCH_SIZE);
 
   const limit = pLimit(3);
-
+  const totalSwaps: GetSwapsQuery["swaps"] = [];
   const batchResults = await Promise.all(
     batches.map((batch) =>
       limit(async () => {
-        const [poolHourDatas, swaps] = await Promise.all([
+        const [poolHourDatas, { swaps, swapsAsPoolHourDatas }] = await Promise.all([
           getPoolHourDatasByPoolIds(chainId, batch),
           getSwapsByTokenPairsAsPoolHourDatas(chainId, batch),
         ]);
-
-        return poolHourDatas.concat(swaps).sort((a, b) => a.periodStartUnix - b.periodStartUnix);
+        totalSwaps.push(...swaps);
+        return poolHourDatas
+          .concat(swapsAsPoolHourDatas)
+          .sort((a, b) => a.periodStartUnix - b.periodStartUnix);
       }),
     ),
   );
+  totalSwaps.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
   console.log({ count });
-  return batchResults.flat();
+  return { chartData: batchResults.flat(), swapsData: totalSwaps };
 }

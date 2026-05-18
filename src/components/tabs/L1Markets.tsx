@@ -30,6 +30,7 @@ export const L1Markets = () => {
     isLoadingBalances,
     error,
     charts,
+    totalVolumeMapping,
   } = useProcessL1Predictions(predictions);
 
   const handleDataParsed = (data: PredictionRow[]) => {
@@ -95,6 +96,11 @@ export const L1Markets = () => {
                   x.outcomeName.toLowerCase().includes(name),
                 ),
             )}
+            totalVolumeMarket={
+              Object.values(totalVolumeMapping ?? {})[0]
+                ? `Total volume: ${Object.values(totalVolumeMapping ?? {})[0]}`
+                : ""
+            }
           />
         ) : (
           <>

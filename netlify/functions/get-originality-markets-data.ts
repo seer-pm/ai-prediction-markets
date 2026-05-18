@@ -28,10 +28,7 @@ async function getCharts(keys: string[]) {
     const results = await Promise.all(
       chunks.map((chunk) =>
         limit(async () => {
-          const { data, error } = await supabase
-            .from("key_value")
-            .select("value")
-            .in("key", chunk);
+          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
 
           if (error) throw error;
           return data || [];
@@ -98,7 +95,12 @@ export default async () => {
           acc[row.value.marketId] = row.value.chartData;
           return acc;
         }, {}) ?? {});
-
+    const totalVolumeMapping = chartError
+      ? null
+      : (chartData?.reduce<Record<string, any>>((acc, row) => {
+          acc[row.value.marketId] = row.value.totalVolumeMarket;
+          return acc;
+        }, {}) ?? {});
     //get pools for all the markets
     const queryResult = await UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
       query: GetPoolsDocument,
@@ -183,14 +185,23 @@ export default async () => {
         };
       },
     );
-    return new Response(JSON.stringify({ marketsData: repoToPriceMapping, markets, charts }), {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "http://localhost:5173",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET",
+    return new Response(
+      JSON.stringify({
+        marketsData: repoToPriceMapping,
+        markets,
+        charts,
+        totalVolumeMapping,
+        chartError,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "http://localhost:5173",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "GET",
+        },
       },
-    });
+    );
   } catch (e: any) {
     console.log(e);
     return new Response(JSON.stringify({ error: e.message || "Internal server error" }), {

@@ -30,6 +30,7 @@ export const L2Markets = () => {
     isLoadingBalances,
     error,
     charts,
+    totalVolumeMapping
   } = useProcessL2Predictions(predictions);
   const repoOptions = tableData
     ? Array.from(
@@ -93,7 +94,7 @@ export const L2Markets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(charts) ? (
-          <L2Charts repoOptions={repoOptions} charts={charts} />
+          <L2Charts repoOptions={repoOptions} charts={charts} totalVolumeMapping={totalVolumeMapping!}/>
         ) : (
           <>
             {isLoading ? (

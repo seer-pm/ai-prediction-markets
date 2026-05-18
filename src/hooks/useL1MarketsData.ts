@@ -9,14 +9,17 @@ interface GetMarketsDataApiResult {
       id: Address;
       price: number | null;
       pool: PoolInfo | null;
-      marketId: Address
+      marketId: Address;
     };
   };
   wrappedTokens: Address[];
-  payoutNumerators: string[]
+  payoutNumerators: string[];
   charts: {
-    [key:string]: ChartWithMarketData
-  } | null
+    [key: string]: ChartWithMarketData;
+  } | null;
+  totalVolumeMapping: {
+    [key: string]: string;
+  } | null;
 }
 
 const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
@@ -24,7 +27,13 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
     const response = await fetch(`${getAppUrl()}/.netlify/functions/get-l1-markets-data`);
     return await response.json();
   } catch {
-    return { marketsData: {}, wrappedTokens: [], payoutNumerators: [], charts: null };
+    return {
+      marketsData: {},
+      wrappedTokens: [],
+      payoutNumerators: [],
+      charts: null,
+      totalVolumeMapping: null,
+    };
   }
 };
 

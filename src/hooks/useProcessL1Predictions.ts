@@ -96,5 +96,6 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
     isLoadingBalances,
     error,
     charts: data.charts,
+    totalVolumeMapping: data.totalVolumeMapping
   };
 };

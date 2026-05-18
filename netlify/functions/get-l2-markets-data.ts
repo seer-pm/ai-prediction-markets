@@ -117,6 +117,12 @@ export default async () => {
           acc[row.value.marketId] = row.value.chartData;
           return acc;
         }, {}) ?? {});
+    const totalVolumeMapping = chartError
+      ? null
+      : (chartData?.reduce<Record<string, any>>((acc, row) => {
+          acc[row.value.marketId] = row.value.totalVolumeMarket;
+          return acc;
+        }, {}) ?? {});
     //get pools for all the markets
     const pools = await getPools();
     //we only use the pool with highest liquidity for each pair
@@ -177,7 +183,7 @@ export default async () => {
       },
     );
     return new Response(
-      JSON.stringify({ marketsData: repoToPriceMapping, markets, charts, chartError }),
+      JSON.stringify({ marketsData: repoToPriceMapping, markets, charts, chartError,totalVolumeMapping }),
       {
         status: 200,
         headers: {
