@@ -8,7 +8,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { useEffect, useRef, useState } from "react";
+import { ReactElement, useEffect, useRef, useState } from "react";
 import { Address, formatUnits } from "viem";
 import ErrorBoundary from "./ErrorBoundary";
 
@@ -80,7 +80,7 @@ const COLORS = [
 
 type Props = {
   data: ChartWithMarketData;
-  totalVolumeMarket?: string;
+  totalVolumeMarket?: string | ReactElement;
 };
 
 function findClosestLessThanOrEqualToTimestamp(
@@ -279,9 +279,7 @@ export default function MarketChart({ data, totalVolumeMarket }: Props) {
 
   return (
     <ErrorBoundary fallback={(error) => <p>Render chart error: {error.message}</p>}>
-      {totalVolumeMarket && (
-        <p className="text-sm text-gray-700 my-4">{totalVolumeMarket}</p>
-      )}
+      {totalVolumeMarket && <p className="text-sm text-gray-700 mb-4">{totalVolumeMarket}</p>}
 
       <div style={{ width: "100%" }}>
         {/* Legend */}

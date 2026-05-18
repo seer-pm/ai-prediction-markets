@@ -32,7 +32,16 @@ export const L1Markets = () => {
     charts,
     totalVolumeMapping,
   } = useProcessL1Predictions(predictions);
-
+  const parseL1VolumeData = () => {
+    const volumeString = Object.values(totalVolumeMapping ?? {})[0];
+    if (!volumeString) return "";
+    const [volume] = volumeString.split(" ");
+    return (
+      <>
+        Total volume: <span className="font-semibold">{Number(volume).toFixed(2)} sUSDS</span>
+      </>
+    );
+  };
   const handleDataParsed = (data: PredictionRow[]) => {
     setPredictions(data);
   };
@@ -96,11 +105,7 @@ export const L1Markets = () => {
                   x.outcomeName.toLowerCase().includes(name),
                 ),
             )}
-            totalVolumeMarket={
-              Object.values(totalVolumeMapping ?? {})[0]
-                ? `Total volume: ${Object.values(totalVolumeMapping ?? {})[0]}`
-                : ""
-            }
+            totalVolumeMarket={parseL1VolumeData()}
           />
         ) : (
           <>

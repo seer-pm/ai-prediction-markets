@@ -53,16 +53,19 @@ export const OriginalityMarkets = () => {
     });
   };
   const parseOriginalityVolumeData = () => {
-    if (!totalVolumeMapping) return 0;
-    return (
+    if (!totalVolumeMapping) return "";
+    const volume =
       Object.values(totalVolumeMapping).reduce((acc, curr) => {
         const volume = Number(curr.split(" ")[0]);
         return acc + volume;
-      }, 0) / Object.values(totalVolumeMapping).length
+      }, 0) / Object.values(totalVolumeMapping).length;
+    return (
+      <>
+        Average volume per underlying: <span className="font-semibold">{volume.toFixed(2)}</span>
+      </>
     );
   };
   const parsedData = parseOriginalityChartData();
-  const totalVolumeMarket = parseOriginalityVolumeData();
   const handleDataParsed = (data: OriginalityRow[]) => {
     setPredictions(data);
   };
@@ -112,7 +115,7 @@ export const OriginalityMarkets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(parsedData) ? (
-          <MarketChart data={parsedData} totalVolumeMarket={totalVolumeMarket ? `Average volume per underlying: ${totalVolumeMarket}`:""}/>
+          <MarketChart data={parsedData} totalVolumeMarket={parseOriginalityVolumeData()} />
         ) : (
           <>
             {isLoading ? (
