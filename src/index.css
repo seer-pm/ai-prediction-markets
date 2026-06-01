@@ -26,3 +26,9 @@ body {
 .Toastify__close-button{
   color: white
 }
+
+/* Skip layout/paint for off-screen table rows — browser only renders visible rows */
+table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
+}

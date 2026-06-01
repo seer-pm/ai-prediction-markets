@@ -41,7 +41,7 @@ export const ConvertInterface: React.FC<ConvertInterfaceProps> = ({ onClose, acc
     setValue,
     setError,
   } = useForm<ConvertFormData>({
-    mode: "all",
+    mode: "onSubmit",
     defaultValues: {
       amount: "",
       asset:

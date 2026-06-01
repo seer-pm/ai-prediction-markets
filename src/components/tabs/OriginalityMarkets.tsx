@@ -5,7 +5,7 @@ import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreat
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
 import { OriginalityRow } from "@/types";
-import { useState } from "react";
+import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 import { SellAllOriginalityTokensInterface } from "../trade/SellAllOriginalityTokensInterface";
@@ -14,6 +14,7 @@ import { downloadCsv, isUndefined } from "@/utils/common";
 import { DownloadIcon } from "@/lib/icons";
 import MarketChart from "../MarketChart";
 import { useWalletStore } from "@/stores/walletStore";
+import { Modal } from "../Modal";
 
 export const OriginalityMarkets = () => {
   const { address: account } = useAccount();
@@ -39,7 +40,7 @@ export const OriginalityMarkets = () => {
     totalVolumeMapping,
   } = useProcessOriginalityPredictions(predictions);
 
-  const parseOriginalityChartData = () => {
+  const parseOriginalityChartData = useCallback(() => {
     if (!charts) return null;
     return Object.entries(charts).map(([marketId, chartWithMarketData]) => {
       const { poolHourDatas, collateral, outcomeId } = chartWithMarketData[1]; //outcome UP
@@ -51,8 +52,8 @@ export const OriginalityMarkets = () => {
         outcomeId,
       };
     });
-  };
-  const parseOriginalityVolumeData = () => {
+  }, [charts, marketIdToRepo]);
+  const parseOriginalityVolumeData = useCallback(() => {
     if (!totalVolumeMapping) return "";
     const volume =
       Object.values(totalVolumeMapping).reduce((acc, curr) => {
@@ -64,20 +65,25 @@ export const OriginalityMarkets = () => {
         Average volume per underlying: <span className="font-semibold">{volume.toFixed(2)}</span>
       </>
     );
-  };
-  const parsedData = parseOriginalityChartData();
+  }, [totalVolumeMapping]);
+  const parsedData = useMemo(() => parseOriginalityChartData(), [parseOriginalityChartData]);
   const handleDataParsed = (data: OriginalityRow[]) => {
     setPredictions(data);
   };
 
-  const handleStartTrading = () => {
-    setIsTradeDialogOpen(true);
-  };
+  const handleStartTrading = useCallback(() => {
+    startTransition(() => setIsTradeDialogOpen(true));
+  }, []);
 
-  const handleLoadPredictions = () => {
-    setIsCsvDialogOpen(true);
-  };
-  const exportWeight = () => {
+  const handleLoadPredictions = useCallback(() => {
+    startTransition(() => setIsCsvDialogOpen(true));
+  }, []);
+
+  const closeCsvDialog = useCallback(() => startTransition(() => setIsCsvDialogOpen(false)), []);
+  const closeTradeDialog = useCallback(() => startTransition(() => setIsTradeDialogOpen(false)), []);
+  const closeSellAllDialog = useCallback(() => startTransition(() => setIsSellAllDialogOpen(false)), []);
+  const closeWithdrawTokensDialog = useCallback(() => startTransition(() => setIsWithdrawTokensDialogOpen(false)), []);
+  const exportWeight = useCallback(() => {
     if (!tableData) return;
     downloadCsv(
       [
@@ -100,7 +106,7 @@ export const OriginalityMarkets = () => {
         }),
       "originality-weights",
     );
-  };
+  }, [tableData]);
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
@@ -132,7 +138,7 @@ export const OriginalityMarkets = () => {
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
           {predictions.length > 0 && (
             <button
-              onClick={() => setPredictions([])}
+              onClick={() => startTransition(() => setPredictions([]))}
               className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
             >
               Clear Predictions
@@ -148,13 +154,13 @@ export const OriginalityMarkets = () => {
           {checkTradeExecutorResult?.isCreated && !isUseOldWallet && (
             <>
               <button
-                onClick={() => setIsWithdrawTokensDialogOpen(true)}
+                onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
                 className="cursor-pointer px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
               >
                 Withdraw outcome tokens
               </button>
               <button
-                onClick={() => setIsSellAllDialogOpen(true)}
+                onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
                 className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
               >
                 Sell all to sUSDS
@@ -196,52 +202,38 @@ export const OriginalityMarkets = () => {
         isLoadingBalances={isLoadingBalances}
       />
       {/* CSv Dialog */}
-      {isCsvDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <OriginalityCSVUpload
-              onDataParsed={handleDataParsed}
-              onClose={() => setIsCsvDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={isCsvDialogOpen} onClose={closeCsvDialog} maxWidth="max-w-2xl">
+        <OriginalityCSVUpload
+          onDataParsed={handleDataParsed}
+          onClose={closeCsvDialog}
+        />
+      </Modal>
 
       {/* Trading Dialog */}
-      {isTradeDialogOpen && tableData && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <OriginalityTradingInterface
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              markets={tableData}
-              onClose={() => setIsTradeDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-      {isWithdrawTokensDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <WithdrawOriginalityTokensInterface
-              account={account!}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsWithdrawTokensDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-      {isSellAllDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <SellAllOriginalityTokensInterface
-              markets={tableData}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsSellAllDialogOpen(false)}
-              isLoadingTable={isLoading || isLoadingBalances}
-            />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={isTradeDialogOpen && !!tableData} onClose={closeTradeDialog}>
+        {tableData && (
+          <OriginalityTradingInterface
+            tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+            markets={tableData}
+            onClose={closeTradeDialog}
+          />
+        )}
+      </Modal>
+      <Modal isOpen={isWithdrawTokensDialogOpen} onClose={closeWithdrawTokensDialog}>
+        <WithdrawOriginalityTokensInterface
+          account={account!}
+          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+          onClose={closeWithdrawTokensDialog}
+        />
+      </Modal>
+      <Modal isOpen={isSellAllDialogOpen} onClose={closeSellAllDialog}>
+        <SellAllOriginalityTokensInterface
+          markets={tableData}
+          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+          onClose={closeSellAllDialog}
+          isLoadingTable={isLoading || isLoadingBalances}
+        />
+      </Modal>
     </>
   );
 };

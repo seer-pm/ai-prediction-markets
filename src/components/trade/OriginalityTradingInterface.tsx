@@ -31,7 +31,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
     watch,
     setValue,
   } = useForm<TradeFormData>({
-    mode: "all",
+    mode: "onSubmit",
     defaultValues: {
       amount: "",
     },

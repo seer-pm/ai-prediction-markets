@@ -1,5 +1,6 @@
-import { OriginalityRow, OriginalityTableData } from "@/types";
+import { OriginalityRow } from "@/types";
 import { useAccount } from "wagmi";
+import { useMemo } from "react";
 import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useOriginalityMarketsData } from "./useOriginalityMarketsData";
@@ -11,40 +12,48 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
   const { data, isLoading, error } = useOriginalityMarketsData();
-  const tokens = data?.markets?.map((market) => market.wrappedTokens)?.flat();
+  const tokens = useMemo(
+    () => data?.markets?.map((market) => market.wrappedTokens)?.flat(),
+    [data?.markets],
+  );
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
-    data?.markets?.map((market) => market.wrappedTokens)?.flat(),
+    tokens,
   );
-  const balanceMapping = balances?.reduce(
-    (acc, curr, index) => {
-      const token = tokens?.[index];
-      if (!token) {
-        return acc;
-      }
-      acc[token] = curr;
-      return acc;
-    },
-    {} as { [key: string]: bigint },
+  const balanceMapping = useMemo(
+    () =>
+      balances?.reduce(
+        (acc, curr, index) => {
+          const token = tokens?.[index];
+          if (!token) {
+            return acc;
+          }
+          acc[token] = curr;
+          return acc;
+        },
+        {} as { [key: string]: bigint },
+      ),
+    [balances, tokens],
   );
-  if (!data || !Object.keys(data.marketsData ?? {}).length) {
-    return {
-      data: undefined,
-      isLoading,
-      isLoadingBalances,
-      error,
-    };
-  }
 
-  const repoToPredictionMapping = predictions.reduce(
-    (acc, curr) => {
-      acc[curr.repo.replace("https://github.com/", "")] = curr;
-      return acc;
-    },
-    {} as { [key: string]: OriginalityRow },
+  const repoToPredictionMapping = useMemo(
+    () =>
+      predictions.reduce(
+        (acc, curr) => {
+          acc[curr.repo.replace("https://github.com/", "")] = curr;
+          return acc;
+        },
+        {} as { [key: string]: OriginalityRow },
+      ),
+    [predictions],
   );
+
   const marketIdToRepo: { [key: string]: string } = {};
-  const processedData: OriginalityTableData[] = Object.entries(data.marketsData).map(
+  const processedData = useMemo(() => {
+    if (!data || !Object.keys(data.marketsData ?? {}).length) {
+      return undefined;
+    }
+    return Object.entries(data.marketsData).map(
     ([marketRepo, marketPoolData]) => {
       const prediction = repoToPredictionMapping[marketRepo];
       const { id: marketId, upPrice, downPrice, upPool, downPool } = marketPoolData;
@@ -104,8 +113,17 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
         wrappedTokens: market?.wrappedTokens ?? [],
         collateralToken: market?.collateralToken ?? zeroAddress,
       };
-    },
-  );
+    });
+  }, [data, repoToPredictionMapping, balanceMapping]);
+
+  if (!data || !Object.keys(data.marketsData ?? {}).length) {
+    return {
+      data: undefined,
+      isLoading,
+      isLoadingBalances,
+      error,
+    };
+  }
 
   return {
     data: processedData,

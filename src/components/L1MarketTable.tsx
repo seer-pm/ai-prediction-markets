@@ -9,7 +9,7 @@ interface MarketTableProps {
   isLoadingBalances: boolean;
 }
 
-export const L1MarketTable: React.FC<MarketTableProps> = ({
+const L1MarketTableInner: React.FC<MarketTableProps> = ({
   rows,
   isLoading,
   isLoadingBalances,
@@ -129,3 +129,5 @@ export const L1MarketTable: React.FC<MarketTableProps> = ({
     </div>
   );
 };
+
+export const L1MarketTable = React.memo(L1MarketTableInner);

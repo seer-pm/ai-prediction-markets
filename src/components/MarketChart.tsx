@@ -8,7 +8,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { ReactElement, useEffect, useRef, useState } from "react";
+import React, { ReactElement, useEffect, useRef, useState } from "react";
 import { Address, formatUnits } from "viem";
 import ErrorBoundary from "./ErrorBoundary";
 
@@ -167,7 +167,7 @@ function truncateOutcomeName(name: string, maxLength = 14) {
 /* ================================
    COMPONENT
 ================================ */
-export default function MarketChart({ data, totalVolumeMarket }: Props) {
+const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
@@ -351,4 +351,6 @@ export default function MarketChart({ data, totalVolumeMarket }: Props) {
       </div>
     </ErrorBoundary>
   );
-}
+});
+
+export default MarketChart;

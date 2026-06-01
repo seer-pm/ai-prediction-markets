@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { Address, formatUnits, parseUnits } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
 import { ConvertInterface } from "../ConvertInterface";
+import { Modal } from "../Modal";
 
 interface DepositInterfaceProps {
   onClose: () => void;
@@ -31,7 +32,7 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
     watch,
     setValue,
   } = useForm<DepositFormData>({
-    mode: "all",
+    mode: "onSubmit",
     defaultValues: {
       amount: "",
     },
@@ -168,13 +169,9 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
           </div>
         </form>
       </div>
-      {isConvertDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <ConvertInterface onClose={() => setIsConvertDialogOpen(false)} account={account} />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={isConvertDialogOpen} onClose={() => setIsConvertDialogOpen(false)}>
+        <ConvertInterface onClose={() => setIsConvertDialogOpen(false)} account={account} />
+      </Modal>
     </div>
   );
 };

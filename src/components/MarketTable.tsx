@@ -1,7 +1,10 @@
 import { TableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
-import React from "react";
+import React, { useState } from "react";
 import { formatUnits } from "viem";
+import MarketsPagination from "./MarketsPagination";
+
+const PAGE_SIZE = 50;
 
 interface MarketTableProps {
   rows: TableData[];
@@ -9,11 +12,13 @@ interface MarketTableProps {
   isLoadingBalances: boolean;
 }
 
-export const MarketTable: React.FC<MarketTableProps> = ({
+const MarketTableInner: React.FC<MarketTableProps> = ({
   rows,
   isLoading,
   isLoadingBalances,
 }) => {
+  const [pageIndex, setPageIndex] = useState(0);
+
   if (isLoading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -32,6 +37,9 @@ export const MarketTable: React.FC<MarketTableProps> = ({
   if (rows.length === 0) {
     return null;
   }
+
+  const pageCount = Math.ceil(rows.length / PAGE_SIZE);
+  const processedRows = rows.slice(pageIndex * PAGE_SIZE, (pageIndex + 1) * PAGE_SIZE);
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -57,7 +65,7 @@ export const MarketTable: React.FC<MarketTableProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200 text-sm">
-            {rows.map((row) => {
+            {processedRows.map((row) => {
               const { outcomeId, repo, payout, balance } = row;
 
               if (repo === "Invalid result") return null;
@@ -91,6 +99,15 @@ export const MarketTable: React.FC<MarketTableProps> = ({
           </tbody>
         </table>
       </div>
+      <div className="my-5">
+        <MarketsPagination
+          pageCount={pageCount}
+          handlePageClick={({ selected }) => setPageIndex(selected)}
+          page={pageIndex + 1}
+        />
+      </div>
     </div>
   );
 };
+
+export const MarketTable = React.memo(MarketTableInner);

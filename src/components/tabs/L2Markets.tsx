@@ -4,7 +4,7 @@ import { useProcessL2Predictions } from "@/hooks/useProcessL2Predictions";
 import { DownloadIcon } from "@/lib/icons";
 import { L2Row } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
-import { useState } from "react";
+import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 import { L2CSVUpload } from "../L2CSVUpload";
@@ -13,6 +13,7 @@ import { L2TradingInterface } from "../trade/L2TradingInterface";
 import { SellAllL2TokensInterface } from "../trade/SellAllL2TokensInterface";
 import L2Charts from "./L2Charts";
 import { useWalletStore } from "@/stores/walletStore";
+import { Modal } from "../Modal";
 
 export const L2Markets = () => {
   const { address: account } = useAccount();
@@ -32,26 +33,34 @@ export const L2Markets = () => {
     charts,
     totalVolumeMapping
   } = useProcessL2Predictions(predictions);
-  const repoOptions = tableData
-    ? Array.from(
-        new Map(tableData.map((x) => [x.repo, { text: x.repo, id: x.marketId }])).values(),
-      ).sort((a, b) => {
-        return a.text.toLowerCase() > b.text.toLowerCase() ? 1 : -1;
-      })
-    : [];
+  const repoOptions = useMemo(
+    () =>
+      tableData
+        ? Array.from(
+            new Map(tableData.map((x) => [x.repo, { text: x.repo, id: x.marketId }])).values(),
+          ).sort((a, b) => {
+            return a.text.toLowerCase() > b.text.toLowerCase() ? 1 : -1;
+          })
+        : [],
+    [tableData],
+  );
 
   const handleDataParsed = (data: L2Row[]) => {
     setPredictions(data);
   };
 
-  const handleStartTrading = () => {
-    setIsTradeDialogOpen(true);
-  };
+  const handleStartTrading = useCallback(() => {
+    startTransition(() => setIsTradeDialogOpen(true));
+  }, []);
 
-  const handleLoadPredictions = () => {
-    setIsCsvDialogOpen(true);
-  };
-  const exportWeight = () => {
+  const handleLoadPredictions = useCallback(() => {
+    startTransition(() => setIsCsvDialogOpen(true));
+  }, []);
+
+  const closeCsvDialog = useCallback(() => startTransition(() => setIsCsvDialogOpen(false)), []);
+  const closeTradeDialog = useCallback(() => startTransition(() => setIsTradeDialogOpen(false)), []);
+  const closeSellAllDialog = useCallback(() => startTransition(() => setIsSellAllDialogOpen(false)), []);
+  const exportWeight = useCallback(() => {
     if (!tableData) return;
     downloadCsv(
       [
@@ -79,7 +88,7 @@ export const L2Markets = () => {
         }),
       "l2-weights",
     );
-  };
+  }, [tableData]);
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
@@ -112,7 +121,7 @@ export const L2Markets = () => {
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
           {predictions.length > 0 && (
             <button
-              onClick={() => setPredictions([])}
+              onClick={() => startTransition(() => setPredictions([]))}
               className="cursor-pointer text-red-600 hover:text-red-800 text-sm font-medium px-4 py-2 border border-red-300 rounded-md hover:bg-red-50 transition-colors w-full sm:w-auto text-center"
             >
               Clear Predictions
@@ -130,7 +139,7 @@ export const L2Markets = () => {
             <>
               <button
                 disabled={!tableData || isLoading || !account}
-                onClick={() => setIsSellAllDialogOpen(true)}
+                onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
                 className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Sell all to sUSDS
@@ -170,41 +179,31 @@ export const L2Markets = () => {
         isLoadingBalances={isLoadingBalances}
       />
       {/* CSv Dialog */}
-      {isCsvDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <L2CSVUpload
-              onDataParsed={handleDataParsed}
-              onClose={() => setIsCsvDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={isCsvDialogOpen} onClose={closeCsvDialog} maxWidth="max-w-2xl">
+        <L2CSVUpload
+          onDataParsed={handleDataParsed}
+          onClose={closeCsvDialog}
+        />
+      </Modal>
       {/* Trading Dialog */}
-      {isTradeDialogOpen && tableData && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <L2TradingInterface
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              rows={tableData}
-              onClose={() => setIsTradeDialogOpen(false)}
-              isLoadingBalances={isLoadingBalances}
-            />
-          </div>
-        </div>
-      )}
-      {isSellAllDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <SellAllL2TokensInterface
-              rows={tableData}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsSellAllDialogOpen(false)}
-              isLoadingTable={isLoading || isLoadingBalances}
-            />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={isTradeDialogOpen && !!tableData} onClose={closeTradeDialog}>
+        {tableData && (
+          <L2TradingInterface
+            tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+            rows={tableData}
+            onClose={closeTradeDialog}
+            isLoadingBalances={isLoadingBalances}
+          />
+        )}
+      </Modal>
+      <Modal isOpen={isSellAllDialogOpen} onClose={closeSellAllDialog}>
+        <SellAllL2TokensInterface
+          rows={tableData}
+          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+          onClose={closeSellAllDialog}
+          isLoadingTable={isLoading || isLoadingBalances}
+        />
+      </Modal>
     </>
   );
 };

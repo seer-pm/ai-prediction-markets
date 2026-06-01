@@ -33,7 +33,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
     watch,
     setValue,
   } = useForm<TradeFormData>({
-    mode: "all",
+    mode: "onSubmit",
     defaultValues: {
       amount: "",
     },
@@ -41,7 +41,7 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const amount = watch("amount");
 
-  const debouncedAmount = useDebounce(amount, 500);
+  const debouncedAmount = useDebounce(amount, 300);
   const {
     data: getQuotesResult,
     isLoading: isLoadingQuotes,

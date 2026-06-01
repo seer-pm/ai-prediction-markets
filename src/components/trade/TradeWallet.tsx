@@ -2,13 +2,14 @@ import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreat
 import { useCreateTradeExecutor } from "@/hooks/useCreateTradeExecutor";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { collateral } from "@/utils/constants";
-import { useState } from "react";
+import { startTransition, useCallback, useState } from "react";
 import { formatUnits } from "viem";
 import { useAccount } from "wagmi";
 import { DepositInterface } from "./DepositInterface";
 import { WithdrawInterface } from "./WithdrawInterface";
 import Spinner from "../Spinner";
 import { useWalletStore } from "@/stores/walletStore";
+import { Modal } from "../Modal";
 
 export const TradeWallet = () => {
   const { address: account, chain } = useAccount();
@@ -16,6 +17,23 @@ export const TradeWallet = () => {
   const createTradeExecutorMutate = useCreateTradeExecutor();
   const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
+
+  const openDepositDialog = useCallback(
+    () => startTransition(() => setIsDepositDialogOpen(true)),
+    [],
+  );
+  const closeDepositDialog = useCallback(
+    () => startTransition(() => setIsDepositDialogOpen(false)),
+    [],
+  );
+  const openWithdrawDialog = useCallback(
+    () => startTransition(() => setIsWithdrawDialogOpen(true)),
+    [],
+  );
+  const closeWithdrawDialog = useCallback(
+    () => startTransition(() => setIsWithdrawDialogOpen(false)),
+    [],
+  );
 
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: checkTradeExecutorResult?.predictedAddress,
@@ -27,28 +45,20 @@ export const TradeWallet = () => {
   const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
   return (
     <>
-      {isDepositDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <DepositInterface
-              account={account!}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsDepositDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-      {isWithdrawDialogOpen && (
-        <div className="fixed inset-0 bg-[#00000080] bg-opacity-0.5 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-[45rem] w-full max-h-[90vh] overflow-hidden">
-            <WithdrawInterface
-              account={account!}
-              tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
-              onClose={() => setIsWithdrawDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal isOpen={isDepositDialogOpen} onClose={closeDepositDialog}>
+        <DepositInterface
+          account={account!}
+          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+          onClose={closeDepositDialog}
+        />
+      </Modal>
+      <Modal isOpen={isWithdrawDialogOpen} onClose={closeWithdrawDialog}>
+        <WithdrawInterface
+          account={account!}
+          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+          onClose={closeWithdrawDialog}
+        />
+      </Modal>
       {account && !checkTradeExecutorResult?.isCreated && (
         <div className="mx-auto p-6 bg-slate-800 rounded-2xl shadow-lg text-white">
           <h3 className="text-xl font-semibold mb-3">Trade Wallet</h3>
@@ -96,14 +106,14 @@ export const TradeWallet = () => {
               <div className="flex flex-wrap gap-3">
                 {!isUseOldWallet && (
                   <button
-                    onClick={() => setIsDepositDialogOpen(true)}
+                    onClick={openDepositDialog}
                     className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                   >
                     Deposit sUSDS
                   </button>
                 )}
                 <button
-                  onClick={() => setIsWithdrawDialogOpen(true)}
+                  onClick={openWithdrawDialog}
                   className="cursor-pointer px-5 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
                 >
                   Withdraw sUSDS

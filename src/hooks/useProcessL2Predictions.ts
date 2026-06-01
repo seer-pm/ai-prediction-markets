@@ -1,5 +1,6 @@
 import { L2Row, L2TableData } from "@/types";
 import { useAccount } from "wagmi";
+import { useMemo } from "react";
 import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useL2MarketsData } from "./useL2MarketsData";
@@ -10,43 +11,50 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
   const { data, isLoading, error } = useL2MarketsData();
-  const tokens = data?.markets?.map((market) => market.wrappedTokens)?.flat();
+  const tokens = useMemo(
+    () => data?.markets?.map((market) => market.wrappedTokens)?.flat(),
+    [data?.markets],
+  );
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
-    data?.markets?.map((market) => market.wrappedTokens)?.flat(),
+    tokens,
   );
-  const balanceMapping = balances?.reduce(
-    (acc, curr, index) => {
-      const token = tokens?.[index];
-      if (!token) {
-        return acc;
-      }
-      acc[token] = curr;
-      return acc;
-    },
-    {} as { [key: string]: bigint },
-  );
-  if (!data || !Object.keys(data.marketsData ?? {}).length) {
-    return {
-      data: undefined,
-      isLoading,
-      isLoadingBalances,
-      error,
-    };
-  }
-
-  const dependencyToPredictionMapping = predictions.reduce(
-    (acc, curr) => {
-      const dependency = curr.dependency.replace("https://github.com/", "").toLowerCase();
-      const repo = curr.repo.replace("https://github.com/", "").toLowerCase();
-      acc[`${dependency}-${repo}`] = curr;
-      return acc;
-    },
-    {} as { [key: string]: L2Row },
+  const balanceMapping = useMemo(
+    () =>
+      balances?.reduce(
+        (acc, curr, index) => {
+          const token = tokens?.[index];
+          if (!token) {
+            return acc;
+          }
+          acc[token] = curr;
+          return acc;
+        },
+        {} as { [key: string]: bigint },
+      ),
+    [balances, tokens],
   );
 
-  const processedData: L2TableData[] = Object.entries(data.marketsData)
-    .reduce((acc, [marketRepo, marketPoolData]) => {
+  const dependencyToPredictionMapping = useMemo(
+    () =>
+      predictions.reduce(
+        (acc, curr) => {
+          const dependency = curr.dependency.replace("https://github.com/", "").toLowerCase();
+          const repo = curr.repo.replace("https://github.com/", "").toLowerCase();
+          acc[`${dependency}-${repo}`] = curr;
+          return acc;
+        },
+        {} as { [key: string]: L2Row },
+      ),
+    [predictions],
+  );
+
+  const processedData = useMemo(() => {
+    if (!data || !Object.keys(data.marketsData ?? {}).length) {
+      return undefined;
+    }
+    return Object.entries(data.marketsData)
+      .reduce((acc, [marketRepo, marketPoolData]) => {
       const { id: marketId, prices, pools } = marketPoolData;
       const market = data.markets.find((market) => market.id === marketId);
       if (!market) return acc;
@@ -103,9 +111,19 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
 
       return acc;
     }, [] as L2TableData[])
-    .sort((a, b) => {
-      return a.repo.toLowerCase() > b.repo.toLowerCase() ? 1 : -1;
-    });
+      .sort((a, b) => {
+        return a.repo.toLowerCase() > b.repo.toLowerCase() ? 1 : -1;
+      });
+  }, [data, dependencyToPredictionMapping, balanceMapping]);
+
+  if (!data || !Object.keys(data.marketsData ?? {}).length) {
+    return {
+      data: undefined,
+      isLoading,
+      isLoadingBalances,
+      error,
+    };
+  }
 
   return {
     data: processedData,

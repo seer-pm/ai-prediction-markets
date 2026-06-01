@@ -35,7 +35,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
     watch,
     setValue,
   } = useForm<TradeFormData>({
-    mode: "all",
+    mode: "onSubmit",
     defaultValues: {
       amount: "",
     },
@@ -43,7 +43,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const amount = watch("amount");
 
-  const debouncedAmount = useDebounce(amount, 1000);
+  const debouncedAmount = useDebounce(amount, 500);
   const {
     data: getQuotesResults,
     isLoading: isLoadingQuotes,

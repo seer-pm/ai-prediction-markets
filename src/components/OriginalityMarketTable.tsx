@@ -9,7 +9,7 @@ interface MarketTableProps {
   isLoadingBalances: boolean;
 }
 
-export const OriginalityMarketTable: React.FC<MarketTableProps> = ({
+const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
   markets,
   isLoading,
   isLoadingBalances,
@@ -163,3 +163,5 @@ export const OriginalityMarketTable: React.FC<MarketTableProps> = ({
     </div>
   );
 };
+
+export const OriginalityMarketTable = React.memo(OriginalityMarketTableInner);

@@ -29,7 +29,7 @@ export const WithdrawInterface: React.FC<WithdrawInterfaceProps> = ({
     watch,
     setValue,
   } = useForm<WithdrawFormData>({
-    mode: "all",
+    mode: "onSubmit",
     defaultValues: {
       amount: "",
     },
