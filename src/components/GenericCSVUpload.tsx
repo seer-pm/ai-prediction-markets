@@ -1,20 +1,43 @@
-import { PredictionRow } from "@/types";
 import { downloadCsv } from "@/utils/common";
-import { parseCSV } from "@/utils/csvParser";
-import { sampleL1Predictions } from "@/utils/sampleL1Predictions";
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 
-interface CSVUploadProps {
-  onDataParsed: (data: PredictionRow[]) => void;
+export interface CSVFormatInfo {
+  /** CSV headers line, e.g. "repo,parent,weight" */
+  headers: string;
+  /** Example CSV rows displayed in the format box */
+  exampleRows: string[];
+  /** Description below the format box */
+  description: string;
+}
+
+export interface SampleCsvConfig {
+  columns: { key: string; title: string }[];
+  /** Maps each sample item to a flat record matching the columns */
+  dataMapper: (item: any) => Record<string, any>;
+  sampleData: any[];
+  filename: string;
+}
+
+interface GenericCSVUploadProps<T> {
+  onDataParsed: (data: T[]) => void;
   onClose: () => void;
+  parseFn: (text: string) => T[];
+  formatInfo: CSVFormatInfo;
+  sampleConfig: SampleCsvConfig;
 }
 
 interface FormData {
   csvFile: FileList;
 }
 
-export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) => {
+export function GenericCSVUpload<T>({
+  onDataParsed,
+  onClose,
+  parseFn,
+  formatInfo,
+  sampleConfig,
+}: GenericCSVUploadProps<T>) {
   const {
     register,
     handleSubmit,
@@ -34,7 +57,7 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
         }
 
         const text = await file.text();
-        const parsedData = parseCSV(text);
+        const parsedData = parseFn(text);
         onDataParsed(parsedData);
         onClose();
       } catch (error) {
@@ -43,33 +66,14 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
         });
       }
     },
-    [onDataParsed, setError, clearErrors]
+    [onDataParsed, onClose, parseFn, setError, clearErrors],
   );
 
   const downloadSampleCsv = () => {
     downloadCsv(
-      [
-        {
-          key: "repo",
-          title: "repo",
-        },
-        {
-          key: "parent",
-          title: "parent",
-        },
-        {
-          key: "weight",
-          title: "weight",
-        },
-      ],
-      sampleL1Predictions.map((row) => {
-        return {
-          repo: `https://github.com/${row.item}`,
-          parent: "ethereum",
-          weight: row.weight,
-        };
-      }),
-      "l1-predictions"
+      sampleConfig.columns,
+      sampleConfig.sampleData.map(sampleConfig.dataMapper),
+      sampleConfig.filename,
     );
   };
 
@@ -85,16 +89,15 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
           <h3 className="font-medium text-gray-900 mb-2">Required CSV Format</h3>
           <div className="bg-white p-3 rounded border font-mono text-sm">
-            <div className="text-gray-600">repo,parent,weight</div>
-            <div className="break-all">https://github.com/a16z/helios,ethereum,0.01363775945</div>
-            <div className="break-all">
-              https://github.com/ethereum/go-ethereum,ethereum,0.02100000
-            </div>
+            <div className="text-gray-600">{formatInfo.headers}</div>
+            {formatInfo.exampleRows.map((row, i) => (
+              <div key={i} className="break-all">
+                {row}
+              </div>
+            ))}
             <div className="text-gray-400">...</div>
           </div>
-          <p className="text-xs text-gray-600 mt-2">
-            Each row represents a prediction for a repository's weight in the Ethereum ecosystem
-          </p>
+          <p className="text-xs text-gray-600 mt-2">{formatInfo.description}</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -140,4 +143,4 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onDataParsed, onClose }) =
       </div>
     </div>
   );
-};
+}

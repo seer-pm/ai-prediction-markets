@@ -1,27 +1,27 @@
-import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useWithdrawFromTradeExecutor } from "@/hooks/useWithdrawFromTradeExecutor";
 import { ExclamationCircleIcon } from "@/lib/icons";
 import React from "react";
 import { Address } from "viem";
 
-interface WithdrawTokensInterfaceProps {
+export interface WithdrawOutcomeTokensInterfaceProps {
   account: Address;
   onClose: () => void;
   tradeExecutor: Address;
+  /** The outcome token addresses to withdraw. Computed by the parent from market data. */
+  tokens: Address[] | undefined;
 }
 
-export const WithdrawOriginalityTokensInterface: React.FC<WithdrawTokensInterfaceProps> = ({
-  account,
-  tradeExecutor,
-  onClose,
-}) => {
-  const { data } = useOriginalityMarketsData();
+export const WithdrawOutcomeTokensInterface: React.FC<
+  WithdrawOutcomeTokensInterfaceProps
+> = ({ account, tradeExecutor, onClose, tokens }) => {
   const withdrawFromTradeExecutor = useWithdrawFromTradeExecutor(() => {
     onClose();
   });
-  const tokens = data?.markets?.map((market) => market.wrappedTokens)?.flat();
-  const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(tradeExecutor, tokens);
+  const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
+    tradeExecutor,
+    tokens,
+  );
 
   const sumBalances = balances?.reduce((acc, curr) => acc + curr, 0n) ?? 0n;
   const handleWithdraw = async () => {
@@ -78,7 +78,7 @@ export const WithdrawOriginalityTokensInterface: React.FC<WithdrawTokensInterfac
         {isLoadingBalances ? (
           <p>Checking balances...</p>
         ) : sumBalances === 0n ? (
-          <p>Nothing to withdrawn</p>
+          <p>Nothing to withdraw</p>
         ) : (
           <div className="flex space-x-4 mb-2">
             <button

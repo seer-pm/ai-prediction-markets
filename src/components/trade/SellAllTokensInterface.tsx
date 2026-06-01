@@ -1,45 +1,49 @@
-import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
-import { TableData } from "@/types";
+import { InfoCircleIcon } from "@/lib/icons";
 import React from "react";
-import { Address } from "viem";
 import { ErrorPanel } from "./ErrorPanel";
 import { LoadingPanel } from "./LoadingPanel";
-import { InfoCircleIcon } from "@/lib/icons";
 
-interface SellAllTokensInterfaceProps {
+export interface SellAllTokensInterfaceProps {
   onClose: () => void;
-  tradeExecutor: Address;
-  rows: TableData[] | undefined;
-  isLoadingTable: boolean;
+  /** Subtitle shown below the header. L1 uses "using direct swaps", others use a simpler string. */
+  subtitle?: string;
+  /** Whether the sell mutation has errored */
+  isError: boolean;
+  /** The error from the sell mutation */
+  error: Error | null;
+  /** Whether the sell mutation is pending */
+  isPending: boolean;
+  /** Current transaction state description */
+  txState: string;
+  /** Reset the sell mutation state */
+  reset: () => void;
+  /** Execute the sell */
+  onSellAll: () => void;
+  /** True while balances or table data is still loading */
+  isLoading: boolean;
+  /** True if there are tokens to sell */
+  hasTokens: boolean;
 }
 
-export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
-  tradeExecutor,
+export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   onClose,
-  rows,
-  isLoadingTable,
+  subtitle = "Sell all positions to sUSDS",
+  isError,
+  error,
+  isPending,
+  txState,
+  reset,
+  onSellAll,
+  isLoading,
+  hasTokens,
 }) => {
-  const sellAllFromTradeExecutor = useSellL1ToCollateral(() => {
-    onClose();
-  });
-
-  const handleSellAll = async () => {
-    if (!rows) return;
-    sellAllFromTradeExecutor.mutate({
-      tradeExecutor,
-      tableData: rows,
-    });
-  };
-
-  const hasTokens = !!rows?.filter((x) => x.currentPrice && x.balance)?.length;
-
   return (
     <div className="max-h-[90vh] overflow-y-auto">
       {/* Header with Close Button */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
         <div>
           <h3 className="text-xl font-bold text-white">Sell all outcome tokens</h3>
-          <p className="text-sm text-white">Sell all positions to sUSDS using direct swaps</p>
+          <p className="text-sm text-white">{subtitle}</p>
         </div>
         <button
           onClick={onClose}
@@ -57,17 +61,17 @@ export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
       </div>
 
       <div className="px-6 py-4 space-y-4">
-        {sellAllFromTradeExecutor.isError && (
+        {isError && (
           <ErrorPanel
             title="Sell Tokens Failed"
-            description={sellAllFromTradeExecutor.error?.message}
-            onDismiss={sellAllFromTradeExecutor.reset}
+            description={error?.message ?? "Unknown error"}
+            onDismiss={reset}
           />
         )}
-        {sellAllFromTradeExecutor.isPending && (
-          <LoadingPanel title="Selling tokens" description={sellAllFromTradeExecutor.txState} />
+        {isPending && (
+          <LoadingPanel title="Selling tokens" description={txState} />
         )}
-        {isLoadingTable ? (
+        {isLoading ? (
           <p>Checking balances...</p>
         ) : !hasTokens ? (
           <p>Nothing to sell</p>
@@ -92,11 +96,11 @@ export const SellAllL1TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
               </button>
               <button
                 type="button"
-                onClick={() => handleSellAll()}
+                onClick={onSellAll}
                 className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={sellAllFromTradeExecutor.isPending}
+                disabled={isPending}
               >
-                {sellAllFromTradeExecutor.isPending ? "Executing..." : "Sell"}
+                {isPending ? "Executing..." : "Sell"}
               </button>
             </div>
           </>

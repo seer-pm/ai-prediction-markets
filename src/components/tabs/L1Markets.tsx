@@ -1,19 +1,48 @@
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
+import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
 import { DownloadIcon } from "@/lib/icons";
 import { PredictionRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
+import { parseCSV } from "@/utils/csvParser";
+import { sampleL1Predictions } from "@/utils/sampleL1Predictions";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
-import { CSVUpload } from "../CSVUpload";
+import { GenericCSVUpload } from "../GenericCSVUpload";
+import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { L1MarketTable } from "../L1MarketTable";
 import MarketChart from "../MarketChart";
 import { Modal } from "../Modal";
-import { SellAllL1TokensInterface } from "../trade/SellAllL1TokensInterface";
+import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
 import { useWalletStore } from "@/stores/walletStore";
+
+const L1_CSV_FORMAT: CSVFormatInfo = {
+  headers: "repo,parent,weight",
+  exampleRows: [
+    "https://github.com/a16z/helios,ethereum,0.01363775945",
+    "https://github.com/ethereum/go-ethereum,ethereum,0.02100000",
+  ],
+  description:
+    "Each row represents a prediction for a repository's weight in the Ethereum ecosystem",
+};
+
+const L1_SAMPLE_CONFIG: SampleCsvConfig = {
+  columns: [
+    { key: "repo", title: "repo" },
+    { key: "parent", title: "parent" },
+    { key: "weight", title: "weight" },
+  ],
+  dataMapper: (row) => ({
+    repo: `https://github.com/${row.item}`,
+    parent: "ethereum",
+    weight: row.weight,
+  }),
+  sampleData: sampleL1Predictions,
+  filename: "l1-predictions",
+};
 
 export const L1Markets = () => {
   const { address: account } = useAccount();
@@ -21,10 +50,10 @@ export const L1Markets = () => {
 
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
-
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
+
   const {
     data: tableData,
     isLoading,
@@ -33,6 +62,11 @@ export const L1Markets = () => {
     charts,
     totalVolumeMapping,
   } = useProcessL1Predictions(predictions);
+
+  const sellAll = useSellL1ToCollateral(() => {
+    closeSellAllDialog();
+  });
+
   const parseL1VolumeData = useCallback(() => {
     const volumeString = Object.values(totalVolumeMapping ?? {})[0];
     if (!volumeString) return "";
@@ -55,6 +89,7 @@ export const L1Markets = () => {
   }, [charts]);
 
   const volumeLabel = useMemo(() => parseL1VolumeData(), [parseL1VolumeData]);
+
   const handleDataParsed = (data: PredictionRow[]) => {
     setPredictions(data);
   };
@@ -70,37 +105,38 @@ export const L1Markets = () => {
   const closeCsvDialog = useCallback(() => startTransition(() => setIsCsvDialogOpen(false)), []);
   const closeTradeDialog = useCallback(() => startTransition(() => setIsTradeDialogOpen(false)), []);
   const closeSellAllDialog = useCallback(() => startTransition(() => setIsSellAllDialogOpen(false)), []);
+
+  const handleSellAll = useCallback(() => {
+    if (!tableData) return;
+    sellAll.mutate({ tradeExecutor: checkTradeExecutorResult?.predictedAddress!, tableData });
+  }, [tableData, sellAll, checkTradeExecutorResult?.predictedAddress]);
+
+  const hasSellTokens = useMemo(
+    () => !!tableData?.filter((x) => x.currentPrice && x.balance)?.length,
+    [tableData],
+  );
+
   const exportWeight = useCallback(() => {
     if (!tableData) return;
     downloadCsv(
       [
-        {
-          key: "repo",
-          title: "repo",
-        },
-        {
-          key: "parent",
-          title: "parent",
-        },
-        {
-          key: "weight",
-          title: "weight",
-        },
+        { key: "repo", title: "repo" },
+        { key: "parent", title: "parent" },
+        { key: "weight", title: "weight" },
       ],
       tableData
         .filter(
           (row) => !row.repo.includes("Other repositories") && !row.repo.includes("Invalid result"),
         )
-        .map((row) => {
-          return {
-            repo: row.repo,
-            parent: "ethereum",
-            weight: row.currentPrice ?? 0,
-          };
-        }),
+        .map((row) => ({
+          repo: row.repo,
+          parent: "ethereum",
+          weight: row.currentPrice ?? 0,
+        })),
       "l1-weights",
     );
   }, [tableData]);
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
@@ -115,10 +151,7 @@ export const L1Markets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(chartData) ? (
-          <MarketChart
-            data={chartData!}
-            totalVolumeMarket={volumeLabel}
-          />
+          <MarketChart data={chartData!} totalVolumeMarket={volumeLabel} />
         ) : (
           <>
             {isLoading ? (
@@ -193,9 +226,16 @@ export const L1Markets = () => {
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
       />
-      {/* CSv Dialog */}
+
+      {/* CSV Dialog */}
       <Modal isOpen={isCsvDialogOpen} onClose={closeCsvDialog} maxWidth="max-w-2xl">
-        <CSVUpload onDataParsed={handleDataParsed} onClose={closeCsvDialog} />
+        <GenericCSVUpload<PredictionRow>
+          onDataParsed={handleDataParsed}
+          onClose={closeCsvDialog}
+          parseFn={parseCSV}
+          formatInfo={L1_CSV_FORMAT}
+          sampleConfig={L1_SAMPLE_CONFIG}
+        />
       </Modal>
 
       {/* Trading Dialog */}
@@ -209,12 +249,19 @@ export const L1Markets = () => {
         )}
       </Modal>
 
+      {/* Sell All Dialog */}
       <Modal isOpen={isSellAllDialogOpen} onClose={closeSellAllDialog}>
-        <SellAllL1TokensInterface
-          rows={tableData}
-          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+        <SellAllTokensInterface
           onClose={closeSellAllDialog}
-          isLoadingTable={isLoading || isLoadingBalances}
+          subtitle="Sell all positions to sUSDS using direct swaps"
+          isError={sellAll.isError}
+          error={sellAll.error}
+          isPending={sellAll.isPending}
+          txState={sellAll.txState}
+          reset={sellAll.reset}
+          onSellAll={handleSellAll}
+          isLoading={isLoading || isLoadingBalances}
+          hasTokens={hasSellTokens}
         />
       </Modal>
     </>

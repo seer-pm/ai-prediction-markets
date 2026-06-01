@@ -1,20 +1,50 @@
-import { OriginalityCSVUpload } from "@/components/OriginalityCSVUpload";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
+import { useSellToCollateral } from "@/hooks/useSellToCollateral";
+import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { OriginalityRow } from "@/types";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
-import { SellAllOriginalityTokensInterface } from "../trade/SellAllOriginalityTokensInterface";
-import { WithdrawOriginalityTokensInterface } from "../trade/WithdrawOriginalityTokensInterface";
-import { downloadCsv, isUndefined } from "@/utils/common";
+import { Address } from "viem";
+import { WithdrawOutcomeTokensInterface } from "../trade/WithdrawOutcomeTokensInterface";
+import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { DownloadIcon } from "@/lib/icons";
 import MarketChart from "../MarketChart";
 import { useWalletStore } from "@/stores/walletStore";
 import { Modal } from "../Modal";
+import { GenericCSVUpload } from "../GenericCSVUpload";
+import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
+import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
+import { parseOriginalityCSV } from "@/utils/csvParser";
+import { sampleOriginalityPredictions } from "@/utils/sampleOriginalityPredictions";
+
+const ORIGINALITY_CSV_FORMAT: CSVFormatInfo = {
+  headers: "repo,originality",
+  exampleRows: [
+    "https://github.com/a16z/helios,0.5",
+    "https://github.com/ethereum/go-ethereum,0.15",
+  ],
+  description:
+    "Each row represents a prediction for how original is the repository (0.6 would mean 60% is original work and 40% is based on dependencies)",
+};
+
+const ORIGINALITY_SAMPLE_CONFIG: SampleCsvConfig = {
+  columns: [
+    { key: "repo", title: "repo" },
+    { key: "originality", title: "originality" },
+  ],
+  dataMapper: (row) => ({
+    repo: row.repo,
+    originality: row.originality,
+  }),
+  sampleData: sampleOriginalityPredictions,
+  filename: "originality-predictions",
+};
 
 export const OriginalityMarkets = () => {
   const { address: account } = useAccount();
@@ -26,10 +56,10 @@ export const OriginalityMarkets = () => {
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
   const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
-
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
   const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
+
   const {
     data: tableData,
     isLoading,
@@ -39,6 +69,28 @@ export const OriginalityMarkets = () => {
     marketIdToRepo,
     totalVolumeMapping,
   } = useProcessOriginalityPredictions(predictions);
+
+  // Raw market data for withdraw (React Query will deduplicate with useProcessOriginalityPredictions)
+  const { data: originalityMarketData } = useOriginalityMarketsData();
+
+  const sellAll = useSellToCollateral(() => {
+    closeSellAllDialog();
+  });
+
+  const collateralTokens = useMemo(
+    () => tableData?.map((x) => x.collateralToken),
+    [tableData],
+  );
+  const { data: balances, isLoading: isLoadingSellBalances } = useTokensBalances(
+    checkTradeExecutorResult?.predictedAddress as Address,
+    collateralTokens,
+  );
+
+  // Tokens for withdraw dialog
+  const withdrawTokens = useMemo(
+    () => originalityMarketData?.markets?.map((market) => market.wrappedTokens)?.flat(),
+    [originalityMarketData?.markets],
+  );
 
   const parseOriginalityChartData = useCallback(() => {
     if (!charts) return null;
@@ -53,6 +105,7 @@ export const OriginalityMarkets = () => {
       };
     });
   }, [charts, marketIdToRepo]);
+
   const parseOriginalityVolumeData = useCallback(() => {
     if (!totalVolumeMapping) return "";
     const volume =
@@ -66,7 +119,9 @@ export const OriginalityMarkets = () => {
       </>
     );
   }, [totalVolumeMapping]);
+
   const parsedData = useMemo(() => parseOriginalityChartData(), [parseOriginalityChartData]);
+
   const handleDataParsed = (data: OriginalityRow[]) => {
     setPredictions(data);
   };
@@ -82,31 +137,39 @@ export const OriginalityMarkets = () => {
   const closeCsvDialog = useCallback(() => startTransition(() => setIsCsvDialogOpen(false)), []);
   const closeTradeDialog = useCallback(() => startTransition(() => setIsTradeDialogOpen(false)), []);
   const closeSellAllDialog = useCallback(() => startTransition(() => setIsSellAllDialogOpen(false)), []);
-  const closeWithdrawTokensDialog = useCallback(() => startTransition(() => setIsWithdrawTokensDialogOpen(false)), []);
+  const closeWithdrawTokensDialog = useCallback(
+    () => startTransition(() => setIsWithdrawTokensDialogOpen(false)),
+    [],
+  );
+
+  const handleSellAll = useCallback(() => {
+    if (!tableData) return;
+    sellAll.mutate({ tradeExecutor: checkTradeExecutorResult?.predictedAddress!, tableData });
+  }, [tableData, sellAll, checkTradeExecutorResult?.predictedAddress]);
+
+  const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
+  const hasSellTokens = useMemo(
+    () => !!tableData?.filter((x) => x.upBalance || x.downBalance)?.length || hasMergeAmount,
+    [tableData, hasMergeAmount],
+  );
+
   const exportWeight = useCallback(() => {
     if (!tableData) return;
     downloadCsv(
       [
-        {
-          key: "repo",
-          title: "repo",
-        },
-        {
-          key: "originality",
-          title: "originality",
-        },
+        { key: "repo", title: "repo" },
+        { key: "originality", title: "originality" },
       ],
       tableData
         .filter((row) => !row.repo.includes("Invalid result"))
-        .map((row) => {
-          return {
-            repo: row.repo,
-            originality: row.upPrice ?? 0,
-          };
-        }),
+        .map((row) => ({
+          repo: row.repo,
+          originality: row.upPrice ?? 0,
+        })),
       "originality-weights",
     );
   }, [tableData]);
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
@@ -201,11 +264,15 @@ export const OriginalityMarkets = () => {
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
       />
-      {/* CSv Dialog */}
+
+      {/* CSV Dialog */}
       <Modal isOpen={isCsvDialogOpen} onClose={closeCsvDialog} maxWidth="max-w-2xl">
-        <OriginalityCSVUpload
+        <GenericCSVUpload<OriginalityRow>
           onDataParsed={handleDataParsed}
           onClose={closeCsvDialog}
+          parseFn={parseOriginalityCSV}
+          formatInfo={ORIGINALITY_CSV_FORMAT}
+          sampleConfig={ORIGINALITY_SAMPLE_CONFIG}
         />
       </Modal>
 
@@ -219,19 +286,30 @@ export const OriginalityMarkets = () => {
           />
         )}
       </Modal>
+
+      {/* Withdraw Dialog */}
       <Modal isOpen={isWithdrawTokensDialogOpen} onClose={closeWithdrawTokensDialog}>
-        <WithdrawOriginalityTokensInterface
+        <WithdrawOutcomeTokensInterface
           account={account!}
           tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
           onClose={closeWithdrawTokensDialog}
+          tokens={withdrawTokens}
         />
       </Modal>
+
+      {/* Sell All Dialog */}
       <Modal isOpen={isSellAllDialogOpen} onClose={closeSellAllDialog}>
-        <SellAllOriginalityTokensInterface
-          markets={tableData}
-          tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
+        <SellAllTokensInterface
           onClose={closeSellAllDialog}
-          isLoadingTable={isLoading || isLoadingBalances}
+          subtitle="Sell all positions to sUSDS"
+          isError={sellAll.isError}
+          error={sellAll.error}
+          isPending={sellAll.isPending}
+          txState={sellAll.txState}
+          reset={sellAll.reset}
+          onSellAll={handleSellAll}
+          isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
+          hasTokens={hasSellTokens}
         />
       </Modal>
     </>

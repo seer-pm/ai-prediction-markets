@@ -25,11 +25,15 @@ export const Modal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      const originalPaddingRight = document.body.style.paddingRight;
       document.addEventListener("keydown", handleKeyDown);
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
       document.body.style.overflow = "hidden";
       return () => {
         document.removeEventListener("keydown", handleKeyDown);
         document.body.style.overflow = "";
+        document.body.style.paddingRight = originalPaddingRight;
       };
     }
   }, [isOpen, handleKeyDown]);

@@ -1,9 +1,10 @@
 import { MarketTable } from "@/components/MarketTable";
 import { RedeemInterface } from "@/components/trade/RedeemInterface";
-import { WithdrawTokensInterface } from "@/components/trade/WithdrawTokensInterface";
+import { WithdrawOutcomeTokensInterface } from "@/components/trade/WithdrawOutcomeTokensInterface";
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
+import { useMarketsData } from "@/hooks/useMarketsData";
 import { useProcessPredictions } from "@/hooks/useProcessPredictions";
-import { startTransition, useCallback, useState } from "react";
+import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
 import { Modal } from "../Modal";
@@ -14,6 +15,9 @@ export const AiMarkets = () => {
   const { data: checkTradeExecutorResult } = useCheckTradeExecutorCreated(account);
   const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
   const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
+
+  const { data: marketsData } = useMarketsData();
+  const withdrawTokens = useMemo(() => marketsData?.wrappedTokens, [marketsData?.wrappedTokens]);
 
   const closeWithdrawTokensDialog = useCallback(
     () => startTransition(() => setIsWithdrawTokensDialogOpen(false)),
@@ -57,10 +61,11 @@ export const AiMarkets = () => {
         isLoadingBalances={isLoadingBalances}
       />
       <Modal isOpen={isWithdrawTokensDialogOpen} onClose={closeWithdrawTokensDialog}>
-        <WithdrawTokensInterface
+        <WithdrawOutcomeTokensInterface
           account={account!}
           tradeExecutor={checkTradeExecutorResult?.predictedAddress!}
           onClose={closeWithdrawTokensDialog}
+          tokens={withdrawTokens}
         />
       </Modal>
       <Modal isOpen={isRedeemDialogOpen} onClose={closeRedeemDialog}>
