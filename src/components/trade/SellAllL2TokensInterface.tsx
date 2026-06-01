@@ -6,6 +6,7 @@ import React from "react";
 import { Address } from "viem";
 import { LoadingPanel } from "./LoadingPanel";
 import { ErrorPanel } from "./ErrorPanel";
+import { InfoCircleIcon } from "@/lib/icons";
 
 interface SellAllTokensInterfaceProps {
   onClose: () => void;
@@ -77,23 +78,34 @@ export const SellAllL2TokensInterface: React.FC<SellAllTokensInterfaceProps> = (
         ) : !hasTokens ? (
           <p>Nothing to sell</p>
         ) : (
-          <div className="flex space-x-4 mb-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSellAll()}
-              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={sellAllFromTradeExecutor.isPending || isLoadingTable}
-            >
-              {sellAllFromTradeExecutor.isPending ? "Executing..." : "Sell"}
-            </button>
-          </div>
+          <>
+            <div className="flex items-center gap-4 p-4 border rounded-[4px] border-[#FF9900]">
+              <InfoCircleIcon width="24" height="24" />
+              <div className="space-y-3">
+                <p>
+                  Selling everything at once may result in significant slippage, causing you to
+                  receive much less than expected. Proceed with caution.
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-4 mb-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSellAll()}
+                className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={sellAllFromTradeExecutor.isPending || isLoadingTable}
+              >
+                {sellAllFromTradeExecutor.isPending ? "Executing..." : "Sell"}
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
