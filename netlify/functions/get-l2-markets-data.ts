@@ -2,11 +2,61 @@ import { GetPoolsQuery } from "@/gql/graphql";
 import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { CHAIN_ID, L2_PARENT_MARKET_ID } from "@/utils/constants";
+import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
-import { Address } from "viem";
+import { compareAsc, fromUnixTime } from "date-fns";
 import pLimit from "p-limit";
+import { Address } from "viem";
+
+interface Market {
+  wrappedTokens: Address[];
+  collateralToken: Address;
+  id: Address;
+  outcomes: string[];
+  parentOutcome: number;
+  payoutReported: boolean;
+  conditionId: Address;
+  questions: {
+    question: { opening_ts: string; finalize_ts: string; is_pending_arbitration: boolean };
+  }[];
+}
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
+
+const getMarketStatus = (market: Market) => {
+  if (
+    !(Number(market.questions[0].question.opening_ts) < Math.round(new Date().getTime() / 1000))
+  ) {
+    return MarketStatus.NOT_OPEN;
+  }
+
+  if (market.questions.every((question) => Number(question.question.finalize_ts) === 0)) {
+    return MarketStatus.OPEN;
+  }
+
+  if (market.questions.some((question) => question.question.is_pending_arbitration)) {
+    return MarketStatus.IN_DISPUTE;
+  }
+
+  if (
+    market.questions.some((question) => {
+      const finalizeTs = Number(question.question.finalize_ts);
+      const isFinalized =
+        !question.question.is_pending_arbitration &&
+        finalizeTs > 0 &&
+        compareAsc(new Date(), fromUnixTime(finalizeTs)) === 1;
+      return finalizeTs === 0 || !isFinalized;
+    })
+  ) {
+    return MarketStatus.ANSWER_NOT_FINAL;
+  }
+
+  if (!market!.payoutReported) {
+    return MarketStatus.PENDING_EXECUTION;
+  }
+
+  return MarketStatus.CLOSED;
+};
 
 export async function getPools() {
   const pageSize = 1000;
@@ -73,7 +123,9 @@ export default async () => {
   try {
     const { data: parentMarket, error: parentMarketError } = await supabase
       .from("markets")
-      .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
+      .select(
+        "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutReported,subgraph_data->conditionId,subgraph_data->questions",
+      )
       .eq("id", L2_PARENT_MARKET_ID)
       .eq("chain_id", CHAIN_ID)
       .single();
@@ -87,7 +139,7 @@ export default async () => {
     let { data, error } = await supabase
       .from("markets")
       .select(
-        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome",
+        "id,subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->collateralToken,subgraph_data->parentOutcome,subgraph_data->payoutReported,subgraph_data->conditionId,subgraph_data->questions",
       )
       .eq("subgraph_data->parentMarket->>id", L2_PARENT_MARKET_ID)
       .ilike("subgraph_data->>marketName", "%What will be the average weight of%")
@@ -99,13 +151,10 @@ export default async () => {
       throw new Error("Markets not found");
     }
 
-    const markets = data as {
-      wrappedTokens: Address[];
-      collateralToken: Address;
-      id: Address;
-      outcomes: string[];
-      parentOutcome: number;
-    }[];
+    const markets = (data as Market[]).map((market) => ({
+      ...market,
+      marketStatus: getMarketStatus(market),
+    }));
     console.time("get chart");
     const { data: chartData, error: chartError } = await getCharts(
       markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`),
@@ -183,7 +232,13 @@ export default async () => {
       },
     );
     return new Response(
-      JSON.stringify({ marketsData: repoToPriceMapping, markets, charts, chartError,totalVolumeMapping }),
+      JSON.stringify({
+        marketsData: repoToPriceMapping,
+        markets,
+        charts,
+        chartError,
+        totalVolumeMapping,
+      }),
       {
         status: 200,
         headers: {

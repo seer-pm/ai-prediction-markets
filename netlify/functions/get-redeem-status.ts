@@ -1,18 +1,11 @@
 import { AI_PREDICTION_MARKET_ID } from "@/utils/constants";
+import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { compareAsc, fromUnixTime } from "date-fns";
 import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
-enum MarketStatus {
-  NOT_OPEN = "not_open",
-  OPEN = "open",
-  ANSWER_NOT_FINAL = "answer_not_final",
-  IN_DISPUTE = "in_dispute",
-  PENDING_EXECUTION = "pending_execution",
-  CLOSED = "closed",
-}
 
 interface Market {
   payoutReported: boolean;
