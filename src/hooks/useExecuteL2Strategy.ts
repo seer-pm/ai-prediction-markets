@@ -78,6 +78,36 @@ export function mergeFromRouter(
   ];
 }
 
+export function redeemFromRouter(
+  router: Address,
+  collateralToken: Address,
+  marketId: Address,
+  tokens: Address[],
+  outcomeIndexes: bigint[],
+  amounts: bigint[],
+): Execution[] {
+  return [
+    ...tokens.map((token, i) => ({
+      to: token,
+      value: 0n,
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [router, amounts[i]],
+      }),
+    })),
+    {
+      to: router,
+      value: 0n,
+      data: encodeFunctionData({
+        abi: RouterAbi,
+        functionName: "redeemPositions",
+        args: [collateralToken, marketId, outcomeIndexes, amounts],
+      }),
+    },
+  ];
+}
+
 const getSellTradeExecutorCalls = async ({
   amount,
   getQuotesResults,
