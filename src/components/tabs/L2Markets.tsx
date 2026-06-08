@@ -235,7 +235,7 @@ export const L2Markets = () => {
                 Sell all to sUSDS
               </button>
               <button
-                disabled={!hasRedeemable || isLoading || !account}
+                disabled={isLoading || !account}
                 onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
                 className="cursor-pointer px-5 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
