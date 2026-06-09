@@ -1,6 +1,8 @@
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
+import { useL2MarketsData } from "@/hooks/useL2MarketsData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessL2Predictions } from "@/hooks/useProcessL2Predictions";
+import { useRedeemL2 } from "@/hooks/useRedeemL2";
 import { useSellL2ToCollateral } from "@/hooks/useSellL2ToCollateral";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { DownloadIcon } from "@/lib/icons";
@@ -8,6 +10,7 @@ import { L2Row } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { parseL2CSV } from "@/utils/csvParser";
 import { sampleL2Predictions } from "@/utils/samepleL2Predictions";
+import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
@@ -16,6 +19,7 @@ import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { L2MarketTable } from "../L2MarketTable";
 import { L2TradingInterface } from "../trade/L2TradingInterface";
+import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import L2Charts from "./L2Charts";
 import { useWalletStore } from "@/stores/walletStore";
@@ -27,8 +31,7 @@ const L2_CSV_FORMAT: CSVFormatInfo = {
     "https://github.com/rust-lang/cc-rs,https://github.com/supranational/blst,0.01363775945",
     "https://github.com/eth-clients/holesky,https://github.com/status-im/nimbus-eth2,0.02100000",
   ],
-  description:
-    "Each row represents a prediction for a repository's dependency weight",
+  description: "Each row represents a prediction for a repository's dependency weight",
 };
 
 const L2_SAMPLE_CONFIG: SampleCsvConfig = {
@@ -54,7 +57,10 @@ export const L2Markets = () => {
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
   const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
+
+  const { data: l2Data } = useL2MarketsData();
 
   const {
     data: tableData,
@@ -67,6 +73,23 @@ export const L2Markets = () => {
 
   const sellAll = useSellL2ToCollateral(() => {
     closeSellAllDialog();
+  });
+
+  const closedMarkets = useMemo(
+    () =>
+      (l2Data?.markets ?? [])
+        .filter((m) => m.marketStatus === MarketStatus.CLOSED)
+        .map(({ id, collateralToken, wrappedTokens }) => ({ id, collateralToken, wrappedTokens })),
+    [l2Data?.markets],
+  );
+
+  const closedMarketIds = useMemo(
+    () => new Set(closedMarkets.map((m) => m.id.toLowerCase())),
+    [closedMarkets],
+  );
+
+  const redeem = useRedeemL2(() => {
+    closeRedeemDialog();
   });
 
   const collateralTokens = useMemo(
@@ -101,8 +124,18 @@ export const L2Markets = () => {
   }, []);
 
   const closeCsvDialog = useCallback(() => startTransition(() => setIsCsvDialogOpen(false)), []);
-  const closeTradeDialog = useCallback(() => startTransition(() => setIsTradeDialogOpen(false)), []);
-  const closeSellAllDialog = useCallback(() => startTransition(() => setIsSellAllDialogOpen(false)), []);
+  const closeTradeDialog = useCallback(
+    () => startTransition(() => setIsTradeDialogOpen(false)),
+    [],
+  );
+  const closeSellAllDialog = useCallback(
+    () => startTransition(() => setIsSellAllDialogOpen(false)),
+    [],
+  );
+  const closeRedeemDialog = useCallback(
+    () => startTransition(() => setIsRedeemDialogOpen(false)),
+    [],
+  );
 
   const handleSellAll = useCallback(() => {
     if (!tableData) return;
@@ -113,6 +146,14 @@ export const L2Markets = () => {
   const hasSellTokens = useMemo(
     () => !!tableData?.filter((x) => x.balance)?.length || hasMergeAmount,
     [tableData, hasMergeAmount],
+  );
+
+  const hasRedeemable = useMemo(
+    () =>
+      !!tableData?.some(
+        (row) => closedMarketIds.has(row.marketId.toLowerCase()) && (row.balance ?? 0n) > 0n,
+      ),
+    [tableData, closedMarketIds],
   );
 
   const exportWeight = useCallback(() => {
@@ -148,7 +189,11 @@ export const L2Markets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(charts) ? (
-          <L2Charts repoOptions={repoOptions} charts={charts} totalVolumeMapping={totalVolumeMapping!} />
+          <L2Charts
+            repoOptions={repoOptions}
+            charts={charts}
+            totalVolumeMapping={totalVolumeMapping!}
+          />
         ) : (
           <>
             {isLoading ? (
@@ -188,6 +233,13 @@ export const L2Markets = () => {
                 className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Sell all to sUSDS
+              </button>
+              <button
+                disabled={isLoading || !account}
+                onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                className="cursor-pointer px-5 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Redeem to sUSDS
               </button>
               <button
                 onClick={handleStartTrading}
@@ -260,6 +312,26 @@ export const L2Markets = () => {
           onSellAll={handleSellAll}
           isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
           hasTokens={hasSellTokens}
+        />
+      </Modal>
+
+      {/* Redeem Dialog */}
+      <Modal isOpen={isRedeemDialogOpen} onClose={closeRedeemDialog}>
+        <RedeemL2Interface
+          onClose={closeRedeemDialog}
+          isError={redeem.isError}
+          error={redeem.error}
+          isPending={redeem.isPending}
+          txState={redeem.txState}
+          reset={redeem.reset}
+          onRedeem={() => {
+            redeem.mutate({
+              tradeExecutor: checkTradeExecutorResult?.predictedAddress!,
+              closedMarkets,
+            });
+          }}
+          isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
+          hasRedeemable={hasRedeemable}
         />
       </Modal>
     </>

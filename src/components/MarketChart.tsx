@@ -81,6 +81,7 @@ const COLORS = [
 type Props = {
   data: ChartWithMarketData;
   totalVolumeMarket?: string | ReactElement;
+  startTimestamp?: number;
 };
 
 function findClosestLessThanOrEqualToTimestamp(
@@ -133,7 +134,7 @@ function resolveOutcomePrice(d: PoolHourData, collateral: Address): number | nul
   return price;
 }
 
-function buildTimeline(all: ChartWithMarketData) {
+function buildTimeline(all: ChartWithMarketData, startTimestamp?: number) {
   let min = Infinity;
   let max = -Infinity;
 
@@ -144,6 +145,10 @@ function buildTimeline(all: ChartWithMarketData) {
     min = Math.min(min, arr[0].periodStartUnix);
     max = Math.max(max, arr[arr.length - 1].periodStartUnix);
   });
+
+  if (startTimestamp !== undefined) {
+    min = Math.max(min, startTimestamp);
+  }
 
   const now = Math.floor(Date.now() / 1000); // 👈 current time
 
@@ -167,7 +172,7 @@ function truncateOutcomeName(name: string, maxLength = 14) {
 /* ================================
    COMPONENT
 ================================ */
-const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }: Props) {
+const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket, startTimestamp }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
@@ -206,7 +211,7 @@ const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }:
 
     chartRef.current = chart;
 
-    const timeline = buildTimeline(data);
+    const timeline = buildTimeline(data, startTimestamp);
 
     data.forEach((outcomeData, i) => {
       const series = chart.addSeries(LineSeries, {

@@ -2,6 +2,7 @@ import { ChartWithMarketData, PoolInfo } from "@/types";
 import { getAppUrl } from "@/utils/common";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
+import { MarketStatus } from "@seer-pm/sdk";
 
 interface GetL2MarketsDataApiResult {
   marketsData: {
@@ -16,6 +17,7 @@ interface GetL2MarketsDataApiResult {
     wrappedTokens: Address[];
     collateralToken: Address;
     outcomes: string[];
+    marketStatus: MarketStatus;
   }[];
   charts: {
     [key: string]: ChartWithMarketData;
@@ -34,7 +36,7 @@ const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiRe
     if (retryCount) {
       return await fetchL2MarketsData(retryCount - 1);
     }
-    return { marketsData: {}, markets: [], charts: null,totalVolumeMapping: null };
+    return { marketsData: {}, markets: [], charts: null, totalVolumeMapping: null };
   }
 };
 
