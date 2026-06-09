@@ -184,7 +184,7 @@ export const OriginalityMarkets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(parsedData) ? (
-          <MarketChart data={parsedData} totalVolumeMarket={parseOriginalityVolumeData()} />
+          <MarketChart data={parsedData} totalVolumeMarket={parseOriginalityVolumeData()} startTimestamp={1776038400} />
         ) : (
           <>
             {isLoading ? (

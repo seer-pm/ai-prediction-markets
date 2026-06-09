@@ -469,7 +469,7 @@ export const toastifyBatchTxSessionKey = async (
   try {
     for (let i = 0; i < input.length; i++) {
       const { calls, message, skipFailCalls } = input[i];
-
+      console.log(message)
       onStateChange(message ?? `Executing batch ${i + 1}`);
 
       const request = await executeBatch(calls as Execution[], skipFailCalls);

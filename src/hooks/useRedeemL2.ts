@@ -7,6 +7,7 @@ import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Address } from "viem";
+import { Execution } from "./useCheck7702Support";
 import { redeemFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
 
@@ -23,7 +24,6 @@ async function redeemL2({
 }: RedeemL2Props & { onStateChange: (state: string) => void }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
-  const BATCH_SIZE = 100;
 
   // ── Phase 1: redeem conditional market tokens → receive parent outcome tokens ──
   onStateChange("Checking balances");
@@ -35,7 +35,13 @@ async function redeemL2({
     allConditionalTokens.map((token, i) => [token.toLowerCase(), conditionalBalances[i]]),
   );
 
-  const redeemCalls: ReturnType<typeof redeemFromRouter>[number][] = [];
+  // Group calls by market and track outcome count as a gas proxy.
+  // redeemPositions does one unwrap per outcome + one CTF redeem, so outcome count
+  // dominates gas. Keep each batch under MAX_OUTCOMES_PER_BATCH to stay well inside
+  // the 20M gas cap used by toastifyBatchTxSessionKey.
+  const MAX_OUTCOMES_PER_BATCH = 40;
+  const marketGroups: { calls: Execution[]; outcomeCount: number }[] = [];
+
   for (const market of closedMarkets) {
     const tokens: Address[] = [];
     const outcomeIndexes: bigint[] = [];
@@ -52,21 +58,35 @@ async function redeemL2({
     }
 
     if (tokens.length > 0) {
-      redeemCalls.push(
-        ...redeemFromRouter(router, market.collateralToken, market.id, tokens, outcomeIndexes, amounts),
-      );
+      marketGroups.push({
+        calls: redeemFromRouter(router, collateral.address, market.id, tokens, outcomeIndexes, amounts),
+        outcomeCount: outcomeIndexes.length,
+      });
     }
   }
 
-  if (redeemCalls.length > 0) {
-    const phase1Input: CallBatchesInput = [];
-    for (let i = 0; i < redeemCalls.length; i += BATCH_SIZE) {
-      phase1Input.push({
-        calls: redeemCalls.slice(i, i + BATCH_SIZE),
-        message: `Redeeming conditional markets batch ${i / BATCH_SIZE + 1}/${Math.ceil(redeemCalls.length / BATCH_SIZE)}`,
-        skipFailCalls: false,
-      });
+  // Greedily pack market groups into gas-bounded batches.
+  // A single market that exceeds the budget on its own gets its own batch.
+  const phase1Batches: Execution[][] = [];
+  let currentBatch: Execution[] = [];
+  let currentOutcomes = 0;
+  for (const group of marketGroups) {
+    if (currentBatch.length > 0 && currentOutcomes + group.outcomeCount > MAX_OUTCOMES_PER_BATCH) {
+      phase1Batches.push(currentBatch);
+      currentBatch = [];
+      currentOutcomes = 0;
     }
+    currentBatch.push(...group.calls);
+    currentOutcomes += group.outcomeCount;
+  }
+  if (currentBatch.length > 0) phase1Batches.push(currentBatch);
+
+  if (phase1Batches.length > 0) {
+    const phase1Input: CallBatchesInput = phase1Batches.map((calls, i) => ({
+      calls,
+      message: `Redeeming conditional markets batch ${i + 1}/${phase1Batches.length}`,
+      skipFailCalls: false,
+    }));
     const phase1Result = await toastifyBatchTxSessionKey(tradeExecutor, phase1Input, onStateChange);
     if (!phase1Result.status) {
       await withdrawFundSessionKey();
@@ -100,14 +120,14 @@ async function redeemL2({
       parentOutcomeIndexes,
       parentAmounts,
     );
-    const phase2Input: CallBatchesInput = [];
-    for (let i = 0; i < parentCalls.length; i += BATCH_SIZE) {
-      phase2Input.push({
-        calls: parentCalls.slice(i, i + BATCH_SIZE),
-        message: `Redeeming parent market batch ${i / BATCH_SIZE + 1}/${Math.ceil(parentCalls.length / BATCH_SIZE)}`,
+    // The parent market is a single redeemPositions call; push it as one batch.
+    const phase2Input: CallBatchesInput = [
+      {
+        calls: parentCalls,
+        message: "Redeeming parent market",
         skipFailCalls: false,
-      });
-    }
+      },
+    ];
     const phase2Result = await toastifyBatchTxSessionKey(tradeExecutor, phase2Input, onStateChange);
     if (!phase2Result.status) {
       await withdrawFundSessionKey();
