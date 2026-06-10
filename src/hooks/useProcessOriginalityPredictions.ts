@@ -53,8 +53,7 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     if (!data || !Object.keys(data.marketsData ?? {}).length) {
       return undefined;
     }
-    return Object.entries(data.marketsData).map(
-    ([marketRepo, marketPoolData]) => {
+    return Object.entries(data.marketsData).map(([marketRepo, marketPoolData]) => {
       const prediction = repoToPredictionMapping[marketRepo];
       const { id: marketId, upPrice, downPrice, upPool, downPool } = marketPoolData;
       const market = data.markets.find((market) => market.id === marketId);
@@ -97,6 +96,26 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
               downDifference > 0 ? "buy" : "sell",
             )
           : 0;
+      const sum = (upPrice ?? 0) + (downPrice ?? 0);
+      if (sum > 1.15 || sum < 0.85) {
+        console.log(sum);
+        console.log({
+          repo: marketRepo,
+          upPrice,
+          downPrice,
+          upDifference,
+          downDifference,
+          marketId,
+          hasPrediction: true,
+          volumeUntilUpPrice,
+          volumeUntilDownPrice,
+          downBalance: balanceMapping?.[market?.wrappedTokens?.[0] ?? ""],
+          upBalance: balanceMapping?.[market?.wrappedTokens?.[1] ?? ""],
+          predictedOriginality: prediction.originality,
+          wrappedTokens: market?.wrappedTokens ?? [],
+          collateralToken: market?.collateralToken ?? zeroAddress,
+        });
+      }
       return {
         repo: marketRepo,
         upPrice,
@@ -132,6 +151,6 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     error,
     charts: data.charts,
     marketIdToRepo,
-    totalVolumeMapping: data.totalVolumeMapping
+    totalVolumeMapping: data.totalVolumeMapping,
   };
 };
