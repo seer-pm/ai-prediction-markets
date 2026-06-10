@@ -73,6 +73,7 @@ export default async () => {
           tick,
           ticks,
           liquidity,
+          feeTier,
           token0: { id: poolToken0Id },
           token1: { id: poolToken1Id },
         } = tokenPairToPoolMapping[tokenPairMappingKey];
@@ -87,6 +88,7 @@ export default async () => {
             token0: poolToken0Id,
             token1: poolToken1Id,
             ticks,
+            feeTier,
           },
         };
         return mapping;

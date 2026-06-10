@@ -78,6 +78,7 @@ export interface PoolInfo {
   token0: Address;
   token1: Address;
   ticks: { liquidityNet: string; tickIdx: string }[];
+  feeTier?: string;
 }
 
 export interface Token {

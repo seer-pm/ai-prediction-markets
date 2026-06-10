@@ -13,16 +13,16 @@ function getVolumeWithinRange(
   if (swapType === "buy") {
     if (isOutcomeToken0) {
       // Buy token0: price goes UP, we're trading token1 for token0
-      // Amount of token0 we get: Δx = L * (√P_target - √P_current) / (√P_target * √P_current)
-      const amount0 =
-        (liquidity * (1n << 96n) * (targetSqrtPriceX96 - currentSqrtPriceX96)) /
-        (targetSqrtPriceX96 * currentSqrtPriceX96);
-      return Number(formatUnits(amount0, 18));
+      // Amount of token1 (collateral) we spend: Δy = L * (√P_target - √P_current) / (2^96)
+      const amount1 = (liquidity * (targetSqrtPriceX96 - currentSqrtPriceX96)) / (1n << 96n);
+      return Number(formatUnits(amount1, 18));
     }
     // Buy token1: price goes DOWN, we're trading token0 for token1
-    // Amount of token1 we get: Δy = L * (√P_current - √P_target) / (2^96)
-    const amount1 = (liquidity * (currentSqrtPriceX96 - targetSqrtPriceX96)) / (1n << 96n);
-    return Number(formatUnits(amount1, 18));
+    // Amount of token0 (collateral) we spend: Δx = L * (√P_current - √P_target) / (√P_target * √P_current)
+    const amount0 =
+      (liquidity * (1n << 96n) * (currentSqrtPriceX96 - targetSqrtPriceX96)) /
+      (targetSqrtPriceX96 * currentSqrtPriceX96);
+    return Number(formatUnits(amount0, 18));
   }
   if (isOutcomeToken0) {
     // Sell token0: price goes DOWN, we're trading token0 for token1
@@ -38,6 +38,8 @@ function getVolumeWithinRange(
   return Number(formatUnits(amount1, 18));
 }
 
+// Returns the swap INPUT amount needed to move the pool to targetPrice:
+// collateral for buys, outcome tokens for sells (both grossed up for the pool fee).
 export function getVolumeUntilPrice(
   pool: PoolInfo,
   targetPrice: number,
@@ -110,5 +112,7 @@ export function getVolumeUntilPrice(
     liquidity += BigInt(relevantTicks[i].liquidityNet) * (movingUp ? 1n : -1n);
   }
 
-  return volume;
+  // only (1 - fee) of the input moves the price, so gross up the required input
+  const fee = Number(pool.feeTier ?? 0);
+  return fee > 0 ? volume / (1 - fee / 1_000_000) : volume;
 }
