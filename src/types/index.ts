@@ -43,11 +43,23 @@ export interface OriginalityTableData {
   hasPrediction: boolean;
   volumeUntilUpPrice: number;
   volumeUntilDownPrice: number;
+  // Prediction-independent sell bounds used by the UP+DOWN>1 arbitrage:
+  // volume to push each pool to its proportional share of 1.
+  volumeUntilUpEqual: number;
+  volumeUntilDownEqual: number;
   upBalance?: bigint;
   downBalance?: bigint;
   wrappedTokens: Address[];
   collateralToken: Address;
   amount?: string;
+}
+
+export interface OriginalityQuoteResult {
+  quoteType: string;
+  quotes: UniswapQuoteTradeResult[];
+  row: OriginalityTableData;
+  // Complete sets to mint for the arb-sell branch (mint exactly what we sell).
+  mintAmount?: string;
 }
 
 export interface L2TableData {

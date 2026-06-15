@@ -23,6 +23,10 @@ export const VOLUME_MIN = 0.01;
 
 export const MIN_PRICE = 0.00000001;
 
+// Minimum UP+DOWN excess over 1 for the mint-and-sell-both arbitrage to clear
+// the ~2% round-trip Uniswap fee (1% per leg).
+export const ARB_SUM_THRESHOLD = 0.02;
+
 type CollateralTokensMap = Record<
   SupportedChain,
   { primary: Token; secondary: Token | undefined; swap?: Token[] }

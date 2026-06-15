@@ -4,12 +4,7 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
-import {
-  CallBatchesInput,
-  OriginalityTableData,
-  OriginalityTradeProps,
-  UniswapQuoteTradeResult,
-} from "@/types";
+import { CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps } from "@/types";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -64,20 +59,22 @@ const getTradeExecutorCalls = ({
   tradeExecutor,
 }: {
   tradeExecutor: Address;
-  quoteResults: {
-    quotes: UniswapQuoteTradeResult[];
-    quoteType: string;
-    row: OriginalityTableData;
-  }[];
+  quoteResults: OriginalityQuoteResult[];
 }) => {
   const calls = quoteResults!
-    .map(({ quotes, quoteType, row }) => {
+    .map(({ quotes, quoteType, row, mintAmount }) => {
       const tradeCalls = getQuoteTradeCalls(tradeExecutor, quotes);
       if (quoteType === "simple" || quoteType === "dual-buy") {
         return tradeCalls;
       }
+      // The arb mints exactly what it sells; skip the split when nothing to mint
+      // (pure balance-sell) so we don't emit a wasted splitPosition(0).
+      const splitAmount = quoteType === "arb-sell" ? mintAmount! : row.amount!;
+      if (Number(splitAmount) <= 0) {
+        return tradeCalls;
+      }
       const splitCalls = getSplitCalls({
-        amount: row.amount!,
+        amount: splitAmount,
         collateral: row.collateralToken,
         mainCollateral,
         market: row.marketId as Address,

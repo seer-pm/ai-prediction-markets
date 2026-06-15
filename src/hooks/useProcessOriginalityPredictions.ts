@@ -1,12 +1,12 @@
 import { OriginalityRow } from "@/types";
-import { useAccount } from "wagmi";
+import { ARB_SUM_THRESHOLD, MIN_PRICE } from "@/utils/constants";
 import { useMemo } from "react";
+import { zeroAddress } from "viem";
+import { useAccount } from "wagmi";
 import { getVolumeUntilPrice } from "../lib/trade/getVolumeUntilPrice";
 import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useOriginalityMarketsData } from "./useOriginalityMarketsData";
 import { useTokensBalances } from "./useTokensBalances";
-import { zeroAddress } from "viem";
-import { MIN_PRICE } from "@/utils/constants";
 
 export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) => {
   const { address: account } = useAccount();
@@ -58,6 +58,21 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
       const { id: marketId, upPrice, downPrice, upPool, downPool } = marketPoolData;
       const market = data.markets.find((market) => market.id === marketId);
       marketIdToRepo[marketId] = marketRepo;
+
+      // Prediction-independent arbitrage bounds: when UP+DOWN>1 we can mint a
+      // complete set and sell both sides until each pool reaches its
+      // proportional share of 1 (target_up = upPrice/sum, target_down = downPrice/sum).
+      const sumPrice = (upPrice ?? 0) + (downPrice ?? 0);
+      const isArb = sumPrice > 1 + ARB_SUM_THRESHOLD;
+      const volumeUntilUpEqual =
+        isArb && upPool && upPrice && market
+          ? getVolumeUntilPrice(upPool, upPrice / sumPrice, market.wrappedTokens[1], "sell")
+          : 0;
+      const volumeUntilDownEqual =
+        isArb && downPool && downPrice && market
+          ? getVolumeUntilPrice(downPool, downPrice / sumPrice, market.wrappedTokens[0], "sell")
+          : 0;
+
       if (!prediction) {
         return {
           repo: marketRepo,
@@ -69,6 +84,8 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
           hasPrediction: false,
           volumeUntilUpPrice: 0,
           volumeUntilDownPrice: 0,
+          volumeUntilUpEqual,
+          volumeUntilDownEqual,
           downBalance: balanceMapping?.[market?.wrappedTokens?.[0] ?? ""],
           upBalance: balanceMapping?.[market?.wrappedTokens?.[1] ?? ""],
           predictedOriginality: null,
@@ -126,6 +143,8 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
         hasPrediction: true,
         volumeUntilUpPrice,
         volumeUntilDownPrice,
+        volumeUntilUpEqual,
+        volumeUntilDownEqual,
         downBalance: balanceMapping?.[market?.wrappedTokens?.[0] ?? ""],
         upBalance: balanceMapping?.[market?.wrappedTokens?.[1] ?? ""],
         predictedOriginality: prediction.originality,

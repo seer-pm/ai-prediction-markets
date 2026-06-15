@@ -1,13 +1,17 @@
+import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
+import { erc20Abi } from "@/abis/erc20Abi";
+import { fetchTokensBalances } from "@/hooks/useTokensBalances";
 import {
-  QuoteTradeFn,
-  UniswapQuoteTradeResult,
-  Token,
-  QuoteProps,
-  TableData,
-  OriginalityQuoteProps,
-  OriginalityTableData,
   L2QuoteProps,
   L2TableData,
+  OriginalityQuoteProps,
+  OriginalityQuoteResult,
+  OriginalityTableData,
+  QuoteProps,
+  QuoteTradeFn,
+  TableData,
+  Token,
+  UniswapQuoteTradeResult,
 } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
 import {
@@ -18,13 +22,10 @@ import {
   UNISWAP_ROUTER_ADDRESSES,
   VOLUME_MIN,
 } from "@/utils/constants";
-import { Address, encodeFunctionData, formatUnits, parseUnits, zeroAddress } from "viem";
-import pLimit from "p-limit";
-import { UniswapRouterAbi } from "@/abis/UniswapRouterAbi";
-import { erc20Abi } from "@/abis/erc20Abi";
-import { getUniswapQuoteFast } from "./getQuoteFast";
-import { fetchTokensBalances } from "@/hooks/useTokensBalances";
 import { l2MarketOutcomes, l2OutcomeTokens } from "@/utils/l2MarketOutcomes";
+import pLimit from "p-limit";
+import { Address, encodeFunctionData, formatUnits, parseUnits, zeroAddress } from "viem";
+import { getUniswapQuoteFast } from "./getQuoteFast";
 
 export const getUniswapQuote: QuoteTradeFn = getUniswapQuoteFast;
 
@@ -598,15 +599,74 @@ const dualSellOriginalityQuotes = async ({
   return [up, down].filter(Boolean) as UniswapQuoteTradeResult[];
 };
 
+// UP+DOWN>1 arbitrage: mint a complete set and sell both sides until each pool
+// reaches its proportional share of 1. Ignores the user's prediction. Existing
+// token balances are sold first (free), so we only mint the symmetric remainder.
+const arbSellOriginalityQuotes = async ({
+  account,
+  row,
+}: {
+  account: Address;
+  row: OriginalityTableData;
+}): Promise<OriginalityQuoteResult | null> => {
+  const volUp = row.volumeUntilUpEqual;
+  const volDown = row.volumeUntilDownEqual;
+
+  // No headroom on either side to push the sum back toward 1.
+  if (volUp < VOLUME_MIN && volDown < VOLUME_MIN) return null;
+
+  const upBal = Number(formatUnits(row.upBalance ?? 0n, DECIMALS));
+  const downBal = Number(formatUnits(row.downBalance ?? 0n, DECIMALS));
+  const cap = Number(row.amount ?? "0"); // per-repo collateral available to mint
+
+  // Mint only the symmetric headroom left after selling tokens already owned.
+  const mintAmount = Math.max(0, Math.min(volUp - upBal, volDown - downBal, cap));
+
+  // Each side sells owned + minted tokens, capped so we never overshoot sum<1.
+  const sellUp = Math.min(volUp, upBal + mintAmount);
+  const sellDown = Math.min(volDown, downBal + mintAmount);
+
+  const [upToken, downToken] = [row.wrappedTokens[1], row.wrappedTokens[0]];
+  const sellQuote = (token: Address, symbol: TradeSide, amount: number) =>
+    amount < VOLUME_MIN
+      ? Promise.resolve(null)
+      : getUniswapQuote(
+          CHAIN_ID,
+          account,
+          amount.toFixed(15),
+          { address: token, symbol, decimals: DECIMALS },
+          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+          "sell",
+        ).catch(() => null);
+
+  const [upSell, downSell] = await Promise.all([
+    sellQuote(upToken, "UP", sellUp),
+    sellQuote(downToken, "DOWN", sellDown),
+  ]);
+
+  const quotes = [upSell, downSell].filter(Boolean) as UniswapQuoteTradeResult[];
+  if (!quotes.length) return null;
+
+  return {
+    quoteType: "arb-sell",
+    quotes,
+    row,
+    mintAmount: mintAmount.toFixed(15),
+  };
+};
+
 const compareOriginalityQuotes = async ({
   account,
   row,
 }: {
   account: Address;
   row: OriginalityTableData;
-}) => {
+}): Promise<OriginalityQuoteResult | undefined> => {
   if (!row.amount) return;
   const amount = row.amount;
+  // UP+DOWN>1 arbitrage takes priority and ignores the prediction.
+  const arbQuote = await arbSellOriginalityQuotes({ account, row });
+  if (arbQuote) return arbQuote;
   if (!row.upDifference || !row.downDifference) return;
   // check if both are overvalued or undervalued
   const isUpUndervalued = row.upDifference > 0;
@@ -789,11 +849,7 @@ export const getOriginalityQuotes = async ({
       }
       return quotes;
     },
-    [] as {
-      quoteType: string;
-      quotes: UniswapQuoteTradeResult[];
-      row: OriginalityTableData;
-    }[],
+    [] as OriginalityQuoteResult[],
   );
 
   if (!quotes) {
