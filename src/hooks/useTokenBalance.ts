@@ -24,9 +24,10 @@ export const useTokenBalance = ({
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
+    // Show persisted/cached balance instantly, then refetch in the background on mount.
+    refetchOnMount: true,
     refetchInterval: false,
-    staleTime: 24 * 60 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["useTokenBalance", address, token],
     queryFn: () => fetchTokenBalance(address!, token),
