@@ -10,8 +10,25 @@ export const queryClient = new QueryClient({
   },
 });
 
+// Persisted queries (e.g. token balances) hold native BigInt values, which the
+// default JSON.stringify serializer cannot handle — it throws and aborts the
+// entire persist write, so nothing (including market data) ever reaches
+// localStorage. Tag bigints as a sentinel string on the way out and revive them
+// back to real bigint on the way in, so the whole cache round-trips intact.
+const BIGINT_TAG = "$bigint:";
+
+const replacer = (_key: string, value: unknown) =>
+  typeof value === "bigint" ? `${BIGINT_TAG}${value}` : value;
+
+const reviver = (_key: string, value: unknown) =>
+  typeof value === "string" && value.startsWith(BIGINT_TAG)
+    ? BigInt(value.slice(BIGINT_TAG.length))
+    : value;
+
 export const localStoragePersister = createAsyncStoragePersister({
   storage: window.localStorage,
+  serialize: (client) => JSON.stringify(client, replacer),
+  deserialize: (cached) => JSON.parse(cached, reviver),
 });
 
 // Query keys whose data we persist to localStorage so it renders instantly on revisit
