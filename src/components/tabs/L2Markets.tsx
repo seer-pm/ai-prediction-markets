@@ -65,6 +65,7 @@ export const L2Markets = () => {
   const {
     data: tableData,
     isLoading,
+    isFetching,
     isLoadingBalances,
     error,
     charts,
@@ -196,7 +197,7 @@ export const L2Markets = () => {
           />
         ) : (
           <>
-            {isLoading ? (
+            {isLoading || isFetching ? (
               <div className="animate-pulse">
                 <div className="h-40 bg-gray-300 rounded"></div>
               </div>

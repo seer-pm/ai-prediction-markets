@@ -63,6 +63,7 @@ export const OriginalityMarkets = () => {
   const {
     data: tableData,
     isLoading,
+    isFetching,
     isLoadingBalances,
     error,
     charts,
@@ -187,7 +188,7 @@ export const OriginalityMarkets = () => {
           <MarketChart data={parsedData} totalVolumeMarket={parseOriginalityVolumeData()} startTimestamp={1776038400} />
         ) : (
           <>
-            {isLoading ? (
+            {isLoading || isFetching ? (
               <div className="animate-pulse">
                 <div className="h-40 bg-gray-300 rounded"></div>
               </div>

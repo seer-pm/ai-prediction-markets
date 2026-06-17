@@ -1,4 +1,5 @@
 import { QueryClient, defaultShouldDehydrateQuery } from "@tanstack/react-query";
+import type { PersistedClient } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 
 export const queryClient = new QueryClient({
@@ -25,9 +26,32 @@ const reviver = (_key: string, value: unknown) =>
     ? BigInt(value.slice(BIGINT_TAG.length))
     : value;
 
+// The market-data queries (L1/Originality/L2) embed huge `charts` history
+// (~5MB, ~5MB and ~86MB respectively) that blows past the ~5MB localStorage
+// quota — setItem throws QuotaExceededError and aborts the whole persist, so
+// nothing is restored on reload. Charts are display-only and refetched on
+// mount, so we drop them from the persisted snapshot while keeping them live in
+// memory. The query data restores without `charts` (undefined), then the
+// background refetch repopulates it. We shallow-clone the affected paths so the
+// in-memory cache is never mutated.
+const stripChartsForPersist = (client: PersistedClient): PersistedClient => ({
+  ...client,
+  clientState: {
+    ...client.clientState,
+    queries: client.clientState.queries.map((query) => {
+      const data = query.state?.data;
+      if (data && typeof data === "object" && "charts" in data) {
+        const { charts: _charts, ...rest } = data as Record<string, unknown>;
+        return { ...query, state: { ...query.state, data: rest } };
+      }
+      return query;
+    }),
+  },
+});
+
 export const localStoragePersister = createAsyncStoragePersister({
   storage: window.localStorage,
-  serialize: (client) => JSON.stringify(client, replacer),
+  serialize: (client) => JSON.stringify(stripChartsForPersist(client), replacer),
   deserialize: (cached) => JSON.parse(cached, reviver),
 });
 

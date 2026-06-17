@@ -10,7 +10,7 @@ import { MIN_PRICE } from "@/utils/constants";
 export const useProcessL2Predictions = (predictions: L2Row[]) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
-  const { data, isLoading, error } = useL2MarketsData();
+  const { data, isLoading, isFetching, error } = useL2MarketsData();
   const tokens = useMemo(
     () => data?.markets?.map((market) => market.wrappedTokens)?.flat(),
     [data?.markets],
@@ -120,6 +120,7 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
     return {
       data: undefined,
       isLoading,
+      isFetching,
       isLoadingBalances,
       error,
     };
@@ -128,6 +129,7 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
   return {
     data: processedData,
     isLoading,
+    isFetching,
     isLoadingBalances,
     error,
     charts: data.charts,

@@ -11,7 +11,7 @@ import { useTokensBalances } from "./useTokensBalances";
 export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
-  const { data, isLoading, error } = useOriginalityMarketsData();
+  const { data, isLoading, isFetching, error } = useOriginalityMarketsData();
   const tokens = useMemo(
     () => data?.markets?.map((market) => market.wrappedTokens)?.flat(),
     [data?.markets],
@@ -158,6 +158,7 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     return {
       data: undefined,
       isLoading,
+      isFetching,
       isLoadingBalances,
       error,
     };
@@ -166,6 +167,7 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
   return {
     data: processedData,
     isLoading,
+    isFetching,
     isLoadingBalances,
     error,
     charts: data.charts,

@@ -11,7 +11,7 @@ import { isTwoStringsEqual } from "@/utils/common";
 export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
-  const { data, isLoading, error } = useL1MarketsData();
+  const { data, isLoading, isFetching, error } = useL1MarketsData();
   const tokens = useMemo(() => data?.wrappedTokens, [data?.wrappedTokens]);
   const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
     checkResult?.predictedAddress,
@@ -102,6 +102,7 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
     return {
       data: undefined,
       isLoading,
+      isFetching,
       isLoadingBalances,
       error,
     };
@@ -110,6 +111,7 @@ export const useProcessL1Predictions = (predictions: PredictionRow[]) => {
   return {
     data: processedData,
     isLoading,
+    isFetching,
     isLoadingBalances,
     error,
     charts: data.charts,
