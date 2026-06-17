@@ -5,6 +5,7 @@ import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/g
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { PoolInfo } from "@/types";
 import { AI_PREDICTION_MARKET_ID, CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
+import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
@@ -104,9 +105,7 @@ export default async () => {
       {
         status: 200,
         headers: {
-          "Access-Control-Allow-Origin": "http://localhost:5173",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Methods": "GET",
+          ...EDGE_CACHE_HEADERS,
         },
       },
     );

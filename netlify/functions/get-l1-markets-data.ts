@@ -3,6 +3,7 @@ import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/g
 import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID } from "@/utils/constants";
+import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 
@@ -11,40 +12,46 @@ const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUP
 export default async () => {
   try {
     const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
-    const { data, error } = await supabase
-      .from("markets")
-      .select(
-        "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators",
-      )
-      .eq("id", L1_MARKET_ID)
-      .eq("chain_id", CHAIN_ID)
-      .single();
+    // Parent market, child market and chart data are independent — fetch concurrently.
+    const [
+      { data, error },
+      { data: otherMarketData, error: otherMarketError },
+      { data: chartData, error: chartError },
+    ] = await Promise.all([
+      supabase
+        .from("markets")
+        .select(
+          "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators",
+        )
+        .eq("id", L1_MARKET_ID)
+        .eq("chain_id", CHAIN_ID)
+        .single(),
+      supabase
+        .from("markets")
+        .select(
+          "id,subgraph_data->wrappedTokens,subgraph_data->blockTimestamp,subgraph_data->outcomes,subgraph_data->payoutNumerators",
+        )
+        .eq("subgraph_data->parentMarket->>id", L1_MARKET_ID)
+        .eq("chain_id", CHAIN_ID)
+        .single(),
+      supabase
+        .from("key_value")
+        .select("value")
+        .eq("key", `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`)
+        .single(),
+    ]);
     if (error) {
       throw error;
     }
     if (!data) {
       throw { message: "Market not found" };
     }
-
-    const { data: otherMarketData, error: otherMarketError } = await supabase
-      .from("markets")
-      .select(
-        "id,subgraph_data->wrappedTokens,subgraph_data->blockTimestamp,subgraph_data->outcomes,subgraph_data->payoutNumerators",
-      )
-      .eq("subgraph_data->parentMarket->>id", L1_MARKET_ID)
-      .eq("chain_id", CHAIN_ID)
-      .single();
     if (otherMarketError) {
       throw otherMarketError;
     }
     if (!otherMarketData) {
       throw { message: "Other market not found" };
     }
-    const { data: chartData, error: chartError } = await supabase
-      .from("key_value")
-      .select("value")
-      .eq("key", `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`)
-      .single();
     const charts = chartError
       ? null
       : {
@@ -153,9 +160,7 @@ export default async () => {
       {
         status: 200,
         headers: {
-          "Access-Control-Allow-Origin": "http://localhost:5173",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Methods": "GET",
+          ...EDGE_CACHE_HEADERS,
         },
       },
     );

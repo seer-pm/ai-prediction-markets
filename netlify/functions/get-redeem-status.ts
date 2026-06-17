@@ -69,9 +69,7 @@ export default async () => {
     return new Response(JSON.stringify({ isRedeemable }), {
       status: 200,
       headers: {
-        "Access-Control-Allow-Origin": "http://localhost:5173",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "GET",
+        "Content-Type": "application/json",
       },
     });
   } catch (e: any) {

@@ -1,6 +1,5 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, defaultShouldDehydrateQuery } from "@tanstack/react-query";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-import { persistQueryClient } from "@tanstack/query-persist-client-core";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -10,15 +9,20 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
 export const localStoragePersister = createAsyncStoragePersister({
   storage: window.localStorage,
 });
-persistQueryClient({
-  queryClient,
-  persister: localStoragePersister,
-  dehydrateOptions: {
-    shouldDehydrateQuery: (query) => {
-      return query.queryKey[0] === "useMarketsData" || query.queryKey[0] === 'useTokensBalances';
-    },
-  },
-});
+
+// Query keys whose data we persist to localStorage so it renders instantly on revisit
+// (and is then refreshed in the background by the hooks' refetchOnMount).
+const PERSISTED_QUERY_KEYS = new Set([
+  "useMarketsData", // Round 1
+  "useL1MarketsData", // Round 2 L1
+  "fetchOriginalityMarketsData", // Round 2 Originality
+  "fetchL2MarketsData", // Round 2 L2 (default tab)
+  "useTokensBalances", // balances
+]);
+
+export const shouldDehydrateQuery = (query: Parameters<typeof defaultShouldDehydrateQuery>[0]) =>
+  defaultShouldDehydrateQuery(query) && PERSISTED_QUERY_KEYS.has(query.queryKey[0] as string);

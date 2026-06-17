@@ -39,6 +39,14 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
 
 export const useL1MarketsData = () => {
   return useQuery({
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    // Show persisted/cached data instantly, then refetch in the background on mount.
+    refetchOnMount: true,
+    refetchInterval: false,
+    staleTime: 30 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
     queryKey: ["useL1MarketsData"],
     queryFn: fetchMarketsData,
   });

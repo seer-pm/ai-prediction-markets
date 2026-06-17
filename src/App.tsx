@@ -6,7 +6,7 @@ import { WagmiProvider } from "wagmi";
 import Footer from "./components/Footer";
 import { TradeWallet } from "./components/trade/TradeWallet";
 import { WalletConnect } from "./components/WalletConnect";
-import { localStoragePersister, queryClient } from "./config/queryClient";
+import { localStoragePersister, queryClient, shouldDehydrateQuery } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { Tab } from "./components/Tab";
 import { OldTradeWallet } from "./components/trade/OldTradeWallet";
@@ -105,7 +105,10 @@ function App() {
     <WagmiProvider config={config}>
       <PersistQueryClientProvider
         client={queryClient}
-        persistOptions={{ persister: localStoragePersister }}
+        persistOptions={{
+          persister: localStoragePersister,
+          dehydrateOptions: { shouldDehydrateQuery },
+        }}
       >
         <ToastContainer />
         <AppContent />
