@@ -5,6 +5,7 @@ import {
   COLLATERAL_TOKENS,
   L1_MARKET_ID,
   L2_PARENT_MARKET_ID,
+  OCTANT_MARKET_ID,
   ORIGINALITY_PARENT_MARKET_ID,
 } from "@/utils/constants";
 import { createClient } from "@supabase/supabase-js";
@@ -89,6 +90,66 @@ const getL1Pairs = async (
   );
   if (upsertError) {
     console.log("insert l1 error", upsertError.message);
+  }
+};
+
+const getOctantPairs = async (
+  poolIndex: Map<string, PoolHourData[]>,
+  volumeIndex: Map<string, PoolVolumeData>,
+) => {
+  const { data, error } = await supabase
+    .from("markets")
+    .select("subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators")
+    .eq("id", OCTANT_MARKET_ID)
+    .eq("chain_id", CHAIN_ID)
+    .single();
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    throw { message: "Market not found" };
+  }
+  const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
+  const wrappedTokens = data.wrappedTokens as Address[];
+  const outcomes = data.outcomes as string[];
+  const chartDataMarket = wrappedTokens.map((token) => {
+    return poolIndex.get(pairKey(token, collateral)) ?? [];
+  });
+  const totalVolumeMarket = wrappedTokens.reduce((acc, token) => {
+    const volumeByPair = volumeIndex.get(pairKey(token, collateral));
+    if (!volumeByPair) return acc;
+    const { totalVolume0, totalVolume1, token0 } = volumeByPair;
+    return (acc += isTwoStringsEqual(collateral, token0) ? totalVolume0 : totalVolume1);
+  }, 0);
+  const poolData = volumeIndex.get(pairKey(wrappedTokens[0], collateral));
+  const collateralSymbol = poolData
+    ? isTwoStringsEqual(collateral, poolData.token0)
+      ? poolData.token0Name
+      : poolData.token1Name
+    : "";
+  const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
+    return {
+      poolHourDatas,
+      outcomeName: outcomes[outcomeIndex],
+      outcomeId: wrappedTokens[outcomeIndex],
+      collateral,
+      marketId: OCTANT_MARKET_ID,
+    };
+  });
+  const { error: upsertError } = await supabase.from("key_value").upsert(
+    {
+      key: `market_chart_hour_data_${OCTANT_MARKET_ID}_${CHAIN_ID}_deep_pm`,
+      value: {
+        chartData: chartWithMarketData,
+        timestamp: Date.now(),
+        marketId: OCTANT_MARKET_ID,
+        totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
+      },
+    },
+    { onConflict: "key" },
+  );
+  if (upsertError) {
+    console.log("insert octant error", upsertError.message);
   }
 };
 
@@ -341,6 +402,12 @@ export default async () => {
   try {
     console.log("getting l1 chart");
     await getL1Pairs(poolIndex, volumeIndex);
+  } catch (e) {
+    console.log(e);
+  }
+  try {
+    console.log("getting octant chart");
+    await getOctantPairs(poolIndex, volumeIndex);
   } catch (e) {
     console.log(e);
   }
