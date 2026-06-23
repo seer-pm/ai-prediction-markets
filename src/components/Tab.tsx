@@ -3,8 +3,10 @@ import { AiMarkets } from "./tabs/AiMarkets";
 import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
+import { OctantMarkets } from "./tabs/OctantMarkets";
 
 const TABS = [
+  { id: "octant", label: "Octant", Component: OctantMarkets },
   { id: "round2-l2", label: "Round 2 L2", Component: L2Markets },
   { id: "round2-l1", label: "Round 2 L1", Component: L1Markets },
   { id: "round2", label: "Round 2 Originality", Component: OriginalityMarkets },
@@ -12,10 +14,10 @@ const TABS = [
 ] as const;
 
 export const Tab = () => {
-  const [activeTab, setActiveTab] = useState("round2-l2");
+  const [activeTab, setActiveTab] = useState("octant");
   // Lazy-mount: only render a tab once it's been visited.
   // Once mounted, keep it alive (hidden) so useLocalStorage / useMemo state is preserved.
-  const [visited, setVisited] = useState<Set<string>>(new Set(["round2-l2"]));
+  const [visited, setVisited] = useState<Set<string>>(new Set(["octant"]));
 
   const handleTabClick = (tabId: string) => {
     startTransition(() => setActiveTab(tabId));

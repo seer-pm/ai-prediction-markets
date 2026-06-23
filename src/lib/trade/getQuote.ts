@@ -235,6 +235,190 @@ export const getL1BuyQuotes = async ({
   };
 };
 
+export const getOctantSellQuotes = async ({
+  account,
+  amount,
+  tableData,
+  onProgress,
+}: QuoteProps & { onProgress?: ProgressCallback }) => {
+  const chainId = CHAIN_ID;
+  let currentProgress = 0;
+  const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
+
+  const sellMarkets = marketsWithData.filter((row) => row.difference! < 0);
+
+  const sellPromises = sellMarkets.reduce((promises, row) => {
+    const availableSellVolume = parseUnits(amount, DECIMALS) + (row.balance ?? 0n);
+    const volume =
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableSellVolume
+        ? formatUnits(availableSellVolume, DECIMALS)
+        : row.volumeUntilPrice.toFixed(15);
+    if (Number(volume) < VOLUME_MIN) {
+      return promises;
+    }
+    // get quote
+    promises.push(
+      getUniswapQuote(
+        chainId,
+        account,
+        volume,
+        { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
+        collateral,
+        "sell",
+      )
+        .then((result) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          return result;
+        })
+        .catch((e) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          throw e;
+        }),
+    );
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  if (!sellPromises.length) {
+    throw new Error("Quote Error: No sell route found");
+  }
+  const sellQuoteResults = await Promise.allSettled(sellPromises);
+  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+  if (!sellQuotes.length) {
+    throw new Error("No quote found");
+  }
+  return {
+    quotes: sellQuotes,
+    mergeAmount: 0n,
+  };
+};
+
+export const getOctantBuyQuotes = async ({
+  account,
+  amount: _,
+  tableData,
+  collateralFromSell,
+  onProgress,
+}: QuoteProps & { onProgress?: ProgressCallback; collateralFromSell: bigint }) => {
+  const chainId = CHAIN_ID;
+  let currentProgress = 0;
+  const marketsWithData = tableData.filter((row) => row.hasPrediction && row.difference);
+  const buyMarkets = marketsWithData.filter((row) => row.difference! > 0);
+
+  // single market: collateral from merge = min balance across all outcome tokens
+  const balances = await fetchTokensBalances(
+    account,
+    tableData.map((row) => row.outcomeId as Address),
+  );
+  const collateralFromMerge = minBigIntArray(balances);
+
+  const totalCollateral = collateralFromSell + collateralFromMerge;
+
+  if (!totalCollateral) {
+    throw new Error(`Quote Error: Cannot sell to ${collateral.symbol}`);
+  }
+
+  // get buy quotes
+  const sumBuyDifference = buyMarkets.reduce((acc, curr) => acc + curr.difference!, 0);
+  const buyPromises = buyMarkets.reduce((promises, row) => {
+    const availableBuyVolume =
+      (parseUnits(row.difference!.toFixed(15), DECIMALS) * totalCollateral) /
+      parseUnits(sumBuyDifference!.toFixed(15), DECIMALS);
+    const volume =
+      parseUnits(row.volumeUntilPrice.toFixed(15), DECIMALS) > availableBuyVolume
+        ? formatUnits(availableBuyVolume, DECIMALS)
+        : row.volumeUntilPrice.toFixed(15);
+    if (Number(volume) < VOLUME_MIN) {
+      return promises;
+    }
+    // get quote
+    promises.push(
+      getUniswapQuote(
+        chainId,
+        account,
+        volume.toString(),
+        { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
+        collateral,
+        row.difference! > 0 ? "buy" : "sell",
+      )
+        .then((result) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          return result;
+        })
+        .catch((e) => {
+          currentProgress++;
+          onProgress?.(currentProgress);
+          throw e;
+        }),
+    );
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  if (!buyPromises.length) {
+    throw new Error("Quote Error: Amount too small");
+  }
+  const buyQuoteResult = await Promise.allSettled(buyPromises);
+  const buyQuotes = buyQuoteResult.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+
+  if (!buyQuotes) {
+    throw new Error(`Quote Error: Cannot buy from ${collateral.symbol}`);
+  }
+  // sell first, then buy
+  return {
+    quotes: buyQuotes,
+    mergeAmount: collateralFromMerge,
+  };
+};
+
+export const getSellAllOctantQuotes = async ({
+  account,
+  tableData,
+}: {
+  account: Address;
+  tableData: TableData[];
+}) => {
+  const chainId = CHAIN_ID;
+  const sellPromises = tableData.reduce((promises, row) => {
+    // sell from token to collateral
+    if (row.balance) {
+      promises.push(
+        getUniswapQuote(
+          chainId,
+          account,
+          formatUnits(row.balance, DECIMALS),
+          { address: row.outcomeId as Address, symbol: row.repo, decimals: DECIMALS },
+          collateral,
+          "sell",
+        ),
+      );
+    }
+
+    return promises;
+  }, [] as Promise<UniswapQuoteTradeResult>[]);
+
+  const sellQuoteResults = await Promise.allSettled(sellPromises);
+  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
+    if (result.status === "fulfilled") {
+      quotes.push(result.value);
+    }
+    return quotes;
+  }, [] as UniswapQuoteTradeResult[]);
+
+  return sellQuotes;
+};
+
 export const getL2MarketSellQuotes = async ({
   account,
   amount,

@@ -19,6 +19,11 @@ export interface L2Row {
   weight: number;
 }
 
+export interface OctantRow {
+  project: string;
+  weight: number;
+}
+
 export interface TableData {
   repo: string;
   parent: string | null;

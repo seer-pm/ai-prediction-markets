@@ -1,4 +1,4 @@
-import { L2Row, OriginalityRow, PredictionRow } from "@/types";
+import { L2Row, OctantRow, OriginalityRow, PredictionRow } from "@/types";
 
 export const parseCSV = (csvText: string): PredictionRow[] => {
   const lines = csvText.trim().split("\n");
@@ -128,6 +128,74 @@ export const parseOriginalityCSV = (csvText: string): OriginalityRow[] => {
     results.push({
       repo,
       originality,
+    });
+  }
+
+  if (results.length === 0) {
+    throw new Error("CSV contains no valid data rows");
+  }
+
+  return results;
+};
+
+export const parseOctantCSV = (csvText: string): OctantRow[] => {
+  const lines = csvText.trim().split("\n");
+
+  if (lines.length < 2) {
+    throw new Error("CSV must have at least a header row and one data row");
+  }
+
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+
+  // Check for required columns
+  if (headers.length !== 2) {
+    throw new Error("CSV must have exactly 2 columns: project, percent");
+  }
+
+  if (!headers.includes("project") || !headers.includes("percent")) {
+    throw new Error("CSV must have columns: project, percent");
+  }
+
+  const seenProjects = new Set<string>();
+  const results: OctantRow[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
+
+    const values = line.split(",").map((v) => v.trim());
+
+    if (values.length !== 2) {
+      throw new Error(`Row ${i + 1}: Expected 2 columns, found ${values.length}`);
+    }
+
+    const project = values[0];
+    const percentStr = values[1];
+
+    // Check for empty values
+    if (!project || !percentStr) {
+      throw new Error(`Row ${i + 1}: All columns must have values`);
+    }
+
+    // Check for duplicate project
+    if (seenProjects.has(project)) {
+      throw new Error(`Row ${i + 1}: Duplicate project "${project}"`);
+    }
+    seenProjects.add(project);
+
+    // Validate percent (0-100 in the CSV; stored internally as a 0-1 fraction)
+    const percent = parseFloat(percentStr);
+    if (isNaN(percent)) {
+      throw new Error(`Row ${i + 1}: Percent "${percentStr}" is not a valid number`);
+    }
+
+    if (percent < 0) {
+      throw new Error(`Row ${i + 1}: Percent cannot be negative`);
+    }
+
+    results.push({
+      project,
+      weight: percent / 100,
     });
   }
 
