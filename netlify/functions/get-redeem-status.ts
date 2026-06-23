@@ -1,4 +1,5 @@
 import { AI_PREDICTION_MARKET_ID } from "@/utils/constants";
+import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { compareAsc, fromUnixTime } from "date-fns";
@@ -49,7 +50,10 @@ const getMarketStatus = (market: Market) => {
   return MarketStatus.CLOSED;
 };
 
-export default async () => {
+export default async (req: Request) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = getCorsHeaders(req);
   try {
     const { data, error } = await supabase
       .from("markets")
@@ -70,6 +74,7 @@ export default async () => {
       status: 200,
       headers: {
         "Content-Type": "application/json",
+        ...corsHeaders,
       },
     });
   } catch (e: any) {
@@ -78,6 +83,7 @@ export default async () => {
       status: 500,
       headers: {
         "Content-Type": "application/json",
+        ...corsHeaders,
       },
     });
   }

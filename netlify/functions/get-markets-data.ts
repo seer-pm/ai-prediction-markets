@@ -6,10 +6,14 @@ import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/c
 import { PoolInfo } from "@/types";
 import { AI_PREDICTION_MARKET_ID, CHAIN_ID, COLLATERAL_TOKENS } from "@/utils/constants";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
+import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
-export default async () => {
+export default async (req: Request) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = getCorsHeaders(req);
   try {
     const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
     const { data, error } = await supabase
@@ -106,6 +110,7 @@ export default async () => {
         status: 200,
         headers: {
           ...EDGE_CACHE_HEADERS,
+          ...corsHeaders,
         },
       },
     );
@@ -115,6 +120,7 @@ export default async () => {
       status: 500,
       headers: {
         "Content-Type": "application/json",
+        ...corsHeaders,
       },
     });
   }

@@ -4,12 +4,16 @@ import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID } from "@/utils/constants";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
+import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
-export default async () => {
+export default async (req: Request) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = getCorsHeaders(req);
   try {
     const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
     // Parent market, child market and chart data are independent — fetch concurrently.
@@ -161,6 +165,7 @@ export default async () => {
         status: 200,
         headers: {
           ...EDGE_CACHE_HEADERS,
+          ...corsHeaders,
         },
       },
     );
@@ -170,6 +175,7 @@ export default async () => {
       status: 500,
       headers: {
         "Content-Type": "application/json",
+        ...corsHeaders,
       },
     });
   }

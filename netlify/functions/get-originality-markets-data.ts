@@ -4,6 +4,7 @@ import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
 import { CHAIN_ID, ORIGINALITY_PARENT_MARKET_ID } from "@/utils/constants";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
+import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { createClient } from "@supabase/supabase-js";
 import pLimit from "p-limit";
 import { Address } from "viem";
@@ -50,7 +51,10 @@ async function getCharts(keys: string[]) {
   }
 }
 
-export default async () => {
+export default async (req: Request) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = getCorsHeaders(req);
   try {
     // Parent market and child markets are independent queries — fetch them concurrently.
     const [
@@ -204,6 +208,7 @@ export default async () => {
         status: 200,
         headers: {
           ...EDGE_CACHE_HEADERS,
+          ...corsHeaders,
         },
       },
     );
@@ -213,6 +218,7 @@ export default async () => {
       status: 500,
       headers: {
         "Content-Type": "application/json",
+        ...corsHeaders,
       },
     });
   }
