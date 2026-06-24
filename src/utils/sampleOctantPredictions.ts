@@ -1,0 +1,30 @@
+// Octant initial-price predictions (from octant-initial-price.csv).
+// `percent` is the rescaled initial price as a 0-100 percentage share (the CSV/UI scale).
+// On upload it is divided by 100 to the 0-1 fraction the on-chain price is compared against.
+export const sampleOctantPredictions = [
+  { project: "Protocol Guild", percent: 13.27 },
+  { project: "Solidity", percent: 12.58 },
+  { project: "L2 Beat", percent: 8.35 },
+  { project: "Crypto Altruists", percent: 8.1 },
+  { project: "Revoke Cash", percent: 6.58 },
+  { project: "Tor", percent: 5.41 },
+  { project: "Remix", percent: 4.51 },
+  { project: "Aestus MEV Boost Relay", percent: 4.22 },
+  { project: "Ethereum Cat Herders Institute", percent: 3.7 },
+  { project: "Hypercerts", percent: 3.45 },
+  { project: "Open Source Observer", percent: 3.33 },
+  { project: "Grow the Pie", percent: 3.26 },
+  { project: "Ethereum attestation service", percent: 2.68 },
+  { project: "Eth Economic Zone", percent: 2.68 },
+  { project: "Rotki", percent: 2.55 },
+  { project: "Funding the Commons", percent: 2.42 },
+  { project: "Dappnode", percent: 2.11 },
+  { project: "Eth Staker", percent: 2.05 },
+  { project: "Greenpill", percent: 1.74 },
+  { project: "Zach XBT", percent: 1.63 },
+  { project: "Seal 9/11", percent: 1.63 },
+  { project: "SheFi", percent: 1.09 },
+  { project: "Blue Filter Company", percent: 0.95 },
+  { project: "Gili Eco Trust", percent: 0.95 },
+  { project: "Shutter", percent: 0.76 },
+];
