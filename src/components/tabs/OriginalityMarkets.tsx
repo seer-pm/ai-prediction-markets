@@ -4,9 +4,11 @@ import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreat
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
+import { useRedeemOriginality } from "@/hooks/useRedeemOriginality";
 import { useSellToCollateral } from "@/hooks/useSellToCollateral";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { OriginalityRow } from "@/types";
+import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
@@ -19,6 +21,7 @@ import { useWalletStore } from "@/stores/walletStore";
 import { Modal } from "../Modal";
 import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
+import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import { parseOriginalityCSV } from "@/utils/csvParser";
 import { sampleOriginalityPredictions } from "@/utils/sampleOriginalityPredictions";
@@ -58,6 +61,7 @@ export const OriginalityMarkets = () => {
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
   const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
 
   const {
@@ -76,6 +80,30 @@ export const OriginalityMarkets = () => {
 
   const sellAll = useSellToCollateral(() => {
     closeSellAllDialog();
+  });
+
+  const closedMarkets = useMemo(
+    () =>
+      (originalityMarketData?.markets ?? [])
+        .filter((m) => m.marketStatus === MarketStatus.CLOSED)
+        .map(({ id, collateralToken, wrappedTokens }) => ({ id, collateralToken, wrappedTokens })),
+    [originalityMarketData?.markets],
+  );
+
+  // Conditional tokens for every closed market — used to detect redeemable
+  // balances independently of the per-repo deduped `tableData`, which can
+  // drop a closed market's row in favor of an active market for the same repo.
+  const closedTokens = useMemo(
+    () => closedMarkets.flatMap((m) => m.wrappedTokens),
+    [closedMarkets],
+  );
+  const { data: closedBalances, isLoading: isLoadingClosedBalances } = useTokensBalances(
+    checkTradeExecutorResult?.predictedAddress as Address,
+    closedTokens,
+  );
+
+  const redeem = useRedeemOriginality(() => {
+    closeRedeemDialog();
   });
 
   const collateralTokens = useMemo(
@@ -142,6 +170,10 @@ export const OriginalityMarkets = () => {
     () => startTransition(() => setIsWithdrawTokensDialogOpen(false)),
     [],
   );
+  const closeRedeemDialog = useCallback(
+    () => startTransition(() => setIsRedeemDialogOpen(false)),
+    [],
+  );
 
   const handleSellAll = useCallback(() => {
     if (!tableData) return;
@@ -152,6 +184,11 @@ export const OriginalityMarkets = () => {
   const hasSellTokens = useMemo(
     () => !!tableData?.filter((x) => x.upBalance || x.downBalance)?.length || hasMergeAmount,
     [tableData, hasMergeAmount],
+  );
+
+  const hasRedeemable = useMemo(
+    () => (closedBalances ?? []).some((b) => b > 0n),
+    [closedBalances],
   );
 
   const exportWeight = useCallback(() => {
@@ -185,7 +222,7 @@ export const OriginalityMarkets = () => {
     <>
       <div className="p-5 drop-shadow bg-white rounded-lg">
         {!isUndefined(parsedData) ? (
-          <MarketChart data={parsedData} totalVolumeMarket={parseOriginalityVolumeData()} startTimestamp={1776038400} />
+          <MarketChart data={parsedData} totalVolumeMarket={parseOriginalityVolumeData()} />
         ) : (
           <>
             {isLoading || isFetching ? (
@@ -228,6 +265,13 @@ export const OriginalityMarkets = () => {
                 className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto"
               >
                 Sell all to sUSDS
+              </button>
+              <button
+                disabled={isLoading || !account}
+                onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                className="cursor-pointer px-5 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Redeem to sUSDS
               </button>
 
               <button
@@ -311,6 +355,28 @@ export const OriginalityMarkets = () => {
           onSellAll={handleSellAll}
           isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
           hasTokens={hasSellTokens}
+        />
+      </Modal>
+
+      {/* Redeem Dialog */}
+      <Modal isOpen={isRedeemDialogOpen} onClose={closeRedeemDialog}>
+        <RedeemL2Interface
+          onClose={closeRedeemDialog}
+          isError={redeem.isError}
+          error={redeem.error}
+          isPending={redeem.isPending}
+          txState={redeem.txState}
+          reset={redeem.reset}
+          onRedeem={() => {
+            redeem.mutate({
+              tradeExecutor: checkTradeExecutorResult?.predictedAddress!,
+              closedMarkets,
+              parentTokens: originalityMarketData?.parentWrappedTokens ?? [],
+            });
+          }}
+          isLoading={isLoadingSellBalances || isLoading || isLoadingBalances || isLoadingClosedBalances}
+          hasRedeemable={hasRedeemable}
+          subtitle="Redeem resolved Originality positions to sUSDS"
         />
       </Modal>
     </>

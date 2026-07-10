@@ -14,10 +14,10 @@ const TABS = [
 ] as const;
 
 export const Tab = () => {
-  const [activeTab, setActiveTab] = useState("octant");
+  const [activeTab, setActiveTab] = useState("round2");
   // Lazy-mount: only render a tab once it's been visited.
   // Once mounted, keep it alive (hidden) so useLocalStorage / useMemo state is preserved.
-  const [visited, setVisited] = useState<Set<string>>(new Set(["octant"]));
+  const [visited, setVisited] = useState<Set<string>>(new Set(["round2"]));
 
   const handleTabClick = (tabId: string) => {
     startTransition(() => setActiveTab(tabId));

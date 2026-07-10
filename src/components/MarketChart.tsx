@@ -81,7 +81,6 @@ const COLORS = [
 type Props = {
   data: ChartWithMarketData;
   totalVolumeMarket?: string | ReactElement;
-  startTimestamp?: number;
 };
 
 function findClosestLessThanOrEqualToTimestamp(
@@ -134,26 +133,45 @@ function resolveOutcomePrice(d: PoolHourData, collateral: Address): number | nul
   return price;
 }
 
-function buildTimeline(all: ChartWithMarketData, startTimestamp?: number) {
+// The window during which a series was actually tradable: from the first hour
+// liquidity was present to the last hour it was still present. Falls back to
+// the series' full range if no point reports liquidity > 0.
+function getLiquidityWindow(series: ChartWithMarketData[number]) {
+  const arr = series.poolHourDatas;
+  if (!arr.length) return null;
+
+  let start: number | null = null;
+  let end: number | null = null;
+
+  arr.forEach((d) => {
+    if (Number(d.liquidity) > 0) {
+      if (start === null) start = d.periodStartUnix;
+      end = d.periodStartUnix;
+    }
+  });
+
+  if (start === null || end === null) {
+    start = arr[0].periodStartUnix;
+    end = arr[arr.length - 1].periodStartUnix;
+  }
+
+  return { start, end };
+}
+
+function buildTimeline(all: ChartWithMarketData) {
   let min = Infinity;
   let max = -Infinity;
 
   all.forEach((o) => {
-    const arr = o.poolHourDatas;
-    if (!arr.length) return;
+    const window = getLiquidityWindow(o);
+    if (!window) return;
 
-    min = Math.min(min, arr[0].periodStartUnix);
-    max = Math.max(max, arr[arr.length - 1].periodStartUnix);
+    min = Math.min(min, window.start);
+    max = Math.max(max, window.end);
   });
 
-  if (startTimestamp !== undefined) {
-    min = Math.max(min, startTimestamp);
-  }
-
-  const now = Math.floor(Date.now() / 1000); // 👈 current time
-
   const start = Math.floor(min / INTERVAL) * INTERVAL;
-  const end = Math.ceil(Math.max(max, now) / INTERVAL) * INTERVAL; // 👈 extend to now
+  const end = Math.ceil(max / INTERVAL) * INTERVAL;
 
   const timeline: number[] = [];
   for (let t = start; t <= end; t += INTERVAL) {
@@ -172,7 +190,7 @@ function truncateOutcomeName(name: string, maxLength = 14) {
 /* ================================
    COMPONENT
 ================================ */
-const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket, startTimestamp }: Props) {
+const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
@@ -211,9 +229,11 @@ const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket, s
 
     chartRef.current = chart;
 
-    const timeline = buildTimeline(data, startTimestamp);
+    const timeline = buildTimeline(data);
 
     data.forEach((outcomeData, i) => {
+      const window = getLiquidityWindow(outcomeData);
+      const seriesEnd = window?.end ?? Infinity;
       const series = chart.addSeries(LineSeries, {
         color: COLORS[i % COLORS.length],
         lineWidth: 2,
@@ -236,6 +256,8 @@ const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket, s
       let lastPrice: number | null = null;
 
       timeline.forEach((t) => {
+        if (t > seriesEnd) return; // stop past this series' liquidity removal
+
         const idx = findClosestLessThanOrEqualToTimestamp(timestamps, t);
 
         if (idx !== -1) {
