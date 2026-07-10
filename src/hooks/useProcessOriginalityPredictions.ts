@@ -48,7 +48,17 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     [predictions],
   );
 
-  const marketIdToRepo: { [key: string]: string } = {};
+  // Memoized independently of `processedData` below so it stays populated even on
+  // renders where that memo bails out (unrelated state changes elsewhere in the tree) —
+  // otherwise chart legend labels intermittently render blank.
+  const marketIdToRepo = useMemo(() => {
+    const mapping: { [key: string]: string } = {};
+    for (const [marketRepo, marketPoolData] of Object.entries(data?.marketsData ?? {})) {
+      mapping[marketPoolData.id] = marketRepo;
+    }
+    return mapping;
+  }, [data?.marketsData]);
+
   const processedData = useMemo(() => {
     if (!data || !Object.keys(data.marketsData ?? {}).length) {
       return undefined;
@@ -57,7 +67,6 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
       const prediction = repoToPredictionMapping[marketRepo];
       const { id: marketId, upPrice, downPrice, upPool, downPool } = marketPoolData;
       const market = data.markets.find((market) => market.id === marketId);
-      marketIdToRepo[marketId] = marketRepo;
 
       // Prediction-independent arbitrage bounds: when UP+DOWN>1 we can mint a
       // complete set and sell both sides until each pool reaches its

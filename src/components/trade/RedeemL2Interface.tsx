@@ -12,6 +12,7 @@ export interface RedeemL2InterfaceProps {
   onRedeem: () => void;
   isLoading: boolean;
   hasRedeemable: boolean;
+  subtitle?: string;
 }
 
 export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
@@ -24,6 +25,7 @@ export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
   onRedeem,
   isLoading,
   hasRedeemable,
+  subtitle = "Redeem resolved L2 positions to sUSDS",
 }) => {
   return (
     <div className="max-h-[90vh] overflow-y-auto">
@@ -31,7 +33,7 @@ export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
         <div>
           <h3 className="text-xl font-bold text-white">Redeem outcome tokens</h3>
-          <p className="text-sm text-white">Redeem resolved L2 positions to sUSDS</p>
+          <p className="text-sm text-white">{subtitle}</p>
         </div>
         <button
           onClick={onClose}
