@@ -7,7 +7,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Address } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { redeemFromRouter } from "./useExecuteL2Strategy";
+import { chunkRedeemFromRouter, redeemFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
 
 interface RedeemOriginalityProps {
@@ -40,8 +40,8 @@ async function redeemOriginality({
   // Group calls by market and track outcome count as a gas proxy.
   // redeemPositions does one unwrap per outcome + one CTF redeem, so outcome count
   // dominates gas. Keep each batch under MAX_OUTCOMES_PER_BATCH to stay well inside
-  // the 20M gas cap used by toastifyBatchTxSessionKey.
-  const MAX_OUTCOMES_PER_BATCH = 40;
+  // Optimism's 2^24 (16,777,216) per-transaction gas cap used by toastifyBatchTxSessionKey.
+  const MAX_OUTCOMES_PER_BATCH = 30;
   const marketGroups: { calls: Execution[]; outcomeCount: number }[] = [];
 
   for (const market of closedMarkets) {
@@ -114,22 +114,25 @@ async function redeemOriginality({
   }
 
   if (parentRedeemTokens.length > 0) {
-    const parentCalls = redeemFromRouter(
+    // The parent market can have many outcomes; chunk it the same way as phase 1
+    // so each batchExecute call stays under Optimism's per-transaction gas cap.
+    const parentBatches = chunkRedeemFromRouter(
       router,
       collateral.address,
       ORIGINALITY_PARENT_MARKET_ID,
       parentRedeemTokens,
       parentOutcomeIndexes,
       parentAmounts,
+      MAX_OUTCOMES_PER_BATCH,
     );
-    // The parent market is a single redeemPositions call; push it as one batch.
-    const phase2Input: CallBatchesInput = [
-      {
-        calls: parentCalls,
-        message: "Redeeming parent market",
-        skipFailCalls: false,
-      },
-    ];
+    const phase2Input: CallBatchesInput = parentBatches.map((calls, i) => ({
+      calls,
+      message:
+        parentBatches.length > 1
+          ? `Redeeming parent market batch ${i + 1}/${parentBatches.length}`
+          : "Redeeming parent market",
+      skipFailCalls: false,
+    }));
     const phase2Result = await toastifyBatchTxSessionKey(tradeExecutor, phase2Input, onStateChange);
     if (!phase2Result.status) {
       await withdrawFundSessionKey();

@@ -16,6 +16,10 @@ export const OCTANT_MARKET_ID = "0xe85ada7cd6d33cb41ac596fb4749e3f94d836ece";
 
 export const CHAIN_ID = 10 as SupportedChain;
 
+// Optimism enforces a hard per-transaction gas-limit cap of 2^24. Any tx with a
+// higher gas limit is rejected by the sequencer with "gas limit too high".
+export const OPTIMISM_MAX_TX_GAS = 16_777_216n; // 2^24
+
 export const DECIMALS = 18;
 
 export const SALT_KEY = "TradeExecutorV1";

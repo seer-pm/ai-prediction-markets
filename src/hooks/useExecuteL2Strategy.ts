@@ -108,6 +108,35 @@ export function redeemFromRouter(
   ];
 }
 
+// redeemPositions accepts arrays, so a market with many outcomes can be redeemed
+// via several calls each covering a subset of outcomes. Chunk into groups of at
+// most maxOutcomesPerBatch so a single batchExecute call stays under Optimism's
+// 2^24 per-transaction gas cap (see OPTIMISM_MAX_TX_GAS).
+export function chunkRedeemFromRouter(
+  router: Address,
+  collateralToken: Address,
+  marketId: Address,
+  tokens: Address[],
+  outcomeIndexes: bigint[],
+  amounts: bigint[],
+  maxOutcomesPerBatch: number,
+): Execution[][] {
+  const batches: Execution[][] = [];
+  for (let i = 0; i < tokens.length; i += maxOutcomesPerBatch) {
+    batches.push(
+      redeemFromRouter(
+        router,
+        collateralToken,
+        marketId,
+        tokens.slice(i, i + maxOutcomesPerBatch),
+        outcomeIndexes.slice(i, i + maxOutcomesPerBatch),
+        amounts.slice(i, i + maxOutcomesPerBatch),
+      ),
+    );
+  }
+  return batches;
+}
+
 const getSellTradeExecutorCalls = async ({
   amount,
   getQuotesResults,

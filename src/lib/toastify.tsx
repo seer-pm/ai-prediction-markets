@@ -2,7 +2,7 @@ import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config as wagmiConfig } from "@/config/wagmi";
 import { Execution } from "@/hooks/useCheck7702Support";
 import { CallBatchesInput } from "@/types";
-import { CHAIN_ID } from "@/utils/constants";
+import { CHAIN_ID, OPTIMISM_MAX_TX_GAS } from "@/utils/constants";
 import {
   Config,
   ConnectorNotConnectedError,
@@ -356,7 +356,7 @@ export const toastifyBatchTx = async (
         ],
         value: 0n,
         chainId: CHAIN_ID,
-        gas: 20_000_000n,
+        gas: OPTIMISM_MAX_TX_GAS,
       });
     } catch (err) {
       return {
@@ -440,7 +440,7 @@ export const toastifyBatchTxSessionKey = async (
       args: [buildBatchArgs(calls)],
       account: sessionAccount,
       chainId: CHAIN_ID,
-      gas: 20_000_000n,
+      gas: OPTIMISM_MAX_TX_GAS,
     });
 
     return request;

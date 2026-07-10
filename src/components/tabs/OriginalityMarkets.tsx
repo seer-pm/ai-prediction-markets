@@ -102,6 +102,17 @@ export const OriginalityMarkets = () => {
     closedTokens,
   );
 
+  // Parent market outcome tokens — redeemable independently of closedTokens when
+  // phase 1 (conditional → parent) already ran but phase 2 (parent → sUSDS) hasn't.
+  const parentTokens = useMemo(
+    () => originalityMarketData?.parentWrappedTokens ?? [],
+    [originalityMarketData?.parentWrappedTokens],
+  );
+  const { data: parentBalances, isLoading: isLoadingParentBalances } = useTokensBalances(
+    checkTradeExecutorResult?.predictedAddress as Address,
+    parentTokens,
+  );
+
   const redeem = useRedeemOriginality(() => {
     closeRedeemDialog();
   });
@@ -187,8 +198,8 @@ export const OriginalityMarkets = () => {
   );
 
   const hasRedeemable = useMemo(
-    () => (closedBalances ?? []).some((b) => b > 0n),
-    [closedBalances],
+    () => (closedBalances ?? []).some((b) => b > 0n) || (parentBalances ?? []).some((b) => b > 0n),
+    [closedBalances, parentBalances],
   );
 
   const exportWeight = useCallback(() => {
@@ -371,10 +382,16 @@ export const OriginalityMarkets = () => {
             redeem.mutate({
               tradeExecutor: checkTradeExecutorResult?.predictedAddress!,
               closedMarkets,
-              parentTokens: originalityMarketData?.parentWrappedTokens ?? [],
+              parentTokens,
             });
           }}
-          isLoading={isLoadingSellBalances || isLoading || isLoadingBalances || isLoadingClosedBalances}
+          isLoading={
+            isLoadingSellBalances ||
+            isLoading ||
+            isLoadingBalances ||
+            isLoadingClosedBalances ||
+            isLoadingParentBalances
+          }
           hasRedeemable={hasRedeemable}
           subtitle="Redeem resolved Originality positions to sUSDS"
         />

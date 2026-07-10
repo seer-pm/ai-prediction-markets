@@ -9,6 +9,7 @@ import { DownloadIcon } from "@/lib/icons";
 import { L2Row } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { parseL2CSV } from "@/utils/csvParser";
+import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { sampleL2Predictions } from "@/utils/samepleL2Predictions";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
@@ -102,6 +103,13 @@ export const L2Markets = () => {
     collateralTokens,
   );
 
+  // Parent market outcome tokens — redeemable independently of closed markets when
+  // phase 1 (conditional → parent) already ran but phase 2 (parent → sUSDS) hasn't.
+  const { data: parentBalances, isLoading: isLoadingParentBalances } = useTokensBalances(
+    checkTradeExecutorResult?.predictedAddress as Address,
+    l2MarketOutcomes as Address[],
+  );
+
   const repoOptions = useMemo(
     () =>
       tableData
@@ -153,8 +161,8 @@ export const L2Markets = () => {
     () =>
       !!tableData?.some(
         (row) => closedMarketIds.has(row.marketId.toLowerCase()) && (row.balance ?? 0n) > 0n,
-      ),
-    [tableData, closedMarketIds],
+      ) || (parentBalances ?? []).some((b) => b > 0n),
+    [tableData, closedMarketIds, parentBalances],
   );
 
   const exportWeight = useCallback(() => {
@@ -331,7 +339,7 @@ export const L2Markets = () => {
               closedMarkets,
             });
           }}
-          isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
+          isLoading={isLoadingSellBalances || isLoading || isLoadingBalances || isLoadingParentBalances}
           hasRedeemable={hasRedeemable}
         />
       </Modal>
