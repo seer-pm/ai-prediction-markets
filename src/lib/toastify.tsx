@@ -505,6 +505,87 @@ export const toastifyBatchTxSessionKey = async (
   return { status: true, receipt: lastReceipt! };
 };
 
+// Owner-signed counterpart to toastifyBatchTxSessionKey, for trade executors that don't
+// support a session key (e.g. the deprecated OldTradeExecutor, which is onlyOwner-gated).
+// Submits each pre-built batch as a separate owner-signed batchExecute call, so unlike the
+// session key path the connected wallet is prompted once per batch.
+export const toastifyBatchTxOwner = async (
+  tradeExecutor: Address,
+  input: CallBatchesInput,
+  onStateChange: (state: string) => void,
+) => {
+  let lastReceipt: TransactionReceipt | undefined;
+
+  const buildBatchArgs = (calls: CallBatchesInput[number]["calls"]) =>
+    calls.map(({ to, data }) => ({ to, data }));
+
+  try {
+    for (let i = 0; i < input.length; i++) {
+      const { calls, message, skipFailCalls } = input[i];
+      onStateChange(message ?? `Executing batch ${i + 1}`);
+
+      let executableCalls = calls;
+      try {
+        await simulateContract(wagmiConfig, {
+          address: tradeExecutor,
+          abi: TradeExecutorAbi,
+          functionName: "batchExecute",
+          args: [buildBatchArgs(calls)],
+          chainId: CHAIN_ID,
+          gas: OPTIMISM_MAX_TX_GAS,
+        });
+      } catch (err) {
+        if (!skipFailCalls) {
+          throw err;
+        }
+        const { good } = await buildExecutableBatch(calls as Execution[], (goodCalls) =>
+          simulateContract(wagmiConfig, {
+            address: tradeExecutor,
+            abi: TradeExecutorAbi,
+            functionName: "batchExecute",
+            args: [buildBatchArgs(goodCalls)],
+            chainId: CHAIN_ID,
+            gas: OPTIMISM_MAX_TX_GAS,
+          }),
+        );
+        executableCalls = good;
+      }
+
+      if (skipFailCalls && executableCalls.length === 0) {
+        continue;
+      }
+
+      const writePromise = writeContract(wagmiConfig, {
+        address: tradeExecutor,
+        abi: TradeExecutorAbi,
+        functionName: "batchExecute",
+        args: [buildBatchArgs(executableCalls)],
+        value: 0n,
+        chainId: CHAIN_ID,
+      });
+
+      const result = await toastifyTx(() => writePromise, {
+        txSent: { title: message ?? `Sending batch ${i + 1}/${input.length}...` },
+        txSuccess: {
+          title: i === input.length - 1 ? "Done!" : `Batch ${i + 1}/${input.length} sent!`,
+        },
+      });
+
+      if (!result.status) {
+        if (skipFailCalls) {
+          continue;
+        }
+        throw result.error;
+      }
+
+      lastReceipt = result.receipt;
+    }
+  } catch (error: any) {
+    return { status: false, error };
+  }
+  return { status: true, receipt: lastReceipt! };
+};
+
 async function pollForTransactionReceipt(
   hash: `0x${string}`,
   maxAttempts = 7,

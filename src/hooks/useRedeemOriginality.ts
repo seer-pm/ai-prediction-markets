@@ -1,6 +1,6 @@
 import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
-import { toastifyBatchTxSessionKey } from "@/lib/toastify";
+import { toastifyBatchTxOwner, toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { CallBatchesInput } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS, ORIGINALITY_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
@@ -16,16 +16,24 @@ interface RedeemOriginalityProps {
   closedMarkets: { id: Address; collateralToken: Address; wrappedTokens: Address[] }[];
   /** The Originality parent market's outcome tokens */
   parentTokens: Address[];
+  /**
+   * True when redeeming from the deprecated trade executor, which has no session-key
+   * mechanism (OldTradeExecutor is onlyOwner). Batches are then signed by the connected
+   * owner wallet directly instead of a session key.
+   */
+  isOldWallet?: boolean;
 }
 
 async function redeemOriginality({
   tradeExecutor,
   closedMarkets,
   parentTokens: parentTokensInput,
+  isOldWallet,
   onStateChange,
 }: RedeemOriginalityProps & { onStateChange: (state: string) => void }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
+  const submitBatches = isOldWallet ? toastifyBatchTxOwner : toastifyBatchTxSessionKey;
 
   // ── Phase 1: redeem conditional market tokens → receive parent outcome tokens ──
   onStateChange("Checking balances");
@@ -89,9 +97,9 @@ async function redeemOriginality({
       message: `Redeeming conditional markets batch ${i + 1}/${phase1Batches.length}`,
       skipFailCalls: false,
     }));
-    const phase1Result = await toastifyBatchTxSessionKey(tradeExecutor, phase1Input, onStateChange);
+    const phase1Result = await submitBatches(tradeExecutor, phase1Input, onStateChange);
     if (!phase1Result.status) {
-      await withdrawFundSessionKey();
+      if (!isOldWallet) await withdrawFundSessionKey();
       throw phase1Result.error;
     }
   }
@@ -133,14 +141,14 @@ async function redeemOriginality({
           : "Redeeming parent market",
       skipFailCalls: false,
     }));
-    const phase2Result = await toastifyBatchTxSessionKey(tradeExecutor, phase2Input, onStateChange);
+    const phase2Result = await submitBatches(tradeExecutor, phase2Input, onStateChange);
     if (!phase2Result.status) {
-      await withdrawFundSessionKey();
+      if (!isOldWallet) await withdrawFundSessionKey();
       throw phase2Result.error;
     }
   }
 
-  await withdrawFundSessionKey();
+  if (!isOldWallet) await withdrawFundSessionKey();
 }
 
 export const useRedeemOriginality = (onSuccess?: () => unknown) => {
