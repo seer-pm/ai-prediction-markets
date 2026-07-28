@@ -1,54 +1,17 @@
 import { AI_PREDICTION_MARKET_ID } from "@/utils/constants";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
+import { getMarketStatus, MarketStatusInput } from "./utils/marketStatus";
 import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
-import { compareAsc, fromUnixTime } from "date-fns";
 import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
 
-interface Market {
-  payoutReported: boolean;
+interface Market extends MarketStatusInput {
   wrappedTokens: Address[];
   conditionId: Address;
-  questions: {
-    question: { opening_ts: string; finalize_ts: string; is_pending_arbitration: boolean };
-  }[];
 }
-
-const getMarketStatus = (market: Market) => {
-  if (!(Number(market.questions[0].question.opening_ts) < Math.round(new Date().getTime() / 1000))) {
-    return MarketStatus.NOT_OPEN;
-  }
-
-  if (market.questions.every((question) => Number(question.question.finalize_ts) === 0)) {
-    return MarketStatus.OPEN;
-  }
-
-  if (market.questions.some((question) => question.question.is_pending_arbitration)) {
-    return MarketStatus.IN_DISPUTE;
-  }
-
-  if (
-    market.questions.some((question) => {
-      const finalizeTs = Number(question.question.finalize_ts);
-      const isFinalized =
-        !question.question.is_pending_arbitration &&
-        finalizeTs > 0 &&
-        compareAsc(new Date(), fromUnixTime(finalizeTs)) === 1;
-      return finalizeTs === 0 || !isFinalized;
-    })
-  ) {
-    return MarketStatus.ANSWER_NOT_FINAL;
-  }
-
-  if (!market!.payoutReported) {
-    return MarketStatus.PENDING_EXECUTION;
-  }
-
-  return MarketStatus.CLOSED;
-};
 
 export default async (req: Request) => {
   const preflight = handleCorsPreflight(req);

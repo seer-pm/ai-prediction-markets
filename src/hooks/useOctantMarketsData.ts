@@ -1,5 +1,6 @@
 import { ChartWithMarketData, PoolInfo } from "@/types";
 import { getAppUrl } from "@/utils/common";
+import { MarketStatus } from "@seer-pm/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 
@@ -14,6 +15,7 @@ interface GetMarketsDataApiResult {
   };
   wrappedTokens: Address[];
   payoutNumerators: string[];
+  marketStatus: MarketStatus;
   charts: {
     [key: string]: ChartWithMarketData;
   } | null;
@@ -31,6 +33,8 @@ const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
       marketsData: {},
       wrappedTokens: [],
       payoutNumerators: [],
+      // Never let a failed fetch look like a resolved market to the redeem flow.
+      marketStatus: MarketStatus.NOT_OPEN,
       charts: null,
       totalVolumeMapping: null,
     };

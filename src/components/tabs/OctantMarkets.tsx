@@ -1,20 +1,26 @@
 import { useCheckTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useOctantMarketsData } from "@/hooks/useOctantMarketsData";
 import { useProcessOctantPredictions } from "@/hooks/useProcessOctantPredictions";
+import { useRedeemOctant } from "@/hooks/useRedeemOctant";
 import { useSellOctantToCollateral } from "@/hooks/useSellOctantToCollateral";
+import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { DownloadIcon } from "@/lib/icons";
 import { OctantRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
 import { parseOctantCSV } from "@/utils/csvParser";
 import { sampleOctantPredictions } from "@/utils/sampleOctantPredictions";
+import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount } from "wagmi";
+import { Address } from "viem";
 import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { OctantMarketTable } from "../OctantMarketTable";
 import MarketChart from "../MarketChart";
 import { Modal } from "../Modal";
+import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import { OctantTradingInterface } from "../trade/OctantTradingInterface";
 import { useWalletStore } from "@/stores/walletStore";
@@ -47,6 +53,7 @@ export const OctantMarkets = () => {
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
   const isUseOldWallet = useWalletStore((s) => s.isUseOldWallet);
 
   const {
@@ -62,6 +69,30 @@ export const OctantMarkets = () => {
   const sellAll = useSellOctantToCollateral(() => {
     closeSellAllDialog();
   });
+
+  // Redeem needs the outcome tokens in outcome order — `tableData` is sorted by
+  // price, so the row index no longer matches the on-chain outcome index.
+  // React Query dedupes both of these with useProcessOctantPredictions.
+  const { data: octantMarketData } = useOctantMarketsData();
+  const wrappedTokens = useMemo(
+    () => (octantMarketData?.wrappedTokens ?? []) as Address[],
+    [octantMarketData?.wrappedTokens],
+  );
+  const { data: outcomeBalances, isLoading: isLoadingOutcomeBalances } = useTokensBalances(
+    checkTradeExecutorResult?.predictedAddress as Address,
+    wrappedTokens,
+  );
+
+  const redeem = useRedeemOctant(() => {
+    closeRedeemDialog();
+  });
+
+  const hasRedeemable = useMemo(
+    () =>
+      octantMarketData?.marketStatus === MarketStatus.CLOSED &&
+      (outcomeBalances ?? []).some((b) => b > 0n),
+    [octantMarketData?.marketStatus, outcomeBalances],
+  );
 
   const parseOctantVolumeData = useCallback(() => {
     const volumeString = Object.values(totalVolumeMapping ?? {})[0];
@@ -99,6 +130,10 @@ export const OctantMarkets = () => {
   const closeTradeDialog = useCallback(() => startTransition(() => setIsTradeDialogOpen(false)), []);
   const closeSellAllDialog = useCallback(
     () => startTransition(() => setIsSellAllDialogOpen(false)),
+    [],
+  );
+  const closeRedeemDialog = useCallback(
+    () => startTransition(() => setIsRedeemDialogOpen(false)),
     [],
   );
 
@@ -184,6 +219,14 @@ export const OctantMarkets = () => {
               </button>
 
               <button
+                disabled={isLoading || !account}
+                onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                className="cursor-pointer px-5 py-2.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium text-white shadow-md transition-colors duration-200 w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Redeem to sUSDS
+              </button>
+
+              <button
                 onClick={handleStartTrading}
                 disabled={
                   !tableData ||
@@ -254,6 +297,27 @@ export const OctantMarkets = () => {
           onSellAll={handleSellAll}
           isLoading={isLoading || isLoadingBalances}
           hasTokens={hasSellTokens}
+        />
+      </Modal>
+
+      {/* Redeem Dialog */}
+      <Modal isOpen={isRedeemDialogOpen} onClose={closeRedeemDialog}>
+        <RedeemL2Interface
+          onClose={closeRedeemDialog}
+          isError={redeem.isError}
+          error={redeem.error}
+          isPending={redeem.isPending}
+          txState={redeem.txState}
+          reset={redeem.reset}
+          onRedeem={() => {
+            redeem.mutate({
+              tradeExecutor: checkTradeExecutorResult?.predictedAddress!,
+              wrappedTokens,
+            });
+          }}
+          isLoading={isLoading || isLoadingBalances || isLoadingOutcomeBalances}
+          hasRedeemable={hasRedeemable}
+          subtitle="Redeem resolved Octant positions to sUSDS"
         />
       </Modal>
     </>

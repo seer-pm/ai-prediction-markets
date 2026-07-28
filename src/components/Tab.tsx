@@ -6,7 +6,7 @@ import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
 
 const TABS = [
-  { id: "octant", label: "Octant", Component: OctantMarkets, finished: false },
+  { id: "octant", label: "Octant (Finished)", Component: OctantMarkets, finished: true },
   { id: "round2-l2", label: "Round 2 L2 (Finished)", Component: L2Markets, finished: true },
   { id: "round2-l1", label: "Round 2 L1", Component: L1Markets, finished: false },
   {

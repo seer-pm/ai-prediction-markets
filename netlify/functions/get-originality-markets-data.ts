@@ -5,61 +5,21 @@ import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/c
 import { CHAIN_ID, ORIGINALITY_PARENT_MARKET_ID } from "@/utils/constants";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
-import { MarketStatus } from "@seer-pm/sdk";
+import { getMarketStatus, MarketStatusInput } from "./utils/marketStatus";
 import { createClient } from "@supabase/supabase-js";
-import { compareAsc, fromUnixTime } from "date-fns";
 import pLimit from "p-limit";
 import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
-interface Market {
+interface Market extends MarketStatusInput {
   wrappedTokens: Address[];
   collateralToken: Address;
   id: Address;
   outcomes: string[];
   parentOutcome: number;
-  payoutReported: boolean;
   conditionId: Address;
-  questions: {
-    question: { opening_ts: string; finalize_ts: string; is_pending_arbitration: boolean };
-  }[];
 }
-
-const getMarketStatus = (market: Market) => {
-  if (
-    !(Number(market.questions[0].question.opening_ts) < Math.round(new Date().getTime() / 1000))
-  ) {
-    return MarketStatus.NOT_OPEN;
-  }
-
-  if (market.questions.every((question) => Number(question.question.finalize_ts) === 0)) {
-    return MarketStatus.OPEN;
-  }
-
-  if (market.questions.some((question) => question.question.is_pending_arbitration)) {
-    return MarketStatus.IN_DISPUTE;
-  }
-
-  if (
-    market.questions.some((question) => {
-      const finalizeTs = Number(question.question.finalize_ts);
-      const isFinalized =
-        !question.question.is_pending_arbitration &&
-        finalizeTs > 0 &&
-        compareAsc(new Date(), fromUnixTime(finalizeTs)) === 1;
-      return finalizeTs === 0 || !isFinalized;
-    })
-  ) {
-    return MarketStatus.ANSWER_NOT_FINAL;
-  }
-
-  if (!market!.payoutReported) {
-    return MarketStatus.PENDING_EXECUTION;
-  }
-
-  return MarketStatus.CLOSED;
-};
 
 async function getCharts(keys: string[]) {
   try {

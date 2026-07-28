@@ -5,6 +5,7 @@ import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/c
 import { CHAIN_ID, COLLATERAL_TOKENS, OCTANT_MARKET_ID } from "@/utils/constants";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
+import { getMarketStatus, MarketStatusInput } from "./utils/marketStatus";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 
@@ -24,7 +25,7 @@ export default async (req: Request) => {
       supabase
         .from("markets")
         .select(
-          "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators",
+          "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators,subgraph_data->payoutReported,subgraph_data->questions",
         )
         .eq("id", OCTANT_MARKET_ID)
         .eq("chain_id", CHAIN_ID)
@@ -138,6 +139,8 @@ export default async (req: Request) => {
         charts,
         wrappedTokens,
         payoutNumerators: data.payoutNumerators,
+        // Octant is a single flat market, so one status covers the whole contest.
+        marketStatus: getMarketStatus(data as unknown as MarketStatusInput),
         totalVolumeMapping,
       }),
       {
