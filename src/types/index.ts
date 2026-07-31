@@ -1,6 +1,6 @@
 import { SupportedChain } from "@/utils/constants";
 import { GetPoolHourDatasQuery } from "@seer-pm/sdk/subgraph/swapr";
-import { Address } from "viem";
+import { Address, TransactionReceipt } from "viem";
 
 export interface PredictionRow {
   repo: string;
@@ -181,6 +181,24 @@ export type CallBatchesInput = {
   message: string;
   skipFailCalls?: boolean;
 }[];
+
+/** viem/wagmi errors carry a `shortMessage` that reads better than the full `message`. */
+export type BatchTxError = Error & { shortMessage?: string };
+
+/**
+ * Outcome of a multi-batch submission. `executedCalls` counts the calls that actually made it
+ * on-chain, so callers can tell "every call was pruned during simulation" apart from "the batch
+ * simulated fine but nothing was ever broadcast".
+ */
+export type BatchTxResult =
+  | {
+      status: true;
+      receipt?: TransactionReceipt;
+      executedCalls: number;
+      prunedCalls: number;
+      skippedBatches: number;
+    }
+  | { status: false; error: BatchTxError };
 
 export type PoolHourData = {
   token0Price: string;

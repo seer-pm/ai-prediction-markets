@@ -3,7 +3,8 @@ import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { CallBatchesInput, L2TradeProps } from "@/types";
-import { isTwoStringsEqual } from "@/utils/common";
+import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
+import { fetchTokensBalances } from "./useTokensBalances";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -16,7 +17,8 @@ import { Execution } from "./useCheck7702Support";
 import { useState } from "react";
 import { getL2BuyQuotes } from "@/lib/trade/getQuote";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
-import { getQuoteTradeCalls } from "@/utils/trade";
+import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
+import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -78,6 +80,52 @@ export function mergeFromRouter(
   ];
 }
 
+/**
+ * Builds the merge batches that undo a mint when a later phase of a strategy aborts, so a failed
+ * run never strands collateral as complete sets.
+ *
+ * `levels` must be ordered child market first: merging a child yields its parent's outcome token,
+ * which the parent level can then merge onward. Amounts come from live balances rather than the
+ * minted amount, because a partially executed sell would make a full-amount merge revert.
+ */
+export async function getUnwindMintCalls(
+  tradeExecutor: Address,
+  router: Address,
+  levels: { marketId: Address; tokens: Address[]; producesToken?: Address }[],
+): Promise<CallBatchesInput> {
+  const input: CallBatchesInput = [];
+  // Tokens an earlier level will mint that aren't in the wallet yet.
+  const credited: { [token: string]: bigint } = {};
+
+  for (let i = 0; i < levels.length; i++) {
+    const { marketId, tokens, producesToken } = levels[i];
+    if (!tokens.length) continue;
+
+    const balances = await fetchTokensBalances(tradeExecutor, tokens);
+    if (balances.length !== tokens.length) {
+      throw new Error("Cannot read token balances to unwind the mint");
+    }
+
+    const amount = minBigIntArray(
+      balances.map((balance, index) => balance + (credited[tokens[index].toLowerCase()] ?? 0n)),
+    );
+    if (amount <= 0n) continue;
+
+    input.push({
+      calls: mergeFromRouter(router, amount, marketId, tokens),
+      message: `Merging tokens back to collateral ${i + 1}/${levels.length}`,
+      skipFailCalls: false,
+    });
+
+    if (producesToken) {
+      const key = producesToken.toLowerCase();
+      credited[key] = (credited[key] ?? 0n) + amount;
+    }
+  }
+
+  return input;
+}
+
 export function redeemFromRouter(
   router: Address,
   collateralToken: Address,
@@ -137,42 +185,49 @@ export function chunkRedeemFromRouter(
   return batches;
 }
 
-const getSellTradeExecutorCalls = async ({
-  amount,
-  getQuotesResults,
-  tradeExecutor,
-  tableData,
-}: L2TradeProps) => {
-  // mint l1
+// Distinct L2 markets present in the table, keyed so each market/collateral pair appears once.
+const getL2Markets = (tableData: L2TradeProps["tableData"]) => {
+  const l2Markets = {} as {
+    [key: string]: { marketId: string; collateralToken: string };
+  };
+  for (const { marketId, collateralToken } of tableData) {
+    l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken };
+  }
+  return Object.values(l2Markets);
+};
+
+// Kept separate from the sell batches so a sell failure can be told apart from a mint failure,
+// and so the mint can be unwound on abort.
+const getMintTradeExecutorCalls = ({ amount, tableData }: L2TradeProps) => {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
   const input: CallBatchesInput = [];
-  if (parsedSplitAmount > 0n) {
-    input.push({
-      calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
-      message: "Minting parent tokens",
-    });
-    // mint l2 markets
-    const l2Markets = {} as {
-      [key: string]: { marketId: string; collateralToken: string };
-    };
-    for (const { marketId, collateralToken } of tableData) {
-      l2Markets[`${marketId}-${collateralToken}`] = { marketId, collateralToken };
-    }
-    for (let i = 0; i < Object.values(l2Markets).length; i++) {
-      const { marketId, collateralToken } = Object.values(l2Markets)[i];
-      input.push({
-        calls: splitFromRouter(
-          router,
-          parsedSplitAmount,
-          marketId as Address,
-          collateralToken as Address,
-        ),
-        message: `Minting tokens for market ${i + 1}/${Object.values(l2Markets).length}`,
-      });
-    }
+  if (parsedSplitAmount <= 0n) {
+    return input;
   }
+  input.push({
+    calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
+    message: "Minting parent tokens",
+  });
+  // mint l2 markets
+  const l2Markets = getL2Markets(tableData);
+  for (let i = 0; i < l2Markets.length; i++) {
+    const { marketId, collateralToken } = l2Markets[i];
+    input.push({
+      calls: splitFromRouter(
+        router,
+        parsedSplitAmount,
+        marketId as Address,
+        collateralToken as Address,
+      ),
+      message: `Minting tokens for market ${i + 1}/${l2Markets.length}`,
+    });
+  }
+  return input;
+};
 
+const getSellTradeExecutorCalls = async ({ getQuotesResults, tradeExecutor }: L2TradeProps) => {
+  const input: CallBatchesInput = [];
   const calls: Execution[] = [];
   //trade transactions
   for (const { quotes } of getQuotesResults) {
@@ -251,6 +306,67 @@ const executeL2StrategyContract = async ({
   if (!filteredTableData.length) {
     throw new Error("No token found");
   }
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
+  const didMint = Number(amount) > 0;
+
+  // Merge the freshly minted complete sets back to collateral so an aborted run doesn't leave the
+  // wallet holding tokens it never asked for. Child markets first: merging them yields the parent
+  // outcome tokens that the parent merge then converts back to collateral.
+  const abortAfterMint = async (reason: string): Promise<Error> => {
+    if (!didMint) {
+      await withdrawFundSessionKey();
+      return new Error(reason);
+    }
+    let unwindNote = "your minted tokens are still held, re-run the strategy with amount 0";
+    try {
+      onStateChange("Merging minted tokens back to collateral");
+      // Same markets that were minted, but each with its complete outcome set — mergePositions
+      // needs an approval for every outcome token, not just the ones we have predictions for.
+      const childLevels = getL2Markets(filteredTableData).map(({ marketId, collateralToken }) => ({
+        marketId: marketId as Address,
+        tokens: (tableData.find((row) => isTwoStringsEqual(row.marketId, marketId))?.wrappedTokens ??
+          []) as Address[],
+        producesToken: collateralToken as Address,
+      }));
+      const unwindInput = await getUnwindMintCalls(tradeExecutor, router, [
+        ...childLevels,
+        {
+          marketId: L2_PARENT_MARKET_ID,
+          tokens: l2MarketOutcomes as Address[],
+        },
+      ]);
+      const unwindResult = await toastifyBatchTxSessionKey(
+        tradeExecutor,
+        unwindInput,
+        onStateChange,
+        18_000_000n,
+      );
+      if (unwindResult.status) {
+        unwindNote = `your ${amount} ${collateral.symbol} was merged back`;
+      }
+    } catch (e) {
+      console.log("Cannot unwind mint ", e);
+    }
+    await withdrawFundSessionKey();
+    return new Error(`${reason} No trades were made — ${unwindNote}.`);
+  };
+
+  const mintInput = getMintTradeExecutorCalls({
+    amount,
+    getQuotesResults,
+    tradeExecutor,
+    tableData: filteredTableData,
+  });
+  const mintResult = await toastifyBatchTxSessionKey(
+    tradeExecutor,
+    mintInput,
+    onStateChange,
+    18_000_000n,
+  );
+  if (!mintResult.status) {
+    await withdrawFundSessionKey();
+    throw mintResult.error;
+  }
   const sellInput = await getSellTradeExecutorCalls({
     amount,
     getQuotesResults,
@@ -264,8 +380,12 @@ const executeL2StrategyContract = async ({
     18_000_000n,
   );
   if (!sellResult.status) {
-    await withdrawFundSessionKey();
-    throw sellResult.error;
+    throw await abortAfterMint(
+      `Sell phase failed: ${sellResult.error?.shortMessage ?? sellResult.error?.message ?? "unknown error"}.`,
+    );
+  }
+  if (sellInput.length > 0 && sellResult.executedCalls === 0) {
+    throw await abortAfterMint(describeSellFailure(sellResult, collateral.symbol));
   }
   onStateChange("Updating tokens balances");
   const getBuyQuotesResults = await getL2BuyQuotes({ account: tradeExecutor, amount, tableData });
@@ -312,13 +432,14 @@ export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
         queryClient.invalidateQueries({ queryKey: ["useGetL2Quotes"] });
       }, 3000);
     },
-    onError() {
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["useL2MarketsData"] });
-        queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
-        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
-        queryClient.invalidateQueries({ queryKey: ["useGetL2Quotes"] });
-      }, 3000);
+    // Await the balance refetches so a resubmit is validated against post-run balances.
+    async onError() {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["useTokenBalance"] }),
+        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] }),
+      ]);
+      queryClient.refetchQueries({ queryKey: ["useL2MarketsData"] });
+      queryClient.invalidateQueries({ queryKey: ["useGetL2Quotes"] });
     },
   });
   return {

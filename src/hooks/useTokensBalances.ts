@@ -26,6 +26,22 @@ export const fetchTokensBalances = async (
   }
 };
 
+/**
+ * Same read, but surfaces a failure instead of returning `[]`. Callers doing bigint arithmetic on
+ * the result need this — an empty array silently yields `undefined` operands and an opaque
+ * "Cannot mix BigInt and other types" TypeError further downstream.
+ */
+export const fetchTokensBalancesOrThrow = async (
+  account: Address,
+  tokens: Address[],
+): Promise<bigint[]> => {
+  const balances = await fetchTokensBalances(account, tokens);
+  if (balances.length !== tokens.length) {
+    throw new Error("Cannot read token balances, please retry");
+  }
+  return balances;
+};
+
 export const useTokensBalances = (account: Address | undefined, tokens: Address[] | undefined) => {
   return useQuery({
     enabled: !!account && tokens && tokens.length > 0,

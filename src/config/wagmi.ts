@@ -9,11 +9,21 @@ const OPTIMISM_RPC = rpcEndpoint("optimism");
 
 const projectId = import.meta.env.VITE_WC_PROJECT_ID;
 
+/**
+ * Shared by wagmi and by the standalone session-key wallet clients. Those used to be built with a
+ * bare `http()`, which resolves to optimism's public default RPC — so batches were simulated
+ * against drpc but broadcast to a rate-limited endpoint with no fallback.
+ */
+export const OPTIMISM_TRANSPORT = fallback([
+  http(OPTIMISM_RPC),
+  http("https://mainnet.optimism.io"),
+]);
+
 const wagmiAdapter = new WagmiAdapter({
   networks: [optimism],
   projectId,
   transports: {
-    [optimism.id]: fallback([http(OPTIMISM_RPC), http("https://mainnet.optimism.io")]),
+    [optimism.id]: OPTIMISM_TRANSPORT,
   },
   batch: {
     multicall: {

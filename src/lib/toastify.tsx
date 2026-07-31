@@ -1,7 +1,7 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
-import { config as wagmiConfig } from "@/config/wagmi";
+import { config as wagmiConfig, OPTIMISM_TRANSPORT } from "@/config/wagmi";
 import { Execution } from "@/hooks/useCheck7702Support";
-import { CallBatchesInput } from "@/types";
+import { BatchTxResult, CallBatchesInput } from "@/types";
 import { CHAIN_ID, OPTIMISM_MAX_TX_GAS } from "@/utils/constants";
 import {
   Config,
@@ -23,7 +23,6 @@ import {
   TransactionReceiptNotFoundError,
   WaitForTransactionReceiptTimeoutError,
   createWalletClient,
-  http,
 } from "viem";
 import { optimism } from "viem/chains";
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
@@ -58,6 +57,9 @@ type ToastifyTxReturn =
   | {
       status: false;
       error: Error;
+      // Set when the transaction was broadcast but we lost track of it (e.g. receipt timeout).
+      // Resending in that case would execute the same calls twice, so callers must not retry.
+      hash?: `0x${string}`;
     };
 
 type ToastifyConfig = {
@@ -205,7 +207,7 @@ export const handleTx: ToastifyTxFn = async (contractWrite) => {
       }
     }
 
-    return { status: false, error };
+    return { status: false, error, hash };
   }
 };
 
@@ -409,18 +411,24 @@ async function buildExecutableBatch(
   return { good, bad };
 }
 
+const SEND_ATTEMPTS = 3;
+const INSUFFICIENT_GAS_FUNDS =
+  "The total cost (gas * gas fee + value) of executing this transaction exceeds the balance of the account.";
+
 export const toastifyBatchTxSessionKey = async (
   tradeExecutor: Address,
   input: CallBatchesInput,
   onStateChange: (state: string) => void,
   gasPerBatch = 10_000_000n,
-) => {
+): Promise<BatchTxResult> => {
   const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
 
+  // Same transport the simulations run through — a batch that simulates on drpc must not be
+  // broadcast to a different, rate-limited endpoint.
   const sessionWallet = createWalletClient({
     account: sessionAccount,
     chain: optimism,
-    transport: http(),
+    transport: OPTIMISM_TRANSPORT,
   });
 
   const { maxFeePerGas } = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
@@ -446,9 +454,17 @@ export const toastifyBatchTxSessionKey = async (
     return request;
   };
 
-  const executeBatch = async (calls: Execution[], skipFailCalls?: boolean) => {
+  // Returns null when there is nothing executable left in the batch. Callers must not broadcast
+  // in that case — simulating an empty call array would "succeed" and burn gas on a no-op tx that
+  // reports success while having done nothing.
+  type SimulatedRequest = Awaited<ReturnType<typeof simulateBatchExecute>>;
+
+  const executeBatch = async (
+    calls: Execution[],
+    skipFailCalls?: boolean,
+  ): Promise<{ request: SimulatedRequest; executed: number; pruned: number } | null> => {
     try {
-      return await simulateBatchExecute(calls);
+      return { request: await simulateBatchExecute(calls), executed: calls.length, pruned: 0 };
     } catch (err: any) {
       if (!skipFailCalls) {
         console.log("not skip calls ", calls.length, err.message);
@@ -456,53 +472,88 @@ export const toastifyBatchTxSessionKey = async (
       }
 
       const { good } = await buildExecutableBatch(calls, simulateBatchExecute);
-      console.log("keep good calls ", good.length);
+      console.log("keep good calls ", good.length, "of", calls.length);
+      if (!good.length) {
+        return null;
+      }
       try {
-        return await simulateBatchExecute(good);
+        return {
+          request: await simulateBatchExecute(good),
+          executed: good.length,
+          pruned: calls.length - good.length,
+        };
       } catch (err2: any) {
         console.log("final batch still failed", err2.message);
-        return await simulateBatchExecute([]);
+        return null;
       }
     }
   };
 
+  // A batch that simulated fine but failed to broadcast is a transport problem, not a bad call.
+  // Retry it before giving up — and never swallow the failure, regardless of skipFailCalls.
+  const sendBatch = async (request: SimulatedRequest, label: string) => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < SEND_ATTEMPTS; attempt++) {
+      if (attempt > 0) {
+        onStateChange(`${label} (retry ${attempt}/${SEND_ATTEMPTS - 1})`);
+      }
+      const result = await handleTx(() => sessionWallet.writeContract(request));
+      if (result.status) {
+        return result.receipt;
+      }
+      lastError = result.error;
+
+      // The batch was broadcast but we couldn't confirm it. Resending would run the same calls a
+      // second time, so stop here and let the caller surface it.
+      if (result.hash) {
+        break;
+      }
+
+      if (result.error?.message?.includes(INSUFFICIENT_GAS_FUNDS)) {
+        await fundSessionKey(50_000_000n * maxFeePerGas, onStateChange);
+        onStateChange(label);
+        continue;
+      }
+      if (attempt < SEND_ATTEMPTS - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+      }
+    }
+    throw lastError;
+  };
+
+  let executedCalls = 0;
+  let prunedCalls = 0;
+  let skippedBatches = 0;
+
   try {
     for (let i = 0; i < input.length; i++) {
       const { calls, message, skipFailCalls } = input[i];
-      console.log(message)
-      onStateChange(message ?? `Executing batch ${i + 1}`);
+      const label = message ?? `Executing batch ${i + 1}`;
 
-      const request = await executeBatch(calls as Execution[], skipFailCalls);
-
-      const result = await handleTx(() => sessionWallet.writeContract(request));
-
-      if (!result.status) {
-        if (
-          result.error.message.includes(
-            "The total cost (gas * gas fee + value) of executing this transaction exceeds the balance of the account.",
-          )
-        ) {
-          await fundSessionKey(50_000_000n * maxFeePerGas, onStateChange);
-          onStateChange(message ?? `Executing batch ${i + 1}`);
-          const newResult = await handleTx(() => sessionWallet.writeContract(request));
-          if (!newResult.status) {
-            throw newResult.error;
-          }
-          lastReceipt = newResult.receipt;
-          continue;
-        }
-        if (skipFailCalls) {
-          continue;
-        }
-        throw result.error;
+      // Nothing to do — don't pay for an empty batchExecute([]).
+      if (!calls.length) {
+        continue;
       }
 
-      lastReceipt = result.receipt;
+      onStateChange(label);
+
+      const batch = await executeBatch(calls as Execution[], skipFailCalls);
+
+      if (!batch) {
+        // Every call in this batch reverted during simulation.
+        prunedCalls += calls.length;
+        skippedBatches++;
+        continue;
+      }
+
+      lastReceipt = await sendBatch(batch.request, label);
+      executedCalls += batch.executed;
+      prunedCalls += batch.pruned;
     }
   } catch (error: any) {
     return { status: false, error };
   }
-  return { status: true, receipt: lastReceipt! };
+  return { status: true, receipt: lastReceipt, executedCalls, prunedCalls, skippedBatches };
 };
 
 // Owner-signed counterpart to toastifyBatchTxSessionKey, for trade executors that don't
@@ -513,8 +564,11 @@ export const toastifyBatchTxOwner = async (
   tradeExecutor: Address,
   input: CallBatchesInput,
   onStateChange: (state: string) => void,
-) => {
+): Promise<BatchTxResult> => {
   let lastReceipt: TransactionReceipt | undefined;
+  let executedCalls = 0;
+  let prunedCalls = 0;
+  let skippedBatches = 0;
 
   const buildBatchArgs = (calls: CallBatchesInput[number]["calls"]) =>
     calls.map(({ to, data }) => ({ to, data }));
@@ -522,6 +576,12 @@ export const toastifyBatchTxOwner = async (
   try {
     for (let i = 0; i < input.length; i++) {
       const { calls, message, skipFailCalls } = input[i];
+
+      // Nothing to do — don't pay for an empty batchExecute([]).
+      if (!calls.length) {
+        continue;
+      }
+
       onStateChange(message ?? `Executing batch ${i + 1}`);
 
       let executableCalls = calls;
@@ -551,7 +611,10 @@ export const toastifyBatchTxOwner = async (
         executableCalls = good;
       }
 
-      if (skipFailCalls && executableCalls.length === 0) {
+      if (executableCalls.length === 0) {
+        // Every call reverted during simulation.
+        prunedCalls += calls.length;
+        skippedBatches++;
         continue;
       }
 
@@ -571,19 +634,19 @@ export const toastifyBatchTxOwner = async (
         },
       });
 
+      // A send that failed is never swallowed: skipFailCalls governs call pruning, not transport.
       if (!result.status) {
-        if (skipFailCalls) {
-          continue;
-        }
         throw result.error;
       }
 
       lastReceipt = result.receipt;
+      executedCalls += executableCalls.length;
+      prunedCalls += calls.length - executableCalls.length;
     }
   } catch (error: any) {
     return { status: false, error };
   }
-  return { status: true, receipt: lastReceipt! };
+  return { status: true, receipt: lastReceipt, executedCalls, prunedCalls, skippedBatches };
 };
 
 async function pollForTransactionReceipt(

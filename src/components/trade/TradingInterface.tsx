@@ -159,11 +159,11 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
         {/* Strategy Summary */}
         <div className="grid grid-cols-2 gap-4">
           <div className="px-4 py-2 bg-green-50 rounded-lg">
-            <h4 className="font-medium text-green-800 mb-1">Overvalued Markets</h4>
+            <h4 className="font-medium text-green-800 mb-1">Undervalued Markets</h4>
             <p className="text-2xl font-bold text-green-600">{buyOutcomes.length}</p>
           </div>
           <div className="px-4 py-2 bg-red-50 rounded-lg">
-            <h4 className="font-medium text-red-800 mb-1">Undervalued Markets</h4>
+            <h4 className="font-medium text-red-800 mb-1">Overvalued Markets</h4>
             <p className="text-2xl font-bold text-red-600">{sellOutcomes.length}</p>
           </div>
         </div>

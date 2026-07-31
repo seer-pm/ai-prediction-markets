@@ -9,13 +9,13 @@ import {
   OCTANT_MARKET_ID,
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
-import { getQuoteTradeCalls } from "@/utils/trade";
+import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Address, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { mergeFromRouter, splitFromRouter } from "./useExecuteL2Strategy";
-import { fetchTokensBalances } from "./useTokensBalances";
+import { getUnwindMintCalls, mergeFromRouter, splitFromRouter } from "./useExecuteL2Strategy";
+import { fetchTokensBalancesOrThrow } from "./useTokensBalances";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -96,16 +96,51 @@ const executeTradeStrategyContract = async ({
   }
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const parsedSplitAmount = parseUnits(amount, collateral.decimals);
-  const calls: Execution[] = [];
+  const didMint = Number(amount) > 0;
 
-  if (Number(amount) > 0) {
+  // Merge the freshly minted complete sets back to collateral so an aborted run doesn't leave the
+  // wallet holding tokens it never asked for.
+  const abortAfterMint = async (reason: string): Promise<Error> => {
+    if (!didMint) {
+      await withdrawFundSessionKey();
+      return new Error(reason);
+    }
+    let unwindNote = "your minted tokens are still held, re-run the strategy with amount 0";
+    try {
+      onStateChange("Merging minted tokens back to collateral");
+      const unwindInput = await getUnwindMintCalls(tradeExecutor, router, [
+        {
+          marketId: OCTANT_MARKET_ID,
+          tokens: tableData.map((row) => row.outcomeId as Address),
+        },
+      ]);
+      const unwindResult = await toastifyBatchTxSessionKey(
+        tradeExecutor,
+        unwindInput,
+        onStateChange,
+        30_000_000n,
+      );
+      if (unwindResult.status) {
+        unwindNote = `your ${amount} ${collateral.symbol} was merged back`;
+      }
+    } catch (e) {
+      console.log("Cannot unwind mint ", e);
+    }
+    await withdrawFundSessionKey();
+    return new Error(`${reason} No trades were made — ${unwindNote}.`);
+  };
+
+  const calls: Execution[] = [];
+  if (didMint) {
     calls.push(...splitFromRouter(router, parsedSplitAmount, OCTANT_MARKET_ID, collateral.address));
   }
   const mintInput: CallBatchesInput = [];
-  mintInput.push({
-    calls,
-    message: "Minting tokens",
-  });
+  if (calls.length) {
+    mintInput.push({
+      calls,
+      message: "Minting tokens",
+    });
+  }
   const mintResult = await toastifyBatchTxSessionKey(
     tradeExecutor,
     mintInput,
@@ -116,7 +151,7 @@ const executeTradeStrategyContract = async ({
     await withdrawFundSessionKey();
     throw mintResult.error;
   }
-  const [balanceBefore] = await fetchTokensBalances(tradeExecutor, [collateral.address]);
+  const [balanceBefore] = await fetchTokensBalancesOrThrow(tradeExecutor, [collateral.address]);
   const sellInput = await getSellTradeExecutorCalls({
     amount,
     getQuotesResult,
@@ -130,14 +165,14 @@ const executeTradeStrategyContract = async ({
     30_000_000n,
   );
   if (!sellResult.status) {
-    await withdrawFundSessionKey();
-    throw sellResult.error;
+    throw await abortAfterMint(
+      `Sell phase failed: ${sellResult.error?.shortMessage ?? sellResult.error?.message ?? "unknown error"}.`,
+    );
   }
   onStateChange("Updating tokens balances");
-  const [balanceAfter] = await fetchTokensBalances(tradeExecutor, [collateral.address]);
+  const [balanceAfter] = await fetchTokensBalancesOrThrow(tradeExecutor, [collateral.address]);
   if (balanceAfter - balanceBefore === 0n) {
-    await withdrawFundSessionKey();
-    throw new Error("Cannot sell overvalued tokens, execution terminated early");
+    throw await abortAfterMint(describeSellFailure(sellResult, collateral.symbol));
   }
   console.log({ balanceAfter, balanceBefore });
   const getBuyQuotesResults = await getOctantBuyQuotes({
@@ -189,13 +224,14 @@ export const useExecuteOctantTradeStrategy = (onSuccess?: () => unknown) => {
         queryClient.invalidateQueries({ queryKey: ["useGetOctantQuotes"] });
       }, 3000);
     },
-    onError() {
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["useOctantMarketsData"] });
-        queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
-        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
-        queryClient.invalidateQueries({ queryKey: ["useGetOctantQuotes"] });
-      }, 3000);
+    // Await the balance refetches so a resubmit is validated against post-run balances.
+    async onError() {
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["useTokenBalance"] }),
+        queryClient.refetchQueries({ queryKey: ["useTokensBalances"] }),
+      ]);
+      queryClient.refetchQueries({ queryKey: ["useOctantMarketsData"] });
+      queryClient.invalidateQueries({ queryKey: ["useGetOctantQuotes"] });
     },
   });
   return {

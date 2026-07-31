@@ -1,5 +1,5 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
-import { config } from "@/config/wagmi";
+import { config, OPTIMISM_TRANSPORT } from "@/config/wagmi";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   estimateFeesPerGas,
@@ -9,7 +9,7 @@ import {
   sendTransaction,
   writeContract,
 } from "@wagmi/core";
-import { Address, createWalletClient, http } from "viem";
+import { Address, createWalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { handleTx } from "../toastify";
 import { CHAIN_ID } from "@/utils/constants";
@@ -158,7 +158,7 @@ export const withdrawFundSessionKey = async () => {
       const sessionWallet = createWalletClient({
         account: sessionAccount,
         chain: optimism,
-        transport: http(),
+        transport: OPTIMISM_TRANSPORT,
       });
       await handleTx(() =>
         sessionWallet.sendTransaction({
