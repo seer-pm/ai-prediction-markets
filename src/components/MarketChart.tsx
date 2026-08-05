@@ -1,5 +1,9 @@
+import { ChartLegend, type LegendEntry } from "@/components/ChartLegend";
+import { Card, CardHeader, EmptyState } from "@/components/ui";
 import { ChartWithMarketData, PoolHourData } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
+import { withAlpha } from "@/utils/color";
+import { formatWeight } from "@/utils/format";
 import {
   createChart,
   IChartApi,
@@ -7,80 +11,56 @@ import {
   LineData,
   LineSeries,
   LineStyle,
+  UTCTimestamp,
 } from "lightweight-charts";
-import React, { ReactElement, useEffect, useRef, useState } from "react";
+import React, {
+  ReactElement,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Address, formatUnits } from "viem";
 import ErrorBoundary from "./ErrorBoundary";
 
 const INTERVAL = 30 * 60;
 
-const COLORS = [
-  "#f58231",
-  "#4363d8",
-  "#3cb44b",
-  "#e6194B",
-  "#42d4f4",
-  "#fabed4",
-  "#469990",
-  "#dcbeff",
-  "#9A6324",
-  "#ffe119",
-  "#FF6F61",
-  "#6B7280",
-  "#FBBF24",
-  "#34D399",
-  "#3B82F6",
-  "#EC4899",
-  "#F97316",
-  "#22D3EE",
-  "#84CC16",
-  "#A855F7",
-  "#EF4444",
-  "#10B981",
-  "#6366F1",
-  "#F59E0B",
-  "#06B6D4",
-  "#8B5CF6",
-  "#D97706",
-  "#14B8A6",
-  "#7C3AED",
-  "#F87171",
-  "#4ADE80",
+/**
+ * Series colours: saturated enough to tell apart at 1px on white, held to a
+ * common lightness so no single line dominates. Replaces the old 60-entry list
+ * that mixed neon and pastel at random and was unreadable past a dozen series.
+ */
+const SERIES_COLORS = [
   "#2563EB",
-  "#FBBF24",
-  "#0EA5E9",
-  "#A78BFA",
-  "#EF6C00",
-  "#2DD4BF",
-  "#7E22CE",
   "#DC2626",
-  "#22C55E",
-  "#1D4ED8",
-  "#EAB308",
-  "#0891B2",
-  "#9333EA",
-  "#C2410C",
-  "#14B8A6",
-  "#6D28D9",
-  "#B91C1C",
   "#16A34A",
-  "#1E40AF",
-  "#D97706",
-  "#0E7490",
-  "#7C3AED",
-  "#991B1B",
-  "#15803D",
-  "#1E3A8A",
+  "#9333EA",
+  "#EA580C",
+  "#0891B2",
+  "#CA8A04",
+  "#DB2777",
+  "#4F46E5",
+  "#059669",
   "#B45309",
+  "#7C3AED",
   "#0E7490",
-  "#6B21A8",
-  "#7F1D1D",
-  "#047857",
+  "#BE123C",
 ];
+
+const AXIS_COLOR = "#6B7280";
+const GRID_COLOR = "#E5E7EB";
 
 type Props = {
   data: ChartWithMarketData;
   totalVolumeMarket?: string | ReactElement;
+  title?: string;
+  eyebrow?: string;
+  description?: string;
+  actions?: ReactNode;
+  /** How a series' latest price reads in the legend. Weights by default. */
+  formatValue?: (value: number) => string;
 };
 
 function findClosestLessThanOrEqualToTimestamp(
@@ -180,6 +160,24 @@ function buildTimeline(all: ChartWithMarketData) {
 
   return timeline;
 }
+
+/**
+ * The most recent resolvable price for a series, walking back from the end of
+ * its liquidity window. Drives both the legend readout and its sort order.
+ */
+function getLastPrice(series: ChartWithMarketData[number]): number | null {
+  const window = getLiquidityWindow(series);
+  const end = window?.end ?? Infinity;
+
+  for (let i = series.poolHourDatas.length - 1; i >= 0; i--) {
+    const point = series.poolHourDatas[i];
+    if (point.periodStartUnix > end) continue;
+    const price = resolveOutcomePrice(point, series.collateral);
+    if (price != null) return price;
+  }
+  return null;
+}
+
 function truncateOutcomeName(name: string, maxLength = 14) {
   if (!name) return "";
 
@@ -187,43 +185,177 @@ function truncateOutcomeName(name: string, maxLength = 14) {
 
   return name.slice(0, maxLength - 2) + "…";
 }
+
 /* ================================
    COMPONENT
 ================================ */
-const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }: Props) {
+const MarketChart = React.memo(function MarketChart({
+  data,
+  totalVolumeMarket,
+  title = "Price history",
+  eyebrow,
+  description,
+  actions,
+  formatValue = formatWeight,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
-  // visibility state ONLY for legend UI
-  const [visible, setVisible] = useState<boolean[]>(() => data.map(() => true));
-  const hasVisibleSeries = visible.some(Boolean);
-  const accentColor = "#999";
-  const gridLinesColor = "#e5e5e5";
+  const seriesTitles = useRef<string[]>([]);
+
+  // Series drawn on the chart, by index into `data`.
+  const [visible, setVisible] = useState<Set<number>>(
+    () => new Set(data.map((_, index) => index)),
+  );
+  const [hovered, setHovered] = useState<number | null>(null);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const hoveredRef = useRef<number | null>(null);
+
+  // Keep the legend in step when the underlying series set changes.
+  useEffect(() => {
+    setVisible(new Set(data.map((_, index) => index)));
+    setHovered(null);
+    hoveredRef.current = null;
+  }, [data]);
+
+  const legendEntries: LegendEntry[] = useMemo(
+    () =>
+      data.map((series, index) => ({
+        index,
+        name: series.outcomeName,
+        color: SERIES_COLORS[index % SERIES_COLORS.length],
+        value: getLastPrice(series),
+      })),
+    [data],
+  );
+
+  const appliedHighlight = useRef<number | null | undefined>(undefined);
+  const highlightFrame = useRef<number | null>(null);
+
+  /**
+   * Pulls one series forward and pushes the rest back. With forty overlapping
+   * lines, picking one out of the tangle is otherwise guesswork.
+   */
+  const applyHighlightNow = useCallback((target: number | null) => {
+    seriesRef.current.forEach((series, index) => {
+      if (!series) return;
+      const isVisible = visibleRef.current.has(index);
+      if (!isVisible) {
+        series.applyOptions({ visible: false, lastValueVisible: false, title: "" });
+        return;
+      }
+
+      const baseColor = SERIES_COLORS[index % SERIES_COLORS.length];
+      const isHovered = target === index;
+      const resting = target === null;
+
+      series.applyOptions({
+        visible: true,
+        lineWidth: resting ? 2 : isHovered ? 3 : 1,
+        color: resting || isHovered ? baseColor : withAlpha(baseColor, 0.18),
+        title: isHovered ? (seriesTitles.current[index] ?? "") : "",
+        lastValueVisible: isHovered,
+        priceLineVisible: false,
+      });
+    });
+  }, []);
+
+  /**
+   * Dragging the cursor down a hundred-row legend fires an enter event per row,
+   * and each one would otherwise re-apply options to every series — thousands
+   * of redraws for a gesture the eye reads as one. Collapse to one update per
+   * frame, and skip it entirely when nothing actually changed.
+   */
+  const applyHighlight = useCallback(
+    (target: number | null) => {
+      if (highlightFrame.current !== null) {
+        cancelAnimationFrame(highlightFrame.current);
+      }
+      highlightFrame.current = requestAnimationFrame(() => {
+        highlightFrame.current = null;
+        if (appliedHighlight.current === target) return;
+        appliedHighlight.current = target;
+        applyHighlightNow(target);
+      });
+    },
+    [applyHighlightNow],
+  );
+
+  // Visibility changes have to repaint even when the hovered series is the same.
+  const refreshHighlight = useCallback(() => {
+    appliedHighlight.current = undefined;
+    applyHighlight(hoveredRef.current);
+  }, [applyHighlight]);
+
+  useEffect(
+    () => () => {
+      if (highlightFrame.current !== null) cancelAnimationFrame(highlightFrame.current);
+    },
+    [],
+  );
+
+  const handleHover = useCallback(
+    (index: number | null) => {
+      hoveredRef.current = index;
+      setHovered(index);
+      applyHighlight(index);
+    },
+    [applyHighlight],
+  );
+
+  const toggleSeries = useCallback(
+    (index: number) => {
+      // Built outside the state updater: `applyHighlight` reads the ref
+      // synchronously, and React may run an updater more than once.
+      const next = new Set(visibleRef.current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+
+      visibleRef.current = next;
+      setVisible(next);
+      refreshHighlight();
+    },
+    [refreshHighlight],
+  );
+
+  const toggleAll = useCallback(
+    (nextVisible: boolean) => {
+      const next = nextVisible ? new Set(data.map((_, index) => index)) : new Set<number>();
+      setVisible(next);
+      visibleRef.current = next;
+      refreshHighlight();
+    },
+    [data, refreshHighlight],
+  );
+
   /* ============================
      CREATE CHART
   ============================ */
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
-      height: 420,
+    const container = containerRef.current;
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
       layout: {
-        background: {
-          color: "transparent",
-        },
-        textColor: accentColor,
+        background: { color: "transparent" },
+        textColor: AXIS_COLOR,
+        fontFamily:
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
+        fontSize: 12,
       },
       grid: {
-        vertLines: {
-          color: gridLinesColor,
-          style: LineStyle.SparseDotted,
-        },
-        horzLines: {
-          color: gridLinesColor,
-          style: LineStyle.SparseDotted,
-        },
+        vertLines: { color: GRID_COLOR, style: LineStyle.SparseDotted },
+        horzLines: { color: GRID_COLOR, style: LineStyle.SparseDotted },
       },
-      timeScale: { timeVisible: true, rightOffset: 250 },
+      crosshair: {
+        vertLine: { color: "#9CA3AF", labelBackgroundColor: "#111827" },
+        horzLine: { color: "#9CA3AF", labelBackgroundColor: "#111827" },
+      },
+      timeScale: { timeVisible: true, rightOffset: 12, borderColor: GRID_COLOR },
       rightPriceScale: { borderVisible: false },
     });
 
@@ -235,10 +367,13 @@ const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }:
       const window = getLiquidityWindow(outcomeData);
       const seriesEnd = window?.end ?? Infinity;
       const series = chart.addSeries(LineSeries, {
-        color: COLORS[i % COLORS.length],
+        color: SERIES_COLORS[i % SERIES_COLORS.length],
         lineWidth: 2,
-        title: truncateOutcomeName(outcomeData.outcomeName),
-        lastValueVisible: true,
+        // Nothing on the price scale at rest: the legend is the readout, and a
+        // hundred stacked labels made the right edge unreadable. The name comes
+        // back only for the series being hovered.
+        title: "",
+        lastValueVisible: false,
         priceLineVisible: false,
         priceFormat: {
           type: "price",
@@ -248,12 +383,17 @@ const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }:
       });
 
       seriesRef.current.push(series);
+      seriesTitles.current.push(truncateOutcomeName(outcomeData.outcomeName));
 
       const timestamps = outcomeData.poolHourDatas.map((d) => d.periodStartUnix);
 
       const lineData: LineData[] = [];
 
       let lastPrice: number | null = null;
+      // A flat stretch only needs its two endpoints — the renderer draws a
+      // straight line between them. Carrying a point per 30-minute tick for
+      // every one of a hundred series is what made panning crawl.
+      let pendingFlat: LineData | null = null;
 
       timeline.forEach((t) => {
         if (t > seriesEnd) return; // stop past this series' liquidity removal
@@ -268,115 +408,101 @@ const MarketChart = React.memo(function MarketChart({ data, totalVolumeMarket }:
           }
         }
 
-        if (lastPrice != null) {
-          lineData.push({
-            time: t as any,
-            value: lastPrice, //reuse last price → flat line
-          });
+        if (lastPrice == null) return;
+
+        const previous = lineData[lineData.length - 1];
+        if (previous && previous.value === lastPrice) {
+          // Same value as the point before: hold it back, and only commit it
+          // when the run ends so the flat segment keeps its true length.
+          pendingFlat = { time: t as UTCTimestamp, value: lastPrice };
+          return;
         }
+
+        if (pendingFlat) {
+          lineData.push(pendingFlat);
+          pendingFlat = null;
+        }
+        lineData.push({ time: t as UTCTimestamp, value: lastPrice });
       });
+
+      if (pendingFlat) lineData.push(pendingFlat);
 
       series.setData(lineData);
     });
 
     chart.timeScale().fitContent();
+    // Restore whatever the legend had selected before this rebuild.
+    appliedHighlight.current = undefined;
+    applyHighlightNow(hoveredRef.current);
+
+    /*
+     * Deliberately not `autoSize`. Tabs are kept alive behind `display: none`,
+     * which collapses this container to 0x0 — autoSize would resize a
+     * hundred-series chart down to nothing on every tab switch and lay it all
+     * out again on the way back. Ignoring zero-size measurements leaves a
+     * hidden chart untouched, and one resize per frame covers real ones.
+     */
+    let resizeFrame: number | null = null;
+    const observer = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect;
+      if (!box || box.width === 0 || box.height === 0) return;
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        chart.applyOptions({ width: Math.floor(box.width), height: Math.floor(box.height) });
+      });
+    });
+    observer.observe(container);
 
     return () => {
+      observer.disconnect();
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       chart.remove();
       seriesRef.current = [];
+      seriesTitles.current = [];
     };
-  }, [data]);
-
-  /* ============================
-     TOGGLE VISIBILITY
-  ============================ */
-  function toggleSeries(index: number) {
-    const series = seriesRef.current[index];
-    if (!series) return;
-
-    const next = [...visible];
-    next[index] = !next[index];
-    setVisible(next);
-
-    series.applyOptions({
-      visible: next[index],
-      lastValueVisible: next[index],
-    });
-  }
+  }, [data, applyHighlightNow]);
 
   return (
-    <ErrorBoundary fallback={(error) => <p>Render chart error: {error.message}</p>}>
-      {totalVolumeMarket && <p className="text-sm text-gray-700 mb-4">{totalVolumeMarket}</p>}
+    <Card flush>
+      <CardHeader
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
+        actions={
+          <div className="flex items-center gap-3">
+            {totalVolumeMarket && <span className="text-body text-ink-3">{totalVolumeMarket}</span>}
+            {actions}
+          </div>
+        }
+      />
 
-      <div style={{ width: "100%" }}>
-        {/* Legend */}
-        <div
-          style={{
-            overflowX: "auto",
-            whiteSpace: "nowrap",
-            borderBottom: "1px solid #1e293b",
-            paddingBottom: 6,
-            marginBottom: 8,
-          }}
-        >
-          <button
-            onClick={() => {
-              const next = visible.map(() => !hasVisibleSeries);
+      <ErrorBoundary
+        fallback={(error) => (
+          <EmptyState title="The chart could not be drawn" description={error.message} />
+        )}
+      >
+        {/* Chart and legend sit side by side above md; the legend drops
+            underneath as a short scrollable band on narrow screens. */}
+        <div className="flex flex-col gap-4 p-6 md:h-[440px] md:flex-row">
+          <div className="h-[300px] min-w-0 md:h-full md:flex-1">
+            <div ref={containerRef} className="size-full" />
+          </div>
 
-              setVisible(next);
-
-              seriesRef.current.forEach((series, index) => {
-                series.applyOptions({
-                  visible: next[index],
-                  lastValueVisible: next[index],
-                });
-              });
-            }}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              marginRight: 16,
-              padding: "4px 10px",
-              borderRadius: 999,
-              border: "1px solid #334155",
-              background: "transparent",
-              color: "#999",
-              cursor: "pointer",
-              fontSize: 12,
-              userSelect: "none",
-            }}
-          >
-            {hasVisibleSeries ? "Clear all" : "Show all"}
-          </button>
-          {data.map((outcomeData, i) => {
-            const isVisible = visible[i];
-
-            return (
-              <span
-                key={i}
-                onClick={() => toggleSeries(i)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  cursor: "pointer",
-                  marginRight: 16,
-                  opacity: isVisible ? 1 : 0.35,
-                  fontSize: 13,
-                  color: COLORS[i % COLORS.length],
-                  userSelect: "none",
-                  transition: "opacity 0.15s",
-                }}
-              >
-                {outcomeData.outcomeName}
-              </span>
-            );
-          })}
+          <div className="h-64 shrink-0 md:h-full md:w-60">
+            <ChartLegend
+              entries={legendEntries}
+              visible={visible}
+              hovered={hovered}
+              onToggle={toggleSeries}
+              onToggleAll={toggleAll}
+              onHover={handleHover}
+              formatValue={formatValue}
+            />
+          </div>
         </div>
-
-        {/* Chart */}
-        <div ref={containerRef} />
-      </div>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </Card>
   );
 });
 

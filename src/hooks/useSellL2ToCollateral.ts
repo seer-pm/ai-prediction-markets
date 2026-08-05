@@ -2,12 +2,12 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllL2Quotes } from "@/lib/trade/getQuote";
-import { CallBatchesInput, L2TableData } from "@/types";
+import { CallBatchesInput, L2TableData, TxStateChange } from "@/types";
 import { minBigIntArray } from "@/utils/common";
 import { CHAIN_ID, L2_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { mergeFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
@@ -22,9 +22,8 @@ async function sellL2ToCollateral({
   tradeExecutor,
   tableData,
   onStateChange,
-}: SellAllProps & { onStateChange: (state: string) => void }) {
+}: SellAllProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
-  onStateChange("Getting quotes");
   const sellAllQuotes = await getSellAllL2Quotes({
     account: tradeExecutor,
     tableData,
@@ -33,10 +32,14 @@ async function sellL2ToCollateral({
   const swapCalls = getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const BATCH_SIZE = 100;
   const sellInput: CallBatchesInput = [];
+  const sellBatchCount = Math.ceil(swapCalls.length / BATCH_SIZE);
   for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
     sellInput.push({
       calls: swapCalls.slice(i, i + BATCH_SIZE),
-      message: `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
+      message: "Swapping outcome tokens back to parent collateral",
+      phase: "sell",
+      step: i / BATCH_SIZE + 1,
+      of: sellBatchCount,
       skipFailCalls: true,
     });
   }
@@ -50,7 +53,7 @@ async function sellL2ToCollateral({
     await withdrawFundSessionKey();
     throw sellResult.error;
   }
-  onStateChange("Updating collateral balances");
+  onStateChange({ phase: "merge", label: "Reading collateral balances" });
   const collateralTokens = l2MarketOutcomes as Address[];
   const balances = await fetchTokensBalances(tradeExecutor, collateralTokens);
   const mergeAmount = minBigIntArray(balances);
@@ -59,10 +62,14 @@ async function sellL2ToCollateral({
       ...mergeFromRouter(router, mergeAmount, L2_PARENT_MARKET_ID, collateralTokens),
     ];
     const mergeInput: CallBatchesInput = [];
+    const mergeBatchCount = Math.ceil(mergeCalls.length / BATCH_SIZE);
     for (let i = 0; i < mergeCalls.length; i += BATCH_SIZE) {
       mergeInput.push({
         calls: mergeCalls.slice(i, i + BATCH_SIZE),
-        message: `Merging tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(mergeCalls.length / BATCH_SIZE)}`,
+        message: "Merging complete sets back to sUSDS",
+        phase: "merge",
+        step: i / BATCH_SIZE + 1,
+        of: mergeBatchCount,
         skipFailCalls: false,
       });
     }
@@ -73,15 +80,16 @@ async function sellL2ToCollateral({
     }
   }
 
+  onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
   return sellResult;
 }
 
 export const useSellL2ToCollateral = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
     mutationFn: (props: SellAllProps) =>
-      sellL2ToCollateral({ ...props, onStateChange: setTxState }),
+      sellL2ToCollateral({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
@@ -90,6 +98,6 @@ export const useSellL2ToCollateral = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

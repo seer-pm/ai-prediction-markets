@@ -172,6 +172,34 @@ export interface ApprovalRequest {
   chainId: SupportedChain;
 }
 
+/**
+ * Named stages of a batched run. A strategy is 5–20 sequential transactions,
+ * so progress is reported as a phase plus a batch counter rather than a single
+ * string that gets overwritten — see `RunLedger`.
+ */
+export type TxPhase =
+  | "authorize"
+  | "mint"
+  | "sell"
+  | "requote"
+  | "merge"
+  | "buy"
+  | "redeem"
+  | "unwind"
+  | "settle"
+  | "work";
+
+export type TxProgress = {
+  phase: TxPhase;
+  /** Human-readable detail for the current phase. */
+  label: string;
+  /** Batch counter within the phase, when there is more than one. */
+  step?: number;
+  of?: number;
+};
+
+export type TxStateChange = (progress: TxProgress) => void;
+
 export type CallBatchesInput = {
   calls: {
     to: `0x${string}`;
@@ -179,6 +207,10 @@ export type CallBatchesInput = {
     data: `0x${string}`;
   }[];
   message: string;
+  /** Which stage of the run this batch belongs to. Defaults to "work". */
+  phase?: TxPhase;
+  step?: number;
+  of?: number;
   skipFailCalls?: boolean;
 }[];
 

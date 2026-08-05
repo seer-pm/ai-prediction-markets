@@ -4,7 +4,7 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
-import { CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps } from "@/types";
+import { CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps, TxStateChange } from "@/types";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -14,7 +14,7 @@ import {
 } from "@/utils/constants";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address, encodeFunctionData, formatUnits, parseUnits } from "viem";
 
 const getSplitCalls = ({
@@ -91,7 +91,7 @@ const executeOriginalityStrategy = async ({
   tableData,
   tradeExecutor,
   onStateChange,
-}: OriginalityTradeProps & { onStateChange: (state: string) => void }) => {
+}: OriginalityTradeProps & { onStateChange: TxStateChange }) => {
   if (!tableData?.length) {
     throw new Error("No prediction data");
   }
@@ -174,7 +174,8 @@ const executeOriginalityStrategy = async ({
   const input: CallBatchesInput = [];
   input.push({
     calls: mainSplitCalls,
-    message: "Minting tokens",
+    message: "Minting complete sets",
+      phase: "mint",
     skipFailCalls: false,
   });
   for (let i = 0; i < tradeExecutorCalls.length; i += 100) {
@@ -191,22 +192,17 @@ const executeOriginalityStrategy = async ({
   }
 
   await withdrawFundSessionKey();
-  toastSuccess({
-    title: "Trade executed",
-  });
+  toastSuccess({ title: "Strategy executed" });
   return result;
 };
 
 export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
     mutationFn: (tradeProps: OriginalityTradeProps) =>
       executeOriginalityStrategy({
         ...tradeProps,
-        onStateChange: (state) => {
-          setTxState(state);
-          console.log(state);
-        },
+        onStateChange: progress.onStateChange,
       }),
     onSuccess() {
       onSuccess?.();
@@ -228,6 +224,6 @@ export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

@@ -1,6 +1,7 @@
+import { Button, Dialog } from "@/components/ui";
+import { DownloadIcon } from "@/components/ui/icons";
 import { downloadCsv } from "@/utils/common";
-import { useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { PredictionDropzone } from "./predictions/PredictionDropzone";
 
 export interface CSVFormatInfo {
   /** CSV headers line, e.g. "repo,parent,weight" */
@@ -14,133 +15,70 @@ export interface CSVFormatInfo {
 export interface SampleCsvConfig {
   columns: { key: string; title: string }[];
   /** Maps each sample item to a flat record matching the columns */
+  // biome-ignore lint/suspicious/noExplicitAny: sample rows vary per contest
   dataMapper: (item: any) => Record<string, any>;
+  // biome-ignore lint/suspicious/noExplicitAny: sample rows vary per contest
   sampleData: any[];
   filename: string;
 }
 
 interface GenericCSVUploadProps<T> {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onDataParsed: (data: T[]) => void;
-  onClose: () => void;
   parseFn: (text: string) => T[];
   formatInfo: CSVFormatInfo;
   sampleConfig: SampleCsvConfig;
 }
 
-interface FormData {
-  csvFile: FileList;
-}
-
 export function GenericCSVUpload<T>({
+  open,
+  onOpenChange,
   onDataParsed,
-  onClose,
   parseFn,
   formatInfo,
   sampleConfig,
 }: GenericCSVUploadProps<T>) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setError,
-    clearErrors,
-  } = useForm<FormData>();
-
-  const onSubmit = useCallback(
-    async (data: FormData) => {
-      try {
-        clearErrors();
-        const file = data.csvFile[0];
-        if (!file) {
-          setError("csvFile", { message: "Please select a CSV file" });
-          return;
-        }
-
-        const text = await file.text();
-        const parsedData = parseFn(text);
-        onDataParsed(parsedData);
-        onClose();
-      } catch (error) {
-        setError("csvFile", {
-          message: error instanceof Error ? error.message : "Failed to parse CSV",
-        });
-      }
-    },
-    [onDataParsed, onClose, parseFn, setError, clearErrors],
-  );
-
-  const downloadSampleCsv = () => {
+  const downloadSampleCsv = () =>
     downloadCsv(
       sampleConfig.columns,
       sampleConfig.sampleData.map(sampleConfig.dataMapper),
       sampleConfig.filename,
     );
-  };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-green-500 to-blue-500 px-6 py-4">
-        <h2 className="text-2xl font-bold text-white">Upload Your Predictions</h2>
-      </div>
-
-      <div className="p-6">
-        {/* CSV Format Example */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <h3 className="font-medium text-gray-900 mb-2">Required CSV Format</h3>
-          <div className="bg-white p-3 rounded border font-mono text-sm">
-            <div className="text-gray-600">{formatInfo.headers}</div>
-            {formatInfo.exampleRows.map((row, i) => (
-              <div key={i} className="break-all">
-                {row}
-              </div>
-            ))}
-            <div className="text-gray-400">...</div>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Upload predictions"
+      description={formatInfo.description}
+      size="md"
+    >
+      <div className="space-y-4">
+        <div className="rounded-lg border border-rule bg-sunken px-4 py-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-label font-semibold tracking-wider text-ink-3 uppercase">
+              Expected columns
+            </p>
+            <Button size="sm" variant="ghost" onClick={downloadSampleCsv} iconLeft={<DownloadIcon />}>
+              Sample CSV
+            </Button>
           </div>
-          <p className="text-xs text-gray-600 mt-2">{formatInfo.description}</p>
+          <pre className="overflow-x-auto rounded-md border border-rule bg-surface p-3 font-mono text-micro leading-relaxed text-ink-2">
+            <span className="text-ink-3">{formatInfo.headers}</span>
+            {formatInfo.exampleRows.map((row) => `\n${row}`)}
+            <span className="text-ink-4">{"\n…"}</span>
+          </pre>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <label className="block text-sm font-medium text-gray-700">Select CSV File</label>
-              <button
-                type="button"
-                onClick={() => downloadSampleCsv()}
-                className="hover:underline cursor-pointer text-gray-500 text-sm"
-              >
-                Download Sample CSV
-              </button>
-            </div>
-            <input
-              {...register("csvFile", { required: "CSV file is required" })}
-              type="file"
-              accept=".csv"
-              className="w-full p-3 border-2 border-dashed border-gray-300 rounded-md hover:border-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 transition-colors"
-            />
-            {errors.csvFile && (
-              <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-red-600 text-sm">{errors.csvFile.message}</p>
-              </div>
-            )}
-          </div>
-          <div className="flex space-x-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Load Predictions
-            </button>
-          </div>
-        </form>
+        <PredictionDropzone
+          parseFn={parseFn}
+          onDataParsed={(rows) => {
+            onDataParsed(rows);
+            onOpenChange(false);
+          }}
+        />
       </div>
-    </div>
+    </Dialog>
   );
 }

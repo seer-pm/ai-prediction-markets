@@ -1,87 +1,147 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Badge, Button, Card, EmptyState, StatusDot } from "@/components/ui";
+import { CheckIcon, ChevronDownIcon } from "@/components/ui/icons";
+import { ContestProvider } from "./contest/ContestContext";
+import ErrorBoundary from "./ErrorBoundary";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { cn } from "@/utils/cn";
 import { startTransition, useState } from "react";
 import { AiMarkets } from "./tabs/AiMarkets";
-import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
+import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 
 const TABS = [
-  { id: "octant", label: "Octant (Finished)", Component: OctantMarkets, finished: true },
-  { id: "round2-l2", label: "Round 2 L2 (Finished)", Component: L2Markets, finished: true },
-  { id: "round2-l1", label: "Round 2 L1", Component: L1Markets, finished: false },
-  {
-    id: "round2",
-    label: "Round 2 Originality (Finished)",
-    Component: OriginalityMarkets,
-    finished: true,
-  },
-  { id: "round1", label: "Round 1 (Finished)", Component: AiMarkets, finished: true },
+  { id: "octant", label: "Octant", Component: OctantMarkets, finished: true },
+  { id: "round2-l2", label: "Round 2 · L2", Component: L2Markets, finished: true },
+  { id: "round2-l1", label: "Round 2 · L1", Component: L1Markets, finished: false },
+  { id: "round2", label: "Round 2 · Originality", Component: OriginalityMarkets, finished: true },
+  { id: "round1", label: "Round 1", Component: AiMarkets, finished: true },
 ] as const;
 
-// Unfinished contests first; sort is stable, so authoring order is kept within each group.
-const ORDERED_TABS = [...TABS].sort((a, b) => Number(a.finished) - Number(b.finished));
+const LIVE_TABS = TABS.filter((tab) => !tab.finished);
+const ARCHIVED_TABS = TABS.filter((tab) => tab.finished);
 
 const DEFAULT_TAB: string = "round2-l1";
 
-// Color means live: blue accents the active live contest, finished ones hold a
-// single gray in both states (the underline carries selection). Green dot = live.
-const getTabClassName = (isActive: boolean, finished: boolean) => {
-  if (finished) {
-    return `text-gray-400 hover:text-gray-600 ${isActive ? "border-b-2 border-gray-400" : ""}`;
-  }
-  return isActive
-    ? "border-b-2 border-blue-500 text-blue-600"
-    : "text-gray-700 hover:text-gray-900";
-};
-
+/**
+ * Four of five contests have ended, so they sit in an archive menu rather than
+ * competing with the live one for the same row — the labels used to carry a
+ * "(Finished)" suffix each, which read as five equal choices.
+ */
 export const Tab = () => {
-  const [activeTab, setActiveTab] = useState<string>(DEFAULT_TAB);
+  const [storedTab, setStoredTab] = useLocalStorage<string>("active-contest", DEFAULT_TAB);
+  const initial = TABS.some((tab) => tab.id === storedTab) ? storedTab : DEFAULT_TAB;
+
+  const [activeTab, setActiveTab] = useState<string>(initial);
   // Lazy-mount: only render a tab once it's been visited.
   // Once mounted, keep it alive (hidden) so useLocalStorage / useMemo state is preserved.
-  const [visited, setVisited] = useState<Set<string>>(() => new Set([DEFAULT_TAB]));
+  const [visited, setVisited] = useState<Set<string>>(() => new Set([initial]));
 
   const handleTabClick = (tabId: string) => {
     startTransition(() => setActiveTab(tabId));
+    setStoredTab(tabId);
     if (!visited.has(tabId)) {
       setVisited((prev) => new Set([...prev, tabId]));
     }
   };
 
+  const activeArchived = ARCHIVED_TABS.find((tab) => tab.id === activeTab);
+
   return (
     <div className="w-full">
-      {/* Tabs Header */}
-      <div className="w-fit flex gap-10 border-b border-gray-300">
-        {ORDERED_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => handleTabClick(tab.id)}
-            title={tab.finished ? "Contest ended" : "Contest in progress"}
-            className={`cursor-pointer flex-1 py-2 text-center font-medium whitespace-nowrap
-              ${getTabClassName(activeTab === tab.id, tab.finished)}`}
-          >
-            <span className="inline-flex items-center gap-2">
-              {!tab.finished && (
-                <span
-                  className="w-2 h-2 rounded-full bg-green-500 animate-pulse"
-                  aria-hidden="true"
-                />
+      <div className="flex items-center gap-1 border-b border-rule-strong">
+        {LIVE_TABS.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              className={cn(
+                "-mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-lede font-semibold transition-colors",
+                active ? "border-primary text-primary" : "border-transparent text-ink-3 hover:text-ink",
               )}
+            >
+              <StatusDot tone="long" pulse />
               {tab.label}
-            </span>
-          </button>
-        ))}
+              <span className="text-label font-semibold tracking-wider text-long uppercase">Live</span>
+            </button>
+          );
+        })}
+
+        {/* Radix locks body scroll in modal mode; that shift is what flashed. */}
+        <DropdownMenu.Root modal={false}>
+          <DropdownMenu.Trigger
+            className={cn(
+              "-mb-px inline-flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-3 text-lede font-semibold transition-colors",
+              activeArchived
+                ? "border-primary text-primary"
+                : "border-transparent text-ink-3 hover:text-ink",
+            )}
+          >
+            {activeArchived ? activeArchived.label : "Archive"}
+            {activeArchived && <Badge tone="neutral">Ended</Badge>}
+            <ChevronDownIcon className="text-ink-4" />
+          </DropdownMenu.Trigger>
+
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="start"
+              sideOffset={4}
+              className="z-50 min-w-56 overflow-hidden rounded-md border border-rule bg-surface py-1 shadow-pop"
+            >
+              <p className="px-3 py-1.5 text-label font-semibold tracking-wider text-ink-4 uppercase">
+                Ended contests
+              </p>
+              {ARCHIVED_TABS.map((tab) => {
+                const active = activeTab === tab.id;
+                return (
+                  <DropdownMenu.Item
+                    key={tab.id}
+                    onSelect={() => handleTabClick(tab.id)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 px-3 py-2 text-body outline-none transition-colors data-[highlighted]:bg-primary-bg",
+                      active ? "text-ink" : "text-ink-2",
+                    )}
+                  >
+                    <span className="w-4 shrink-0 text-primary">{active && <CheckIcon />}</span>
+                    {tab.label}
+                  </DropdownMenu.Item>
+                );
+              })}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
 
-      {/* Tab Content — lazy-mount on first visit, then keep alive hidden */}
+      {/* Tab content — lazy-mount on first visit, then keep alive hidden */}
       <div>
-        {ORDERED_TABS.map(({ id, Component }) =>
+        {TABS.map(({ id, Component, finished }) =>
           visited.has(id) ? (
             <div
               key={id}
               style={{ display: id === activeTab ? "block" : "none" }}
-              className="p-4 space-y-4"
+              className="space-y-6 pt-6"
             >
-              <Component />
+              {/* One contest crashing shouldn't take the whole app with it. */}
+              <ErrorBoundary
+                fallback={(error) => (
+                  <Card>
+                    <EmptyState
+                      title="This contest could not be displayed"
+                      description={error.message}
+                      actions={
+                        <Button onClick={() => window.location.reload()}>Reload the page</Button>
+                      }
+                    />
+                  </Card>
+                )}
+              >
+                <ContestProvider finished={finished}>
+                  <Component />
+                </ContestProvider>
+              </ErrorBoundary>
             </div>
           ) : null,
         )}

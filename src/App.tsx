@@ -2,61 +2,81 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import React, { useEffect } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { WagmiProvider } from "wagmi";
+import { useAccount, WagmiProvider } from "wagmi";
 import Footer from "./components/Footer";
-import { TradeWallet } from "./components/trade/TradeWallet";
+import { ReadinessRail } from "./components/ReadinessRail";
+import { Tab } from "./components/Tab";
+import { OldTradeWallet } from "./components/trade/OldTradeWallet";
+import { TradeWalletMenu } from "./components/trade/TradeWalletMenu";
+import { TooltipProvider } from "./components/ui";
+import { BookIcon, ExternalIcon } from "./components/ui/icons";
 import { WalletConnect } from "./components/WalletConnect";
 import { localStoragePersister, queryClient, shouldDehydrateQuery } from "./config/queryClient";
 import { config } from "./config/wagmi";
-import { Tab } from "./components/Tab";
-import { OldTradeWallet } from "./components/trade/OldTradeWallet";
 import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
-import { BookIcon } from "./lib/icons";
+
+const CONTAINER = "mx-auto w-full max-w-[86rem] px-4 sm:px-6 lg:px-8";
 
 const AppContent: React.FC = () => {
+  const { isConnected } = useAccount();
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">AI Prediction Markets</h1>
-            <div className="flex gap-4 items-center">
-              <a
-                className="hover:opacity-60 cursor-pointer text-blue-600 font-semibold flex items-center gap-1"
-                href="https://deep-pm.gitbook.io/seer-docs"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <BookIcon /> User Guide
-              </a>
-              <WalletConnect />
-            </div>
+    // The app scrolls here rather than on the document — see the note in
+    // index.css. `mt-auto` on the footer still pins it when content is short.
+    <div className="flex h-dvh flex-col overflow-y-auto bg-paper">
+      {/* Opaque, not frosted — a persistent backdrop-filter re-composites the
+          page beneath it on every scroll and reflow. */}
+      <header className="sticky top-0 z-30 bg-surface shadow-raised">
+        <div className={`${CONTAINER} flex h-16 items-center justify-between gap-4`}>
+          <div className="flex min-w-0 items-baseline gap-3">
+            <h1 className="truncate text-title font-bold text-ink">AI Prediction Markets</h1>
+            <span className="hidden text-label font-semibold tracking-wider text-ink-4 uppercase sm:inline">
+              Optimism
+            </span>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <a
+              className="hidden items-center gap-1.5 rounded-md px-2 py-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover sm:inline-flex"
+              href="https://deep-pm.gitbook.io/seer-docs"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <BookIcon />
+              Guide
+            </a>
+            {isConnected ? <TradeWalletMenu /> : <WalletConnect />}
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-4 mb-20">
+      <main className={`${CONTAINER} flex-1 py-8`}>
+        <div className="space-y-6 pb-16">
           <OldTradeWallet />
-          <TradeWallet />
+          <ReadinessRail />
           <Tab />
-          <div className="mx-auto p-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg text-white">
-            <h3 className="text-lg font-semibold mb-3">Want More Trading Power?</h3>
-            <p className="text-sm leading-relaxed opacity-95 mb-4">
-              Check out the full Seer platform for advanced trading features — trade individual
-              markets, provide liquidity, and access detailed market analytics.
-            </p>
+
+          <div className="flex flex-col gap-3 rounded-lg bg-surface px-6 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-lede font-semibold text-ink">Trading one market at a time?</p>
+              <p className="mt-1 text-body text-ink-3">
+                Seer has the individual market view, liquidity provision and full analytics.
+              </p>
+            </div>
             <a
               href="https://app.seer.pm/markets/10/what-will-be-the-juror-weight-computed-through-huber-loss-minimization-in-the-lo-2"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block px-5 py-2.5 bg-opacity-20 backdrop-blur-sm border border-white border-opacity-30 rounded-lg text-sm font-medium hover:bg-opacity-30 transition-all duration-200 no-underline"
+              className="inline-flex shrink-0 items-center gap-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover"
             >
-              Visit AI Prediction Markets on Seer →
+              Open Seer
+              <ExternalIcon width={13} height={13} />
             </a>
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 };
@@ -101,6 +121,7 @@ function App() {
     // call the async init
     init();
   }, []);
+
   return (
     <WagmiProvider config={config}>
       <PersistQueryClientProvider
@@ -110,9 +131,10 @@ function App() {
           dehydrateOptions: { shouldDehydrateQuery },
         }}
       >
-        <ToastContainer />
-        <AppContent />
-        <Footer />
+        <TooltipProvider>
+          <ToastContainer />
+          <AppContent />
+        </TooltipProvider>
       </PersistQueryClientProvider>
     </WagmiProvider>
   );

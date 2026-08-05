@@ -1,8 +1,9 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config as wagmiConfig, OPTIMISM_TRANSPORT } from "@/config/wagmi";
 import { Execution } from "@/hooks/useCheck7702Support";
-import { BatchTxResult, CallBatchesInput } from "@/types";
+import { BatchTxResult, CallBatchesInput, TxProgress, TxStateChange } from "@/types";
 import { CHAIN_ID, OPTIMISM_MAX_TX_GAS } from "@/utils/constants";
+import { getErrorHeadline } from "@/utils/errors";
 import {
   Config,
   ConnectorNotConnectedError,
@@ -29,7 +30,7 @@ import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
 import { authorizeSessionKey, fundSessionKey } from "./on-chain/sessionKey";
 
 export const DEFAULT_TOAST_OPTIONS = {
-  position: "top-center" as ToastPosition,
+  position: "bottom-right" as ToastPosition,
   autoClose: 5000,
   hideProgressBar: false,
   closeOnClick: true,
@@ -130,6 +131,49 @@ export function toastError({ title, subtitle = "", options }: ToastContentType) 
   });
 }
 
+/**
+ * One toast for a whole multi-batch run, updated in place.
+ *
+ * The batch loops used to fire an info toast and a success toast per batch, so
+ * a twelve-batch run stacked twenty-four notifications over the dialog that
+ * was already reporting the same thing.
+ */
+export function createRunToast(title: string, subtitle = "") {
+  const id = toast.info(toastContent(title, subtitle), {
+    ...DEFAULT_TOAST_OPTIONS,
+    autoClose: false,
+    closeOnClick: false,
+    icon: <LoadingIcon />,
+  });
+
+  return {
+    update(nextTitle: string, nextSubtitle = "") {
+      toast.update(id, { render: toastContent(nextTitle, nextSubtitle) });
+    },
+    succeed(nextTitle: string, nextSubtitle = "") {
+      toast.update(id, {
+        render: toastContent(nextTitle, nextSubtitle),
+        type: "success",
+        icon: <CheckCircleIcon width={16} height={16} />,
+        autoClose: 5000,
+        closeOnClick: true,
+      });
+    },
+    fail(nextTitle: string, nextSubtitle = "") {
+      toast.update(id, {
+        render: toastContent(nextTitle, nextSubtitle),
+        type: "error",
+        icon: <CloseCircleIcon />,
+        autoClose: 8000,
+        closeOnClick: true,
+      });
+    },
+    dismiss() {
+      toast.dismiss(id);
+    },
+  };
+}
+
 // biome-ignore lint/suspicious/noExplicitAny:
 export const toastify: ToastifyFn<any> = async (execute, config) => {
   toastInfo({
@@ -148,9 +192,7 @@ export const toastify: ToastifyFn<any> = async (execute, config) => {
     return { status: true, data: result };
     // biome-ignore lint/suspicious/noExplicitAny:
   } catch (error: any) {
-    toastError({
-      title: error.reason ?? error.shortMessage ?? error.body?.description ?? error.message,
-    });
+    toastError({ title: getErrorMessage(error) });
 
     return { status: false, error };
   }
@@ -237,16 +279,12 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
     batches.push(calls.slice(i, i + BATCH_SIZE));
   }
 
-  const isSingleBatch = batches.length === 1;
-
-  // Show initial info about batching
-  if (!isSingleBatch) {
-    toastInfo({
-      title: "Processing multiple batches",
-      subtitle: `Due to wallet limitations, ${calls.length} calls will be processed in ${batches.length} batches of up to ${BATCH_SIZE} calls each.`,
-      options: { autoClose: 8000 },
-    });
-  }
+  const runToast = createRunToast(
+    config?.txSent?.title || "Sending transaction…",
+    batches.length > 1
+      ? `Your wallet signs ${batches.length} batches for this run.`
+      : (config?.txSent?.subtitle ?? ""),
+  );
 
   let lastReceipt: TransactionReceipt | undefined;
 
@@ -255,28 +293,26 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
     const batch = batches[i];
     const isLastBatch = i === batches.length - 1;
 
-    const result = await toastifyTx(
-      () => sendCalls(wagmiConfig, { calls: batch }),
-      isSingleBatch
-        ? config
-        : {
-            txSent: {
-              title: config?.txSent?.title || `Sending batch ${i + 1}/${batches.length}...`,
-              subtitle: config?.txSent?.subtitle,
-            },
-            txSuccess: {
-              title: isLastBatch
-                ? config?.txSuccess?.title || "All transactions sent!"
-                : `Batch ${i + 1}/${batches.length} sent!`,
-              subtitle: config?.txSuccess?.subtitle,
-            },
-            txError: {
-              title: config?.txError?.title || `Failed to send batch ${i + 1}/${batches.length}`,
-              subtitle: config?.txError?.subtitle,
-            },
-            options: config?.options,
-          },
-    );
+    if (batches.length > 1) {
+      runToast.update(
+        config?.txSent?.title || "Sending transaction…",
+        `Batch ${i + 1} of ${batches.length}`,
+      );
+    }
+
+    const result = await handleTx(() => sendCalls(wagmiConfig, { calls: batch }));
+
+    if (!result.status) {
+      runToast.fail(
+        config?.txError?.title || "Transaction failed",
+        getErrorMessage(result.error),
+      );
+      return result;
+    }
+
+    if (isLastBatch) {
+      runToast.succeed(config?.txSuccess?.title || "Transaction sent");
+    }
 
     // If any batch fails, abort the entire process and return the error
     if (!result.status) {
@@ -328,15 +364,10 @@ export const toastifyBatchTx = async (
     batches.push(calls.slice(i, i + BATCH_SIZE));
   }
 
-  const isSingleBatch = batches.length === 1;
-  // Show initial info about batching
-  if (!isSingleBatch) {
-    toastInfo({
-      title: "Processing multiple batches",
-      subtitle: `Due to wallet limitations, ${calls.length} calls will be processed in ${batches.length} batches of up to ${BATCH_SIZE} calls each.`,
-      options: { autoClose: 8000 },
-    });
-  }
+  const runToast = createRunToast(
+    messageConfig.txSent,
+    batches.length > 1 ? `Your wallet signs ${batches.length} batches for this run.` : "",
+  );
 
   let lastReceipt: TransactionReceipt | undefined;
 
@@ -361,10 +392,14 @@ export const toastifyBatchTx = async (
         gas: OPTIMISM_MAX_TX_GAS,
       });
     } catch (err) {
+      runToast.fail("Transaction failed", getErrorMessage(err));
       return {
         status: false,
         error: err,
       };
+    }
+    if (batches.length > 1) {
+      runToast.update(messageConfig.txSent, `Batch ${i + 1} of ${batches.length}`);
     }
     const writePromise = writeContract(wagmiConfig, {
       address: tradeExecutor,
@@ -374,16 +409,13 @@ export const toastifyBatchTx = async (
       value: 0n,
       chainId: CHAIN_ID,
     });
-    const result = await toastifyTx(() => writePromise, {
-      txSent: {
-        title: isSingleBatch ? messageConfig.txSent : `Sending batch ${i + 1}/${batches.length}...`,
-      },
-      txSuccess: {
-        title: isLastBatch ? messageConfig.txSuccess : `Batch ${i + 1}/${batches.length} sent!`,
-      },
-    });
+    const result = await handleTx(() => writePromise);
     if (!result.status) {
+      runToast.fail("Transaction failed", getErrorMessage(result.error));
       return { status: false, error: result.error };
+    }
+    if (isLastBatch) {
+      runToast.succeed(messageConfig.txSuccess);
     }
 
     lastReceipt = result.receipt;
@@ -418,7 +450,7 @@ const INSUFFICIENT_GAS_FUNDS =
 export const toastifyBatchTxSessionKey = async (
   tradeExecutor: Address,
   input: CallBatchesInput,
-  onStateChange: (state: string) => void,
+  onStateChange: TxStateChange,
   gasPerBatch = 10_000_000n,
 ): Promise<BatchTxResult> => {
   const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
@@ -491,11 +523,14 @@ export const toastifyBatchTxSessionKey = async (
 
   // A batch that simulated fine but failed to broadcast is a transport problem, not a bad call.
   // Retry it before giving up — and never swallow the failure, regardless of skipFailCalls.
-  const sendBatch = async (request: SimulatedRequest, label: string) => {
+  const sendBatch = async (request: SimulatedRequest, progress: TxProgress) => {
     let lastError: unknown;
     for (let attempt = 0; attempt < SEND_ATTEMPTS; attempt++) {
       if (attempt > 0) {
-        onStateChange(`${label} (retry ${attempt}/${SEND_ATTEMPTS - 1})`);
+        onStateChange({
+          ...progress,
+          label: `${progress.label} — retrying (${attempt}/${SEND_ATTEMPTS - 1})`,
+        });
       }
       const result = await handleTx(() => sessionWallet.writeContract(request));
       if (result.status) {
@@ -511,7 +546,7 @@ export const toastifyBatchTxSessionKey = async (
 
       if (result.error?.message?.includes(INSUFFICIENT_GAS_FUNDS)) {
         await fundSessionKey(50_000_000n * maxFeePerGas, onStateChange);
-        onStateChange(label);
+        onStateChange(progress);
         continue;
       }
       if (attempt < SEND_ATTEMPTS - 1) {
@@ -527,15 +562,20 @@ export const toastifyBatchTxSessionKey = async (
 
   try {
     for (let i = 0; i < input.length; i++) {
-      const { calls, message, skipFailCalls } = input[i];
-      const label = message ?? `Executing batch ${i + 1}`;
+      const { calls, message, skipFailCalls, phase, step, of } = input[i];
+      const progress: TxProgress = {
+        phase: phase ?? "work",
+        label: message ?? `Executing batch ${i + 1}`,
+        step,
+        of,
+      };
 
       // Nothing to do — don't pay for an empty batchExecute([]).
       if (!calls.length) {
         continue;
       }
 
-      onStateChange(label);
+      onStateChange(progress);
 
       const batch = await executeBatch(calls as Execution[], skipFailCalls);
 
@@ -546,7 +586,7 @@ export const toastifyBatchTxSessionKey = async (
         continue;
       }
 
-      lastReceipt = await sendBatch(batch.request, label);
+      lastReceipt = await sendBatch(batch.request, progress);
       executedCalls += batch.executed;
       prunedCalls += batch.pruned;
     }
@@ -563,7 +603,7 @@ export const toastifyBatchTxSessionKey = async (
 export const toastifyBatchTxOwner = async (
   tradeExecutor: Address,
   input: CallBatchesInput,
-  onStateChange: (state: string) => void,
+  onStateChange: TxStateChange,
 ): Promise<BatchTxResult> => {
   let lastReceipt: TransactionReceipt | undefined;
   let executedCalls = 0;
@@ -575,14 +615,19 @@ export const toastifyBatchTxOwner = async (
 
   try {
     for (let i = 0; i < input.length; i++) {
-      const { calls, message, skipFailCalls } = input[i];
+      const { calls, message, skipFailCalls, phase, step, of } = input[i];
 
       // Nothing to do — don't pay for an empty batchExecute([]).
       if (!calls.length) {
         continue;
       }
 
-      onStateChange(message ?? `Executing batch ${i + 1}`);
+      onStateChange({
+        phase: phase ?? "work",
+        label: message ?? `Executing batch ${i + 1}`,
+        step,
+        of,
+      });
 
       let executableCalls = calls;
       try {
@@ -671,11 +716,10 @@ async function pollForTransactionReceipt(
   return null;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny:
-function getErrorMessage(error: any): string {
+function getErrorMessage(error: unknown): string {
   if (error instanceof ConnectorNotConnectedError) {
-    return "Please connect your wallet.";
+    return "Connect your wallet to continue.";
   }
 
-  return error.shortMessage ?? error.message;
+  return getErrorHeadline(error);
 }

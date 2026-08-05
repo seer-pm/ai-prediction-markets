@@ -1,120 +1,110 @@
+import {
+  Card,
+  CardHeader,
+  DeltaCell,
+  Skeleton,
+  Table,
+  TableScroller,
+  TableSkeleton,
+  Tbody,
+  Td,
+  Th,
+  Thead,
+  Tr,
+} from "@/components/ui";
 import { TableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
-import React from "react";
-import { formatUnits } from "viem";
+import { formatPercent, formatSignedPercent, formatTokenAmount, preciseValue,
+  maxAbs,
+} from "@/utils/format";
+import React, { useMemo, type ReactNode } from "react";
 
 interface MarketTableProps {
   rows: TableData[];
   isLoading: boolean;
   isLoadingBalances: boolean;
+  emptyState?: ReactNode;
 }
+
+const asPercent = (value: number | null | undefined) =>
+  typeof value === "number" ? value * 100 : undefined;
 
 const OctantMarketTableInner: React.FC<MarketTableProps> = ({
   rows,
   isLoading,
   isLoadingBalances,
+  emptyState,
 }) => {
-  if (isLoading) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-300 rounded w-1/4 mb-4"></div>
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-4 bg-gray-300 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return null;
-  }
+  const visibleRows = useMemo(
+    () => rows.filter((row) => !row.repo.toLowerCase().includes("invalid result")),
+    [rows],
+  );
+  const scale = useMemo(
+    () => maxAbs(visibleRows.map((row) => asPercent(row.difference))),
+    [visibleRows],
+  );
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="p-6 border-b">
-        <h2 className="text-2xl font-bold">Octant Projects</h2>
-        <p className="text-gray-600">Projects ranked by current percent</p>
-      </div>
+    <Card flush>
+      <CardHeader
+        eyebrow="Octant"
+        title="Project funding share"
+        description="Each project's share of the round, as a percentage."
+      />
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px]">
-          {/* min-width keeps structure for scroll */}
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Project
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Balance
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Current Percent (%)
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Predicted Percent (%)
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Difference (%)
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200 text-sm">
-            {rows.map((row) => {
-              const { outcomeId, repo, currentPrice, predictedWeight, difference, balance } = row;
-
-              if (repo.toLowerCase().includes("invalid result")) return null;
-
-              return (
-                <tr key={outcomeId} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="text-gray-900 max-w-[120px] sm:max-w-xs truncate" title={repo}>
-                      {repo}
-                    </div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+      {isLoading ? (
+        <TableSkeleton columns={5} />
+      ) : visibleRows.length === 0 ? (
+        emptyState
+      ) : (
+        <TableScroller>
+          <Table minWidth={760}>
+            <Thead>
+              <Th pinned>Project</Th>
+              <Th numeric>Balance</Th>
+              <Th numeric>Market %</Th>
+              <Th numeric>Predicted %</Th>
+              <Th numeric>Difference</Th>
+            </Thead>
+            <Tbody>
+              {visibleRows.map((row) => (
+                <Tr key={row.outcomeId}>
+                  <Td pinned>
+                    <span className="block max-w-[220px] truncate sm:max-w-sm" title={row.repo}>
+                      {row.repo}
+                    </span>
+                  </Td>
+                  <Td numeric>
                     {isLoadingBalances ? (
-                      <div className="animate-pulse">
-                        <div className="h-4 bg-gray-300 rounded w-16 sm:w-20"></div>
-                      </div>
+                      <Skeleton className="ml-auto" width={48} height={9} />
                     ) : (
-                      <div className="text-gray-900">
-                        {typeof balance === "bigint"
-                          ? Number(formatUnits(balance, DECIMALS)).toFixed(2)
-                          : "-"}
-                      </div>
+                      formatTokenAmount(
+                        typeof row.balance === "bigint" ? row.balance : undefined,
+                        DECIMALS,
+                      )
                     )}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {currentPrice != null ? (currentPrice * 100).toFixed(4) : "-"}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {predictedWeight != null ? (predictedWeight * 100).toFixed(4) : "-"}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    {difference ? (
-                      <span
-                        className={`font-medium font-mono ${
-                          difference > 0 ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        {difference > 0 ? "+" : ""}
-                        {(difference * 100).toFixed(4)}
-                      </span>
-                    ) : (
-                      <span className="text-gray-900 font-mono">-</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                  </Td>
+                  <Td numeric title={preciseValue(asPercent(row.currentPrice))}>
+                    {formatPercent(asPercent(row.currentPrice))}
+                  </Td>
+                  <Td numeric className="text-ink" title={preciseValue(asPercent(row.predictedWeight))}>
+                    {formatPercent(asPercent(row.predictedWeight))}
+                  </Td>
+                  <Td className="text-right">
+                    <DeltaCell
+                      value={asPercent(row.difference)}
+                      max={scale}
+                      format={formatSignedPercent}
+                      title={preciseValue(asPercent(row.difference))}
+                    />
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </TableScroller>
+      )}
+    </Card>
   );
 };
 

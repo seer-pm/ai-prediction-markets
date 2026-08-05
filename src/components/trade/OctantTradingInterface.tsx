@@ -3,264 +3,94 @@ import { useExecuteOctantTradeStrategy } from "@/hooks/useExecuteOctantTradeStra
 import { useGetOctantQuotes } from "@/hooks/useGetOctantQuotes";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { TableData } from "@/types";
-import { collateral, DECIMALS } from "@/utils/constants";
-import React from "react";
-import { useForm } from "react-hook-form";
-import { Address, formatUnits, parseUnits } from "viem";
-import { ErrorPanel } from "./ErrorPanel";
-import { LoadingPanel } from "./LoadingPanel";
+import { collateral } from "@/utils/constants";
+import { formatPercent } from "@/utils/format";
+import React, { useMemo, useState } from "react";
+import { Address } from "viem";
+import { StrategyDialog } from "./StrategyDialog";
 
 interface TradingInterfaceProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   rows: TableData[];
-  onClose: () => void;
   tradeExecutor: Address;
 }
 
-interface TradeFormData {
-  amount: string;
-}
-
 export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
+  open,
+  onOpenChange,
   tradeExecutor,
   rows,
-  onClose,
 }) => {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    watch,
-    setValue,
-  } = useForm<TradeFormData>({
-    mode: "onSubmit",
-    defaultValues: {
-      amount: "",
-    },
-  });
-
-  const amount = watch("amount");
-
+  const [amount, setAmount] = useState("");
   const debouncedAmount = useDebounce(amount, 300);
+  // The debounce means the quotes on hand can belong to a previous amount.
+  const quotesStale = amount !== debouncedAmount;
+
   const {
     data: getQuotesResult,
     isLoading: isLoadingQuotes,
-    isError: isErrorGettingQuotes,
     error: errorGettingQuotes,
-    progress,
-  } = useGetOctantQuotes({
-    account: tradeExecutor,
-    amount: debouncedAmount,
-    tableData: rows,
-  });
+    progress: quoteProgress,
+  } = useGetOctantQuotes({ account: tradeExecutor, amount: debouncedAmount, tableData: rows });
 
-  // Get sUSDS balance
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
     token: collateral.address,
   });
 
-  const balance = balanceData && formatUnits(balanceData.value, balanceData.decimals);
+  const executeTradeMutation = useExecuteOctantTradeStrategy();
 
-  const executeTradeMutation = useExecuteOctantTradeStrategy(() => {
-    onClose();
-    reset();
-  });
-
-  const onSubmit = ({ amount }: TradeFormData) => {
-    executeTradeMutation.mutate({
-      amount,
-      getQuotesResult,
-      tradeExecutor,
-      tableData: rows,
-    });
-  };
-
-  const handleMaxClick = () => {
-    if (balance) {
-      setValue("amount", balance, { shouldValidate: true });
-    }
-  };
-
-  // Strategy analysis
-  const buyOutcomes = rows.filter((m) => m.difference && m.difference > 0);
-  const sellOutcomes = rows.filter((m) => m.difference && m.difference < 0);
-  const renderButtonText = () => {
-    if (executeTradeMutation.isPending) {
-      return (
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-          Executing Strategy...
-        </div>
-      );
-    }
-    if (errors.amount) {
-      return errors.amount.message;
-    }
-    if (isLoadingQuotes) {
-      return "Getting quotes...";
-    }
-    return "🚀 Execute Strategy";
-  };
+  const { buyCount, sellCount, largestDelta } = useMemo(() => {
+    const deltas = rows.map((row) => row.difference).filter((d): d is number => !!d);
+    return {
+      buyCount: deltas.filter((d) => d > 0).length,
+      sellCount: deltas.filter((d) => d < 0).length,
+      largestDelta: deltas.reduce((max, d) => Math.max(max, Math.abs(d)), 0) * 100,
+    };
+  }, [rows]);
 
   return (
-    <div className="max-h-[90vh] overflow-y-auto">
-      {/* Header with Close Button */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-bold text-white">Execute Advanced Strategy</h3>
-        </div>
-        <button
-          onClick={onClose}
-          className="cursor-pointer text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
-          disabled={executeTradeMutation.isPending}
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <div className="px-6 py-4 space-y-4">
-        {/* Error Display */}
-        {executeTradeMutation.isError && (
-          <ErrorPanel
-            title="Trade Execution Failed"
-            description={executeTradeMutation.error?.message}
-            onDismiss={executeTradeMutation.reset}
-          />
-        )}
-        {isErrorGettingQuotes && (
-          <ErrorPanel title="Quote Failed" description={errorGettingQuotes?.message} />
-        )}
-
-        {/* Loading Overlay */}
-        {executeTradeMutation.isPending && (
-          <LoadingPanel
-            title="Executing Trade Strategy"
-            description={executeTradeMutation.txState}
-          />
-        )}
-
-        {isLoadingQuotes && (
-          <LoadingPanel
-            title={`Getting quotes: ${progress}/${
-              buyOutcomes.length + sellOutcomes.length
-            } markets`}
-            description="Obtaining quotes to construct and execute trades. This may take a while..."
-          />
-        )}
-
-        {/* Strategy Summary */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="px-4 py-2 bg-green-50 rounded-lg">
-            <h4 className="font-medium text-green-800 mb-1">Undervalued Markets</h4>
-            <p className="text-2xl font-bold text-green-600">{buyOutcomes.length}</p>
-          </div>
-          <div className="px-4 py-2 bg-red-50 rounded-lg">
-            <h4 className="font-medium text-red-800 mb-1">Overvalued Markets</h4>
-            <p className="text-2xl font-bold text-red-600">{sellOutcomes.length}</p>
-          </div>
-        </div>
-
-        <div className="px-4 py-2 bg-gray-50 rounded-lg">
-          <h4 className="font-medium text-gray-800 mb-2">Strategy Overview</h4>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-600 marker:font-semibold">
-            <li>Mint complete sets using all sUSDS inputs (optional).</li>
-            <li>
-              Use both minted and existing tokens, sell overvalued markets down to the predicted
-              price.
-            </li>
-            <li>Merge complete sets to sUSDS (if possible).</li>
-            <li>Use the available sUSDS to buy undervalued markets up to the predicted price.</li>
-          </ol>
-        </div>
-
-        {/* Trading Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount to mint (sUSDS)
-            </label>
-
-            {/* Balance Display */}
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm text-gray-600">
-                Balance:{" "}
-                {isBalanceLoading ? (
-                  <span className="animate-pulse">Loading...</span>
-                ) : (
-                  <span className="font-mono text-gray-900">
-                    {balance ? Number(balance).toFixed(2) : 0} sUSDS
-                  </span>
-                )}
-              </span>
-              {!isBalanceLoading && (
-                <button
-                  type="button"
-                  onClick={handleMaxClick}
-                  className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  disabled={executeTradeMutation.isPending}
-                >
-                  Max
-                </button>
-              )}
-            </div>
-
-            <input
-              {...register("amount", {
-                validate: (value) =>
-                  parseUnits(value, DECIMALS) <= (balanceData?.value ?? 0n) || "Not enough balance",
-              })}
-              type="number"
-              step="any"
-              placeholder="Enter amount to mint"
-              className="mb-2 w-full p-4 text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-              disabled={executeTradeMutation.isPending}
-            />
-            <p className="text-sm text-gray-600">
-              Note: You can execute this strategy without minting, as long as you already hold {">"}{" "}
-              0.01 overvalued tokens.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0 mb-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-3 sm:py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={executeTradeMutation.isPending}
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 sm:py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={
-                executeTradeMutation.isPending ||
-                !!errors.amount ||
-                isLoadingQuotes ||
-                !getQuotesResult ||
-                isErrorGettingQuotes
-              }
-            >
-              {renderButtonText()}
-            </button>
-          </div>
-
-          <div className="text-center space-y-2">
-            <p className="text-xs text-gray-500">
-              This will execute trades across all markets automatically
-            </p>
-          </div>
-        </form>
-      </div>
-    </div>
+    <StrategyDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Start trading"
+      stats={[
+        { label: "Projects", value: String(buyCount + sellCount) },
+        { label: "To buy", value: String(buyCount), tone: "long" },
+        { label: "To sell", value: String(sellCount), tone: "short" },
+        { label: "Largest Δ", value: `${formatPercent(largestDelta)}%` },
+      ]}
+      balance={balanceData}
+      balanceLoading={isBalanceLoading}
+      quotesLoading={isLoadingQuotes}
+      quotesProgress={{ step: quoteProgress ?? 0, of: rows.filter((r) => r.difference).length }}
+      quotesError={errorGettingQuotes}
+      mutation={executeTradeMutation}
+      onAmountChange={setAmount}
+      blockedReason={
+        quotesStale
+          ? "Pricing the new amount…"
+          : buyCount + sellCount === 0
+          ? "Every prediction already matches the market — there is nothing to trade."
+          : undefined
+      }
+      onSubmit={(value) =>
+        executeTradeMutation.mutate({
+          amount: value,
+          getQuotesResult,
+          tradeExecutor,
+          tableData: rows,
+        })
+      }
+      howItWorks={
+        <ol className="list-inside list-decimal space-y-1.5 marker:font-medium marker:text-ink-3">
+          <li>Mint complete sets of the market with the sUSDS you supply.</li>
+          <li>Sell projects trading above your predicted share, down to that share.</li>
+          <li>Merge whatever complete sets remain back into sUSDS.</li>
+          <li>Spend the proceeds buying projects trading below your predicted share.</li>
+        </ol>
+      }
+    />
   );
 };

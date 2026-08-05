@@ -1,60 +1,64 @@
-import { useEffect, useState } from "react";
-import DropdownSelect from "../DropdownSelect";
+import { ContestChart } from "@/components/contest/ContestChart";
+import { Select } from "@/components/ui";
 import { ChartWithMarketData } from "@/types";
-import MarketChart from "../MarketChart";
+import { formatAmount } from "@/utils/format";
+import { useEffect, useState } from "react";
 
 export default function L2Charts({
   repoOptions,
   charts,
   totalVolumeMapping,
+  isLoading,
 }: {
-  repoOptions: {
-    id: string;
-    text: string;
-  }[];
-  charts: {
-    [key: string]: ChartWithMarketData;
-  };
-  totalVolumeMapping: {
-    [key: string]: string;
-  };
+  repoOptions: { id: string; text: string }[];
+  charts?: { [key: string]: ChartWithMarketData };
+  totalVolumeMapping?: { [key: string]: string };
+  isLoading: boolean;
 }) {
-  const [repoSelected, setRepoSelected] = useState<string | undefined>(repoOptions[0].id ?? "");
-  const chartData = repoSelected ? charts[repoSelected] : undefined;
-  const totalVolumeMarket = repoSelected ? totalVolumeMapping[repoSelected] : undefined;
-  const parseL2VolumeData = () => {
-    if (!totalVolumeMarket) return "";
+  const [repoSelected, setRepoSelected] = useState<string | undefined>(repoOptions[0]?.id);
+
+  useEffect(() => {
+    if (repoOptions.length && !repoSelected) {
+      setRepoSelected(repoOptions[0].id);
+    }
+  }, [repoOptions, repoSelected]);
+
+  const chartData = repoSelected ? charts?.[repoSelected] : undefined;
+  const totalVolumeMarket = repoSelected ? totalVolumeMapping?.[repoSelected] : undefined;
+
+  const volumeLabel = (() => {
+    if (!totalVolumeMarket) return undefined;
     const [volume, symbol] = totalVolumeMarket.split(" ");
     return (
       <>
-        Total volume:{" "}
-        <span className="font-semibold">
-          {Number(volume).toFixed(2)} {symbol}
+        Volume{" "}
+        <span className="font-mono text-ink">
+          {formatAmount(Number(volume))} {symbol}
         </span>
       </>
     );
-  };
-  useEffect(() => {
-    if (repoOptions && !repoSelected) {
-      setRepoSelected(repoOptions[0].id ?? "");
-    }
-  }, [repoOptions]);
+  })();
+
   return (
-    <>
-      <div className="flex items-center gap-2 mb-4">
-        <p className="text-sm text-gray-700">Select Repo:</p>
-        <DropdownSelect
-          placeholder="Select outcome"
-          options={repoOptions}
-          selectedId={repoSelected}
-          onChange={setRepoSelected}
-        />
-      </div>
-      {chartData ? (
-        <MarketChart data={chartData} totalVolumeMarket={parseL2VolumeData()} />
-      ) : (
-        <p>No chart data</p>
-      )}
-    </>
+    <ContestChart
+      data={chartData}
+      isLoading={isLoading}
+      eyebrow="Round 2 · L2"
+      title="Dependency prices over time"
+      description="One repository at a time — each has its own set of dependency markets."
+      volume={volumeLabel}
+      actions={
+        repoOptions.length > 0 && (
+          <Select
+            className="w-full sm:w-64"
+            placeholder="Select a repository"
+            searchPlaceholder="Search repositories…"
+            options={repoOptions}
+            selectedId={repoSelected}
+            onChange={setRepoSelected}
+          />
+        )
+      }
+    />
   );
 }

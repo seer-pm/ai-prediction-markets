@@ -1,88 +1,109 @@
-import { ErrorPanel } from "@/components/trade/ErrorPanel";
-import { LoadingPanel } from "@/components/trade/LoadingPanel";
-import React from "react";
+import { Button, Dialog, EmptyState, ErrorPanel, Panel } from "@/components/ui";
+import type { TxProgressState } from "@/hooks/useTxProgress";
+import { REDEEM_PHASES, runStatus } from "@/utils/txPhases";
+import React, { useEffect } from "react";
+import { RunLedger } from "./RunLedger";
 
 export interface RedeemL2InterfaceProps {
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   isError: boolean;
-  error: Error | null;
+  error: unknown;
   isPending: boolean;
-  txState: string;
+  isSuccess?: boolean;
+  progress: TxProgressState;
   reset: () => void;
   onRedeem: () => void;
   isLoading: boolean;
   hasRedeemable: boolean;
-  subtitle?: string;
+  description?: string;
 }
 
 export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
-  onClose,
+  open,
+  onOpenChange,
   isError,
   error,
   isPending,
-  txState,
+  isSuccess = false,
+  progress,
   reset,
   onRedeem,
   isLoading,
   hasRedeemable,
-  subtitle = "Redeem resolved L2 positions to sUSDS",
+  description = "Settled outcome tokens pay out at their resolved value, straight back to sUSDS.",
 }) => {
-  return (
-    <div className="max-h-[90vh] overflow-y-auto">
-      {/* Header with Close Button */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-bold text-white">Redeem outcome tokens</h3>
-          <p className="text-sm text-white">{subtitle}</p>
-        </div>
-        <button
-          onClick={onClose}
-          className="cursor-pointer text-white hover:text-gray-200 p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
+  const status = runStatus({ isPending, isSuccess, isError });
 
-      <div className="px-6 py-4 space-y-4">
-        {isError && (
-          <ErrorPanel
-            title="Redeem Failed"
-            description={error?.message ?? "Unknown error"}
-            onDismiss={reset}
+  // Clear the run on dismissal, so reopening starts from a clean slate rather
+  // than the previous receipt.
+  useEffect(() => {
+    if (!open) {
+      progress.reset();
+      reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Redeem settled positions"
+      description={description}
+      size="sm"
+      dismissible={!isPending}
+      footer={
+        status === "succeeded" ? (
+          <Button variant="primary" onClick={() => onOpenChange(false)} fullWidth>
+            Done
+          </Button>
+        ) : (
+          !isLoading &&
+          hasRedeemable && (
+          <>
+            <Button onClick={() => onOpenChange(false)} disabled={isPending} fullWidth>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={onRedeem}
+              loading={isPending}
+              disabled={isPending}
+              fullWidth
+            >
+              Redeem
+            </Button>
+          </>
+          )
+        )
+      }
+    >
+      <div className="space-y-4">
+        {isError && <ErrorPanel title="The redemption stopped" error={error} onDismiss={reset} />}
+
+        {status !== "idle" && (
+          <RunLedger
+            phases={REDEEM_PHASES}
+            current={progress.current}
+            completed={progress.completed}
+            status={status}
           />
         )}
-        {isPending && <LoadingPanel title="Redeeming tokens" description={txState} />}
+
         {isLoading ? (
-          <p>Checking balances...</p>
+          <Panel tone="working" title="Reading your balances">
+            Checking which settled markets you still hold tokens in.
+          </Panel>
         ) : !hasRedeemable ? (
-          <p>Nothing to redeem</p>
+          <EmptyState
+            title="No settled positions to redeem"
+            description="Either these markets have not resolved yet, or you have already redeemed them."
+          />
         ) : (
-          <div className="flex space-x-4 mb-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="cursor-pointer flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-md hover:bg-gray-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onRedeem}
-              disabled={isPending}
-              className="cursor-pointer flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-md hover:from-blue-700 hover:to-purple-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all font-medium text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPending ? "Redeeming..." : "Redeem"}
-            </button>
-          </div>
+null
         )}
       </div>
-    </div>
+    </Dialog>
   );
 };

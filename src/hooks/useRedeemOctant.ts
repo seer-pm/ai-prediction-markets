@@ -1,10 +1,10 @@
 import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
-import { CallBatchesInput } from "@/types";
+import { CallBatchesInput, TxStateChange } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS, OCTANT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { chunkRedeemFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
@@ -24,13 +24,13 @@ async function redeemOctant({
   tradeExecutor,
   wrappedTokens,
   onStateChange,
-}: RedeemOctantProps & { onStateChange: (state: string) => void }) {
+}: RedeemOctantProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
   // Octant is a single flat market — outcome tokens redeem straight to sUSDS,
   // with none of the parent-market phase the nested contests need.
-  onStateChange("Checking balances");
+  onStateChange({ phase: "redeem", label: "Reading your settled balances" });
   const balances = await fetchTokensBalances(tradeExecutor, wrappedTokens);
 
   const tokens: Address[] = [];
@@ -71,13 +71,14 @@ async function redeemOctant({
     }
   }
 
+  onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
 }
 
 export const useRedeemOctant = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
-    mutationFn: (props: RedeemOctantProps) => redeemOctant({ ...props, onStateChange: setTxState }),
+    mutationFn: (props: RedeemOctantProps) => redeemOctant({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
@@ -87,6 +88,6 @@ export const useRedeemOctant = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

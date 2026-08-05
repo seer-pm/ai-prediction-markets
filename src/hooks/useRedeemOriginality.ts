@@ -1,10 +1,10 @@
 import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxOwner, toastifyBatchTxSessionKey } from "@/lib/toastify";
-import { CallBatchesInput } from "@/types";
+import { CallBatchesInput, TxStateChange } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS, ORIGINALITY_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { chunkRedeemFromRouter, redeemFromRouter } from "./useExecuteL2Strategy";
@@ -30,13 +30,13 @@ async function redeemOriginality({
   parentTokens: parentTokensInput,
   isOldWallet,
   onStateChange,
-}: RedeemOriginalityProps & { onStateChange: (state: string) => void }) {
+}: RedeemOriginalityProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
   const submitBatches = isOldWallet ? toastifyBatchTxOwner : toastifyBatchTxSessionKey;
 
   // ── Phase 1: redeem conditional market tokens → receive parent outcome tokens ──
-  onStateChange("Checking balances");
+  onStateChange({ phase: "redeem", label: "Reading your settled balances" });
   const allConditionalTokens = closedMarkets.flatMap((m) => m.wrappedTokens);
   const conditionalBalances = await fetchTokensBalances(tradeExecutor, allConditionalTokens);
 
@@ -94,7 +94,10 @@ async function redeemOriginality({
   if (phase1Batches.length > 0) {
     const phase1Input: CallBatchesInput = phase1Batches.map((calls, i) => ({
       calls,
-      message: `Redeeming conditional markets batch ${i + 1}/${phase1Batches.length}`,
+      message: "Redeeming child markets to parent tokens",
+      phase: "redeem",
+      step: i + 1,
+      of: phase1Batches.length,
       skipFailCalls: false,
     }));
     const phase1Result = await submitBatches(tradeExecutor, phase1Input, onStateChange);
@@ -105,7 +108,7 @@ async function redeemOriginality({
   }
 
   // ── Phase 2: redeem parent outcome tokens → receive sUSDS ──
-  onStateChange("Updating parent token balances");
+  onStateChange({ phase: "redeem", label: "Reading parent token balances" });
   const parentTokens = parentTokensInput;
   const parentBalances = await fetchTokensBalances(tradeExecutor, parentTokens);
 
@@ -152,10 +155,10 @@ async function redeemOriginality({
 }
 
 export const useRedeemOriginality = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
     mutationFn: (props: RedeemOriginalityProps) =>
-      redeemOriginality({ ...props, onStateChange: setTxState }),
+      redeemOriginality({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
@@ -165,6 +168,6 @@ export const useRedeemOriginality = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

@@ -1,166 +1,170 @@
+import {
+  Card,
+  CardHeader,
+  DeltaCell,
+  Skeleton,
+  Table,
+  TableScroller,
+  TableSkeleton,
+  Tbody,
+  Td,
+  Th,
+  Thead,
+  Thr,
+  Tr,
+} from "@/components/ui";
 import { OriginalityTableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
-import React from "react";
-import { formatUnits } from "viem";
+import { formatSignedWeight, formatTokenAmount, formatWeight, preciseValue,
+  maxAbs,
+} from "@/utils/format";
+import React, { useMemo, type ReactNode } from "react";
 
 interface MarketTableProps {
   markets: OriginalityTableData[];
   isLoading: boolean;
   isLoadingBalances: boolean;
+  emptyState?: ReactNode;
 }
 
 const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
   markets,
   isLoading,
   isLoadingBalances,
+  emptyState,
 }) => {
-  if (isLoading) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="animate-pulse">
-          <div className="h-4 bg-gray-300 rounded w-1/4 mb-4"></div>
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-4 bg-gray-300 rounded"></div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const visibleRows = useMemo(
+    () => markets.filter((market) => market.repo !== "Invalid result"),
+    [markets],
+  );
 
-  if (markets.length === 0) {
-    return null;
-  }
+  // One scale across both sides, so an UP bar and a DOWN bar of equal length
+  // mean an equal edge.
+  const scale = useMemo(
+    () => maxAbs(visibleRows.flatMap((row) => [row.upDifference, row.downDifference])),
+    [visibleRows],
+  );
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="p-6 border-b">
-        <h2 className="text-2xl font-bold">Repository Originality</h2>
-      </div>
+    <Card flush>
+      <CardHeader
+        eyebrow="Originality"
+        title="Original work per repository"
+        description="Each repository trades as a pair: UP is the share of original work, DOWN the share carried by dependencies."
+      />
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px]">
-          {/* min-width keeps structure for scroll */}
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Repository
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                UP Balance
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                DOWN Balance
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                UP Price
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                DOWN Price
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Predicted Originality
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Implied UP fair
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Implied DOWN fair
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200 text-sm">
-            {markets.map((market) => {
-              const {
-                marketId,
-                repo,
-                upBalance,
-                downBalance,
-                upPrice,
-                downPrice,
-                predictedOriginality,
-                upDifference,
-                downDifference,
-              } = market;
+      {isLoading ? (
+        <TableSkeleton columns={8} />
+      ) : visibleRows.length === 0 ? (
+        emptyState
+      ) : (
+        <TableScroller>
+          <Table minWidth={1080}>
+            <Thead multiRow>
+              <Thr>
+                <Th pinned rowSpan={2} className="align-bottom">
+                  Repository
+                </Th>
+                <Th numeric rowSpan={2} className="align-bottom">
+                  Predicted
+                </Th>
+                <Th colSpan={4} className="border-l border-rule text-center text-long">
+                  Up · original work
+                </Th>
+                <Th colSpan={4} className="border-l border-rule text-center text-short">
+                  Down · dependencies
+                </Th>
+              </Thr>
+              <Thr>
+                <Th numeric className="border-l border-rule">
+                  Balance
+                </Th>
+                <Th numeric>Market</Th>
+                <Th numeric>Fair</Th>
+                <Th numeric>Difference</Th>
+                <Th numeric className="border-l border-rule">
+                  Balance
+                </Th>
+                <Th numeric>Market</Th>
+                <Th numeric>Fair</Th>
+                <Th numeric>Difference</Th>
+              </Thr>
+            </Thead>
+            <Tbody>
+              {visibleRows.map((market) => {
+                const downFair =
+                  typeof market.predictedOriginality === "number"
+                    ? 1 - market.predictedOriginality
+                    : undefined;
 
-              if (repo === "Invalid result") return null;
-
-              return (
-                <tr key={marketId} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="text-gray-900 max-w-[120px] sm:max-w-xs truncate" title={repo}>
-                      {repo}
-                    </div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    {isLoadingBalances ? (
-                      <div className="animate-pulse">
-                        <div className="h-4 bg-gray-300 rounded w-16 sm:w-20"></div>
-                      </div>
-                    ) : (
-                      <div className="text-gray-900">
-                        {typeof upBalance === "bigint"
-                          ? Number(formatUnits(upBalance, DECIMALS)).toFixed(2)
-                          : "-"}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    {isLoadingBalances ? (
-                      <div className="animate-pulse">
-                        <div className="h-4 bg-gray-300 rounded w-16 sm:w-20"></div>
-                      </div>
-                    ) : (
-                      <div className="text-gray-900">
-                        {typeof downBalance === "bigint"
-                          ? Number(formatUnits(downBalance, DECIMALS)).toFixed(2)
-                          : "-"}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {upPrice?.toFixed(4) ?? "-"}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {downPrice?.toFixed(4) ?? "-"}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {predictedOriginality?.toFixed(4) ?? "-"}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {predictedOriginality?.toFixed(4) ?? "-"}{" "}
-                    {upDifference ? (
-                      <span
-                        className={`font-medium font-mono ${
-                          upDifference > 0 ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        ({upDifference > 0 ? "+" : ""}
-                        {upDifference.toFixed(4)})
+                return (
+                  <Tr key={market.marketId}>
+                    <Td pinned>
+                      <span className="block max-w-[200px] truncate sm:max-w-xs" title={market.repo}>
+                        {market.repo}
                       </span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap font-mono">
-                    {predictedOriginality ? (1 - predictedOriginality).toFixed(4) : "-"}{" "}
-                    {downDifference ? (
-                      <span
-                        className={`font-medium font-mono ${
-                          downDifference > 0 ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        ({downDifference > 0 ? "+" : ""}
-                        {downDifference.toFixed(4)})
-                      </span>
-                    ) : null}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                    </Td>
+                    <Td numeric className="text-ink" title={preciseValue(market.predictedOriginality)}>
+                      {formatWeight(market.predictedOriginality)}
+                    </Td>
+
+                    <Td numeric className="border-l border-rule">
+                      {isLoadingBalances ? (
+                        <Skeleton className="ml-auto" width={44} height={9} />
+                      ) : (
+                        formatTokenAmount(
+                          typeof market.upBalance === "bigint" ? market.upBalance : undefined,
+                          DECIMALS,
+                        )
+                      )}
+                    </Td>
+                    <Td numeric title={preciseValue(market.upPrice)}>
+                      {formatWeight(market.upPrice)}
+                    </Td>
+                    <Td numeric className="text-ink-3">
+                      {formatWeight(market.predictedOriginality)}
+                    </Td>
+                    <Td className="text-right">
+                      <DeltaCell
+                        value={market.upDifference}
+                        max={scale}
+                        format={formatSignedWeight}
+                        title={preciseValue(market.upDifference)}
+                      />
+                    </Td>
+
+                    <Td numeric className="border-l border-rule">
+                      {isLoadingBalances ? (
+                        <Skeleton className="ml-auto" width={44} height={9} />
+                      ) : (
+                        formatTokenAmount(
+                          typeof market.downBalance === "bigint" ? market.downBalance : undefined,
+                          DECIMALS,
+                        )
+                      )}
+                    </Td>
+                    <Td numeric title={preciseValue(market.downPrice)}>
+                      {formatWeight(market.downPrice)}
+                    </Td>
+                    <Td numeric className="text-ink-3">
+                      {formatWeight(downFair)}
+                    </Td>
+                    <Td className="text-right">
+                      <DeltaCell
+                        value={market.downDifference}
+                        max={scale}
+                        format={formatSignedWeight}
+                        title={preciseValue(market.downDifference)}
+                      />
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </Tbody>
+          </Table>
+        </TableScroller>
+      )}
+    </Card>
   );
 };
 

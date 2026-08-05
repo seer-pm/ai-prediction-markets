@@ -2,7 +2,7 @@ import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient } from "@/config/queryClient";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
-import { CallBatchesInput, L2TradeProps } from "@/types";
+import { CallBatchesInput, L2TradeProps, TxStateChange } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
 import { fetchTokensBalances } from "./useTokensBalances";
 import {
@@ -12,9 +12,9 @@ import {
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
+import { useTxProgress } from "./useTxProgress";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
-import { useState } from "react";
 import { getL2BuyQuotes } from "@/lib/trade/getQuote";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
@@ -113,7 +113,10 @@ export async function getUnwindMintCalls(
 
     input.push({
       calls: mergeFromRouter(router, amount, marketId, tokens),
-      message: `Merging tokens back to collateral ${i + 1}/${levels.length}`,
+      message: "Merging minted tokens back to collateral",
+      phase: "unwind",
+      step: i + 1,
+      of: levels.length,
       skipFailCalls: false,
     });
 
@@ -207,7 +210,8 @@ const getMintTradeExecutorCalls = ({ amount, tableData }: L2TradeProps) => {
   }
   input.push({
     calls: splitFromRouter(router, parsedSplitAmount, L2_PARENT_MARKET_ID, collateral.address),
-    message: "Minting parent tokens",
+    message: "Minting parent complete sets",
+    phase: "mint",
   });
   // mint l2 markets
   const l2Markets = getL2Markets(tableData);
@@ -220,7 +224,10 @@ const getMintTradeExecutorCalls = ({ amount, tableData }: L2TradeProps) => {
         marketId as Address,
         collateralToken as Address,
       ),
-      message: `Minting tokens for market ${i + 1}/${l2Markets.length}`,
+      message: "Minting complete sets for each child market",
+      phase: "mint",
+      step: i + 1,
+      of: l2Markets.length,
     });
   }
   return input;
@@ -240,7 +247,10 @@ const getSellTradeExecutorCalls = async ({ getQuotesResults, tradeExecutor }: L2
   for (let i = 0; i < calls.length; i += 100) {
     input.push({
       calls: calls.slice(i, i + 100),
-      message: `Selling overvalued tokens batch ${i / 100 + 1}/${Math.ceil(calls.length / 100)}`,
+      message: "Selling outcomes priced above your prediction",
+      phase: "sell",
+      step: i / 100 + 1,
+      of: Math.ceil(calls.length / 100),
       skipFailCalls: true,
     });
   }
@@ -278,14 +288,20 @@ const getBuyTradeExecutorCalls = async ({
   for (let i = 0; i < mergeCalls.length; i += 100) {
     input.push({
       calls: mergeCalls.slice(i, i + 100),
-      message: `Merging tokens batch ${i / 100 + 1}/${Math.ceil(mergeCalls.length / 100)}`,
+      message: "Merging complete sets back to collateral",
+      phase: "merge",
+      step: i / 100 + 1,
+      of: Math.ceil(mergeCalls.length / 100),
       skipFailCalls: false,
     });
   }
   for (let i = 0; i < buyCalls.length; i += 100) {
     input.push({
       calls: buyCalls.slice(i, i + 100),
-      message: `Buying undervalued tokens batch ${i / 100 + 1}/${Math.ceil(buyCalls.length / 100)}`,
+      message: "Buying outcomes priced below your prediction",
+      phase: "buy",
+      step: i / 100 + 1,
+      of: Math.ceil(buyCalls.length / 100),
       skipFailCalls: true,
     });
   }
@@ -298,7 +314,7 @@ const executeL2StrategyContract = async ({
   tradeExecutor,
   tableData,
   onStateChange,
-}: L2TradeProps & { onStateChange: (state: string) => void }) => {
+}: L2TradeProps & { onStateChange: TxStateChange }) => {
   const filteredTableData = tableData.filter((row) => row.hasPrediction && row.difference);
   if (!getQuotesResults.length) {
     throw new Error("No quote found");
@@ -319,7 +335,7 @@ const executeL2StrategyContract = async ({
     }
     let unwindNote = "your minted tokens are still held, re-run the strategy with amount 0";
     try {
-      onStateChange("Merging minted tokens back to collateral");
+      onStateChange({ phase: "unwind", label: "Returning your minted tokens to collateral" });
       // Same markets that were minted, but each with its complete outcome set — mergePositions
       // needs an approval for every outcome token, not just the ones we have predictions for.
       const childLevels = getL2Markets(filteredTableData).map(({ marketId, collateralToken }) => ({
@@ -387,7 +403,7 @@ const executeL2StrategyContract = async ({
   if (sellInput.length > 0 && sellResult.executedCalls === 0) {
     throw await abortAfterMint(describeSellFailure(sellResult, collateral.symbol));
   }
-  onStateChange("Updating tokens balances");
+  onStateChange({ phase: "requote", label: "Re-reading balances and refreshing quotes" });
   const getBuyQuotesResults = await getL2BuyQuotes({ account: tradeExecutor, amount, tableData });
   const buyInput = await getBuyTradeExecutorCalls({
     amount,
@@ -406,22 +422,17 @@ const executeL2StrategyContract = async ({
     throw buyResult.error;
   }
   await withdrawFundSessionKey();
-  toastSuccess({
-    title: "Trade executed",
-  });
+  toastSuccess({ title: "Strategy executed" });
   return buyResult;
 };
 
 export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
     mutationFn: (tradeProps: L2TradeProps) =>
       executeL2StrategyContract({
         ...tradeProps,
-        onStateChange: (state) => {
-          setTxState(state);
-          console.log(state);
-        },
+        onStateChange: progress.onStateChange,
       }),
     onSuccess() {
       onSuccess?.();
@@ -444,6 +455,6 @@ export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

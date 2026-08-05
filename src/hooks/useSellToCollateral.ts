@@ -2,11 +2,11 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllQuotes } from "@/lib/trade/getQuote";
-import { CallBatchesInput, OriginalityTableData } from "@/types";
+import { CallBatchesInput, OriginalityTableData, TxStateChange } from "@/types";
 import { minBigIntArray } from "@/utils/common";
 import { CHAIN_ID, ORIGINALITY_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { mergeFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
@@ -21,9 +21,8 @@ async function sellToCollateral({
   tradeExecutor,
   tableData,
   onStateChange,
-}: SellAllProps & { onStateChange: (state: string) => void }) {
+}: SellAllProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
-  onStateChange("Getting quotes");
   const sellAllQuotes = await getSellAllQuotes({
     account: tradeExecutor,
     tableData,
@@ -34,7 +33,10 @@ async function sellToCollateral({
   for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
     sellInput.push({
       calls: swapCalls.slice(i, i + BATCH_SIZE),
-      message: `Swapping tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
+      message: "Swapping outcome tokens back to collateral",
+      phase: "sell",
+      step: i / BATCH_SIZE + 1,
+      of: Math.ceil(swapCalls.length / BATCH_SIZE),
       skipFailCalls: true,
     });
   }
@@ -48,7 +50,7 @@ async function sellToCollateral({
     await withdrawFundSessionKey();
     throw sellResult.error;
   }
-  onStateChange("Updating collateral balances");
+  onStateChange({ phase: "merge", label: "Reading collateral balances" });
   const balances = await fetchTokensBalances(
     tradeExecutor,
     tableData.map((x) => x.collateralToken),
@@ -68,7 +70,10 @@ async function sellToCollateral({
     for (let i = 0; i < mergeCalls.length; i += BATCH_SIZE) {
       mergeInput.push({
         calls: mergeCalls.slice(i, i + BATCH_SIZE),
-        message: `Merging tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(mergeCalls.length / BATCH_SIZE)}`,
+        message: "Merging complete sets back to sUSDS",
+        phase: "merge",
+        step: i / BATCH_SIZE + 1,
+        of: Math.ceil(mergeCalls.length / BATCH_SIZE),
         skipFailCalls: false,
       });
     }
@@ -83,9 +88,9 @@ async function sellToCollateral({
 }
 
 export const useSellToCollateral = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
-    mutationFn: (props: SellAllProps) => sellToCollateral({ ...props, onStateChange: setTxState }),
+    mutationFn: (props: SellAllProps) => sellToCollateral({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
@@ -94,6 +99,6 @@ export const useSellToCollateral = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

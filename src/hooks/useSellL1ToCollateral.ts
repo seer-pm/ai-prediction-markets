@@ -2,10 +2,10 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllL1Quotes } from "@/lib/trade/getQuote";
-import { CallBatchesInput, TableData } from "@/types";
+import { CallBatchesInput, TableData, TxStateChange } from "@/types";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 
 interface SellAllProps {
@@ -17,7 +17,7 @@ async function sellToCollateral({
   tradeExecutor,
   tableData,
   onStateChange,
-}: SellAllProps & { onStateChange: (state: string) => void }) {
+}: SellAllProps & { onStateChange: TxStateChange }) {
   const sellAllQuotes = await getSellAllL1Quotes({
     account: tradeExecutor,
     tableData,
@@ -25,10 +25,14 @@ async function sellToCollateral({
   const swapCalls = getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const BATCH_SIZE = 100;
   const sellInput: CallBatchesInput = [];
+  const sellBatchCount = Math.ceil(swapCalls.length / BATCH_SIZE);
   for (let i = 0; i < swapCalls.length; i += BATCH_SIZE) {
     sellInput.push({
       calls: swapCalls.slice(i, i + BATCH_SIZE),
-      message: `Selling tokens batch ${i / BATCH_SIZE + 1}/${Math.ceil(swapCalls.length / BATCH_SIZE)}`,
+      message: "Swapping outcome tokens back to sUSDS",
+      phase: "sell",
+      step: i / BATCH_SIZE + 1,
+      of: sellBatchCount,
       skipFailCalls: true,
     });
   }
@@ -42,14 +46,15 @@ async function sellToCollateral({
     await withdrawFundSessionKey();
     throw sellResult.error;
   }
+  onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
   return sellResult;
 }
 
 export const useSellL1ToCollateral = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
-    mutationFn: (props: SellAllProps) => sellToCollateral({ ...props, onStateChange: setTxState }),
+    mutationFn: (props: SellAllProps) => sellToCollateral({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
@@ -58,6 +63,6 @@ export const useSellL1ToCollateral = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

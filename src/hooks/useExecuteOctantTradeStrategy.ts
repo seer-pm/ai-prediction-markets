@@ -2,7 +2,7 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getOctantBuyQuotes } from "@/lib/trade/getQuote";
-import { CallBatchesInput, TableData, UniswapQuoteTradeResult } from "@/types";
+import { CallBatchesInput, TableData, TxStateChange, UniswapQuoteTradeResult } from "@/types";
 import {
   CHAIN_ID,
   COLLATERAL_TOKENS,
@@ -11,7 +11,7 @@ import {
 } from "@/utils/constants";
 import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useTxProgress } from "./useTxProgress";
 import { Address, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { getUnwindMintCalls, mergeFromRouter, splitFromRouter } from "./useExecuteL2Strategy";
@@ -37,7 +37,10 @@ const getSellTradeExecutorCalls = async ({ getQuotesResult, tradeExecutor }: Oct
   for (let i = 0; i < sellCalls.length; i += 100) {
     input.push({
       calls: sellCalls.slice(i, i + 100),
-      message: `Selling overvalued tokens batch ${i / 100 + 1}/${Math.ceil(sellCalls.length / 100)}`,
+      message: "Selling outcomes priced above your prediction",
+      phase: "sell",
+      step: i / 100 + 1,
+      of: Math.ceil(sellCalls.length / 100),
       skipFailCalls: true,
     });
   }
@@ -62,7 +65,8 @@ const getBuyTradeExecutorCalls = async ({
         OCTANT_MARKET_ID,
         tableData.map((row) => row.outcomeId as Address),
       ),
-      message: "Merging tokens",
+      message: "Merging complete sets back to collateral",
+      phase: "merge",
     });
   }
 
@@ -74,7 +78,10 @@ const getBuyTradeExecutorCalls = async ({
   for (let i = 0; i < buyCalls.length; i += 100) {
     input.push({
       calls: buyCalls.slice(i, i + 100),
-      message: `Buying undervalued tokens batch ${i / 100 + 1}/${Math.ceil(buyCalls.length / 100)}`,
+      message: "Buying outcomes priced below your prediction",
+      phase: "buy",
+      step: i / 100 + 1,
+      of: Math.ceil(buyCalls.length / 100),
       skipFailCalls: true,
     });
   }
@@ -87,7 +94,7 @@ const executeTradeStrategyContract = async ({
   tradeExecutor,
   tableData,
   onStateChange,
-}: OctantTradeProps & { onStateChange: (state: string) => void }) => {
+}: OctantTradeProps & { onStateChange: TxStateChange }) => {
   if (!getQuotesResult?.quotes || !getQuotesResult.quotes.length) {
     throw new Error("No quote found");
   }
@@ -107,7 +114,7 @@ const executeTradeStrategyContract = async ({
     }
     let unwindNote = "your minted tokens are still held, re-run the strategy with amount 0";
     try {
-      onStateChange("Merging minted tokens back to collateral");
+      onStateChange({ phase: "unwind", label: "Returning your minted tokens to collateral" });
       const unwindInput = await getUnwindMintCalls(tradeExecutor, router, [
         {
           marketId: OCTANT_MARKET_ID,
@@ -138,7 +145,8 @@ const executeTradeStrategyContract = async ({
   if (calls.length) {
     mintInput.push({
       calls,
-      message: "Minting tokens",
+      message: "Minting complete sets",
+      phase: "mint",
     });
   }
   const mintResult = await toastifyBatchTxSessionKey(
@@ -169,7 +177,7 @@ const executeTradeStrategyContract = async ({
       `Sell phase failed: ${sellResult.error?.shortMessage ?? sellResult.error?.message ?? "unknown error"}.`,
     );
   }
-  onStateChange("Updating tokens balances");
+  onStateChange({ phase: "requote", label: "Re-reading balances and refreshing quotes" });
   const [balanceAfter] = await fetchTokensBalancesOrThrow(tradeExecutor, [collateral.address]);
   if (balanceAfter - balanceBefore === 0n) {
     throw await abortAfterMint(describeSellFailure(sellResult, collateral.symbol));
@@ -198,22 +206,17 @@ const executeTradeStrategyContract = async ({
     throw buyResult.error;
   }
   await withdrawFundSessionKey();
-  toastSuccess({
-    title: "Trade executed",
-  });
+  toastSuccess({ title: "Strategy executed" });
   return buyResult;
 };
 
 export const useExecuteOctantTradeStrategy = (onSuccess?: () => unknown) => {
-  const [txState, setTxState] = useState("");
+  const progress = useTxProgress();
   const mutation = useMutation({
     mutationFn: (tradeProps: OctantTradeProps) =>
       executeTradeStrategyContract({
         ...tradeProps,
-        onStateChange: (state) => {
-          setTxState(state);
-          console.log(state);
-        },
+        onStateChange: progress.onStateChange,
       }),
     onSuccess() {
       onSuccess?.();
@@ -236,6 +239,6 @@ export const useExecuteOctantTradeStrategy = (onSuccess?: () => unknown) => {
   });
   return {
     ...mutation,
-    txState,
+    progress,
   };
 };

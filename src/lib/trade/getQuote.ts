@@ -11,6 +11,7 @@ import {
   QuoteTradeFn,
   TableData,
   Token,
+  TxStateChange,
   UniswapQuoteTradeResult,
 } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
@@ -1089,13 +1090,18 @@ export const getSellAllL2Quotes = async ({
 }: {
   account: Address;
   tableData: L2TableData[];
-  onStateChange: (state: string) => void;
+  onStateChange: TxStateChange;
 }) => {
   const chainId = CHAIN_ID;
   const limit = pLimit(50);
   let currentQuote = 0;
   const totalQuotes = tableData.filter((x) => x.balance).length;
-  onStateChange(`Getting quotes ${currentQuote}/${totalQuotes}`);
+  onStateChange({
+    phase: "requote",
+    label: "Pricing your positions",
+    step: currentQuote,
+    of: totalQuotes,
+  });
   const sellPromises = tableData.reduce((promises, row) => {
     // sell from token to collateral
     if (row.balance) {
@@ -1111,12 +1117,22 @@ export const getSellAllL2Quotes = async ({
           )
             .then((result) => {
               currentQuote++;
-              onStateChange(`Getting quotes ${currentQuote}/${totalQuotes}`);
+              onStateChange({
+    phase: "requote",
+    label: "Pricing your positions",
+    step: currentQuote,
+    of: totalQuotes,
+  });
               return result;
             })
             .catch((e) => {
               currentQuote++;
-              onStateChange(`Getting quotes ${currentQuote}/${totalQuotes}`);
+              onStateChange({
+    phase: "requote",
+    label: "Pricing your positions",
+    step: currentQuote,
+    of: totalQuotes,
+  });
               throw e;
             }),
         ),

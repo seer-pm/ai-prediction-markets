@@ -1,5 +1,6 @@
 import { TradeExecutorAbi } from "@/abis/TradeExecutorAbi";
 import { config, OPTIMISM_TRANSPORT } from "@/config/wagmi";
+import type { TxStateChange } from "@/types";
 import { isTwoStringsEqual } from "@/utils/common";
 import {
   estimateFeesPerGas,
@@ -99,7 +100,7 @@ export class SessionKeyManager {
   }
 }
 
-export const getSessionAccount = (onStateChange: (state: string) => void) => {
+export const getSessionAccount = (onStateChange: TxStateChange) => {
   let sessionPrivateKey = SessionKeyManager.get();
   let sessionAccount = sessionPrivateKey ? privateKeyToAccount(sessionPrivateKey) : null;
 
@@ -107,17 +108,16 @@ export const getSessionAccount = (onStateChange: (state: string) => void) => {
   if (!sessionPrivateKey) {
     sessionPrivateKey = SessionKeyManager.create();
     sessionAccount = privateKeyToAccount(sessionPrivateKey);
-    onStateChange(
-      `Session key created: ${sessionAccount.address.slice(0, 6)}...${sessionAccount.address.slice(
-        -4,
-      )}`,
-    );
+    onStateChange({
+      phase: "authorize",
+      label: "Created a temporary signing key for this run.",
+    });
   }
 
   return sessionAccount!;
 };
 
-export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: string) => void) => {
+export const fundSessionKey = async (gasCost: bigint, onStateChange: TxStateChange) => {
   const sessionAccount = getSessionAccount(onStateChange);
   // Check if session key exists and has sufficient balance
   const data = await getBalance(config, {
@@ -129,7 +129,10 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: (state: str
   }
 
   // Prompt user to fund
-  onStateChange("Funding session key...");
+  onStateChange({
+    phase: "authorize",
+    label: "Approve the gas top-up in your wallet.",
+  });
   const result = await handleTx(() =>
     sendTransaction(config, {
       to: sessionAccount!.address,
@@ -174,7 +177,7 @@ export const withdrawFundSessionKey = async () => {
 
 export const authorizeSessionKey = async (
   tradeExecutor: Address,
-  onStateChange: (state: string) => void,
+  onStateChange: TxStateChange,
 ) => {
   const sessionAccount = getSessionAccount(onStateChange);
   // Set session key in contract
@@ -196,7 +199,10 @@ export const authorizeSessionKey = async (
     isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) && atLeastFromNow;
   if (!isPermitted) {
     const expiry = Math.floor(new Date().getTime() / 1000) + 60 * 60;
-    onStateChange("Authorizing session key...");
+    onStateChange({
+      phase: "authorize",
+      label: "Approve the signing permission in your wallet.",
+    });
     const result = await handleTx(() =>
       writeContract(config, {
         address: tradeExecutor,
