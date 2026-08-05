@@ -35,6 +35,11 @@ export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
 }) => {
   const status = runStatus({ isPending, isSuccess, isError });
 
+  // Nothing to say once the run is idle and there is something to redeem — the
+  // header already framed the action. Skipping the body keeps the dialog from
+  // showing an empty band between two rules.
+  const hasBody = isError || status !== "idle" || isLoading || !hasRedeemable;
+
   // Clear the run on dismissal, so reopening starts from a clean slate rather
   // than the previous receipt.
   useEffect(() => {
@@ -79,31 +84,31 @@ export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
         )
       }
     >
-      <div className="space-y-4">
-        {isError && <ErrorPanel title="The redemption stopped" error={error} onDismiss={reset} />}
+      {hasBody && (
+        <div className="space-y-4">
+          {isError && <ErrorPanel title="The redemption stopped" error={error} onDismiss={reset} />}
 
-        {status !== "idle" && (
-          <RunLedger
-            phases={REDEEM_PHASES}
-            current={progress.current}
-            completed={progress.completed}
-            status={status}
-          />
-        )}
+          {status !== "idle" && (
+            <RunLedger
+              phases={REDEEM_PHASES}
+              current={progress.current}
+              completed={progress.completed}
+              status={status}
+            />
+          )}
 
-        {isLoading ? (
-          <Panel tone="working" title="Reading your balances">
-            Checking which settled markets you still hold tokens in.
-          </Panel>
-        ) : !hasRedeemable ? (
-          <EmptyState
-            title="No settled positions to redeem"
-            description="Either these markets have not resolved yet, or you have already redeemed them."
-          />
-        ) : (
-null
-        )}
-      </div>
+          {isLoading ? (
+            <Panel tone="working" title="Reading your balances">
+              Checking which settled markets you still hold tokens in.
+            </Panel>
+          ) : !hasRedeemable ? (
+            <EmptyState
+              title="No settled positions to redeem"
+              description="Either these markets have not resolved yet, or you have already redeemed them."
+            />
+          ) : null}
+        </div>
+      )}
     </Dialog>
   );
 };

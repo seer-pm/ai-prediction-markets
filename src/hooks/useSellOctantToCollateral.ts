@@ -18,6 +18,7 @@ async function sellToCollateral({
   tableData,
   onStateChange,
 }: SellAllProps & { onStateChange: TxStateChange }) {
+  onStateChange({ phase: "requote", label: "Pricing your positions" });
   const sellAllQuotes = await getSellAllOctantQuotes({
     account: tradeExecutor,
     tableData,

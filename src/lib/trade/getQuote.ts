@@ -1118,21 +1118,21 @@ export const getSellAllL2Quotes = async ({
             .then((result) => {
               currentQuote++;
               onStateChange({
-    phase: "requote",
-    label: "Pricing your positions",
-    step: currentQuote,
-    of: totalQuotes,
-  });
+                phase: "requote",
+                label: "Pricing your positions",
+                step: currentQuote,
+                of: totalQuotes,
+              });
               return result;
             })
             .catch((e) => {
               currentQuote++;
               onStateChange({
-    phase: "requote",
-    label: "Pricing your positions",
-    step: currentQuote,
-    of: totalQuotes,
-  });
+                phase: "requote",
+                label: "Pricing your positions",
+                step: currentQuote,
+                of: totalQuotes,
+              });
               throw e;
             }),
         ),

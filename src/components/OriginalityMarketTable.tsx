@@ -13,6 +13,7 @@ import {
   Thr,
   Tr,
 } from "@/components/ui";
+import { ExportWeightsButton } from "@/components/contest/ExportWeightsButton";
 import { OriginalityTableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
 import { formatSignedWeight, formatTokenAmount, formatWeight, preciseValue,
@@ -25,6 +26,8 @@ interface MarketTableProps {
   isLoading: boolean;
   isLoadingBalances: boolean;
   emptyState?: ReactNode;
+  onExport?: () => void;
+  exportDisabled?: boolean;
 }
 
 const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
@@ -32,6 +35,8 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
   isLoading,
   isLoadingBalances,
   emptyState,
+  onExport,
+  exportDisabled,
 }) => {
   const visibleRows = useMemo(
     () => markets.filter((market) => market.repo !== "Invalid result"),
@@ -51,6 +56,9 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
         eyebrow="Originality"
         title="Original work per repository"
         description="Each repository trades as a pair: UP is the share of original work, DOWN the share carried by dependencies."
+        actions={
+          onExport && <ExportWeightsButton onClick={onExport} disabled={exportDisabled} />
+        }
       />
 
       {isLoading ? (

@@ -213,11 +213,12 @@ export const OriginalityMarkets = () => {
   const redeemButton = (
     <Button
       size="sm"
+      variant="success"
       onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
       disabled={isLoading || !account}
       disabledReason={isLoading ? "Waiting for market data." : undefined}
     >
-      Redeem settled
+      Redeem to sUSDS
     </Button>
   );
 
@@ -236,8 +237,6 @@ export const OriginalityMarkets = () => {
         predictionCount={predictions.length}
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
-        onExport={exportWeight}
-        exportDisabled={!tableData}
         actions={
           <>
             {canTrade && (
@@ -284,6 +283,8 @@ export const OriginalityMarkets = () => {
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
         emptyState={emptyState}
+        onExport={exportWeight}
+        exportDisabled={!tableData}
       />
 
       <GenericCSVUpload<OriginalityRow>

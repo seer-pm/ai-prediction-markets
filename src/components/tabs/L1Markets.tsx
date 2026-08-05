@@ -162,8 +162,6 @@ export const L1Markets = () => {
         predictionCount={predictions.length}
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
-        onExport={exportWeight}
-        exportDisabled={!tableData}
         actions={
           canTrade && !finished && (
             <>
@@ -194,6 +192,8 @@ export const L1Markets = () => {
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
         emptyState={emptyState}
+        onExport={exportWeight}
+        exportDisabled={!tableData}
       />
 
       <GenericCSVUpload<PredictionRow>
@@ -221,6 +221,7 @@ export const L1Markets = () => {
         isError={sellAll.isError}
         error={sellAll.error}
         isPending={sellAll.isPending}
+        isSuccess={sellAll.isSuccess}
         progress={sellAll.progress}
         reset={sellAll.reset}
         onSellAll={handleSellAll}

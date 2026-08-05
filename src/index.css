@@ -37,6 +37,7 @@
 
   /* direction of trade */
   --color-long: #16a34a;
+  --color-long-hover: #15803d;
   --color-long-bg: #f0fdf4;
   --color-long-rule: #bbf7d0;
   --color-short: #dc2626;

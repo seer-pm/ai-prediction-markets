@@ -73,7 +73,9 @@ export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
           ? "Pricing the new amount…"
           : buyCount + sellCount === 0
           ? "Every prediction already matches the market — there is nothing to trade."
-          : undefined
+          : !getQuotesResult
+            ? "No quotes are available for these markets."
+            : undefined
       }
       onSubmit={(value) =>
         executeTradeMutation.mutate({

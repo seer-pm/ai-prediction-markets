@@ -3,7 +3,7 @@ import React, { forwardRef } from "react";
 import { Spinner } from "./Spinner";
 import { Tooltip } from "./Tooltip";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "success";
 type Size = "sm" | "md" | "lg";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -29,6 +29,8 @@ const VARIANTS: Record<Variant, string> = {
     "bg-surface text-ink border border-rule-strong shadow-raised hover:bg-sunken hover:border-ink-4",
   ghost: "bg-transparent text-ink-2 border border-transparent hover:bg-sunken hover:text-ink",
   danger: "bg-surface text-short border border-short-rule shadow-raised hover:bg-short-bg",
+  success:
+    "bg-long text-white border border-long shadow-raised hover:bg-long-hover hover:border-long-hover",
 };
 
 const SIZES: Record<Size, string> = {

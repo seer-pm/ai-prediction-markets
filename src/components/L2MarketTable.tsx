@@ -16,6 +16,7 @@ import {
   Thead,
   Tr,
 } from "@/components/ui";
+import { ExportWeightsButton } from "@/components/contest/ExportWeightsButton";
 import { L2TableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
 import {  formatSignedWeight,
@@ -35,6 +36,8 @@ interface MarketTableProps {
   isLoading: boolean;
   isLoadingBalances: boolean;
   emptyState?: ReactNode;
+  onExport?: () => void;
+  exportDisabled?: boolean;
 }
 
 const L2MarketTableInner: React.FC<MarketTableProps> = ({
@@ -42,6 +45,8 @@ const L2MarketTableInner: React.FC<MarketTableProps> = ({
   isLoading,
   isLoadingBalances,
   emptyState,
+  onExport,
+  exportDisabled,
 }) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
@@ -87,6 +92,9 @@ const L2MarketTableInner: React.FC<MarketTableProps> = ({
       <CardHeader
         title="Dependency contribution by repository"
         description="Each repository's dependencies, weighted within that repository."
+        actions={
+          onExport && <ExportWeightsButton onClick={onExport} disabled={exportDisabled} />
+        }
       />
 
       {isLoading ? (

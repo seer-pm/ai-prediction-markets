@@ -64,6 +64,10 @@ export function RunLedger({ phases, current, completed, status, className }: Run
     // Phases can be skipped (nothing to sell, no mint) — anything before the
     // running one counts as settled.
     if (currentIndex >= 0 && index < currentIndex) return "done";
+    // Nothing after the running stage can be finished, whatever `completed`
+    // says. A run that reports a later phase early (a pre-flight read, say)
+    // would otherwise show it ticked off before it had happened.
+    if (currentIndex >= 0 && index > currentIndex) return "pending";
     return completed.includes(phase) ? "done" : "pending";
   };
 

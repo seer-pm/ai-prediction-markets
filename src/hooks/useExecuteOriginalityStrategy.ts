@@ -12,6 +12,7 @@ import {
   ORIGINALITY_PARENT_MARKET_ID,
   ROUTER_ADDRESSES,
 } from "@/utils/constants";
+import { safeParseUnits } from "@/utils/format";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
@@ -133,12 +134,8 @@ const executeOriginalityStrategy = async ({
       throw sellResult.error;
     }
   }
-  const mainSplitCalls = getSplitCalls({
-    collateral: mainCollateral,
-    mainCollateral,
-    amount,
-    market: ORIGINALITY_PARENT_MARKET_ID,
-  });
+  const didMint = Number(amount) > 0;
+  const mintValue = safeParseUnits(amount, DECIMALS);
 
   const newTableData = tableData.map((initialRow) => {
     const row = { ...initialRow };
@@ -156,7 +153,7 @@ const executeOriginalityStrategy = async ({
           row.upBalance = row.upBalance ? row.upBalance - data.sellAmount : row.upBalance;
         }
       }
-      row.amount = formatUnits((data?.value ?? 0n) + parseUnits(amount, DECIMALS), DECIMALS);
+      row.amount = formatUnits((data?.value ?? 0n) + mintValue, DECIMALS);
     }
     return row;
   });
@@ -172,12 +169,19 @@ const executeOriginalityStrategy = async ({
     tradeExecutor,
   });
   const input: CallBatchesInput = [];
-  input.push({
-    calls: mainSplitCalls,
-    message: "Minting complete sets",
+  if (didMint) {
+    input.push({
+      calls: getSplitCalls({
+        collateral: mainCollateral,
+        mainCollateral,
+        amount,
+        market: ORIGINALITY_PARENT_MARKET_ID,
+      }),
+      message: "Minting complete sets",
       phase: "mint",
-    skipFailCalls: false,
-  });
+      skipFailCalls: false,
+    });
+  }
   for (let i = 0; i < tradeExecutorCalls.length; i += 100) {
     input.push({
       calls: tradeExecutorCalls.slice(i, i + 100),

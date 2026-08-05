@@ -32,6 +32,11 @@ export const RedeemInterface: React.FC<RedeemInterfaceProps> = ({
   const sumBalances = balances?.reduce((acc, curr) => acc + curr, 0n) ?? 0n;
   const canRedeem = !!redeemStatusData?.isRedeemable && sumBalances > 0n;
 
+  // Nothing to say once the balances are in and there is something to redeem —
+  // the header already framed the action. Skipping the body keeps the dialog
+  // from showing an empty band between two rules.
+  const hasBody = redeem.isError || isLoading || !canRedeem;
+
   return (
     <Dialog
       open={open}
@@ -68,27 +73,33 @@ export const RedeemInterface: React.FC<RedeemInterfaceProps> = ({
         )
       }
     >
-      <div className="space-y-4">
-        {redeem.isError && (
-          <ErrorPanel title="The redemption stopped" error={redeem.error} onDismiss={redeem.reset} />
-        )}
+      {hasBody && (
+        <div className="space-y-4">
+          {redeem.isError && (
+            <ErrorPanel
+              title="The redemption stopped"
+              error={redeem.error}
+              onDismiss={redeem.reset}
+            />
+          )}
 
-        {isLoading ? (
-          <Panel tone="working" title="Checking whether this round can be redeemed">
-            Reading the resolution status and your balances.
-          </Panel>
-        ) : !redeemStatusData?.isRedeemable ? (
-          <EmptyState
-            title="Redemptions are not open yet"
-            description="This round has to finish resolving before payouts can be claimed. Check back later."
-          />
-        ) : sumBalances === 0n ? (
-          <EmptyState
-            title="No settled positions to redeem"
-            description="The trade wallet holds no Round 1 outcome tokens."
-          />
-        ) : null}
-      </div>
+          {isLoading ? (
+            <Panel tone="working" title="Checking whether this round can be redeemed">
+              Reading the resolution status and your balances.
+            </Panel>
+          ) : !redeemStatusData?.isRedeemable ? (
+            <EmptyState
+              title="Redemptions are not open yet"
+              description="This round has to finish resolving before payouts can be claimed. Check back later."
+            />
+          ) : sumBalances === 0n ? (
+            <EmptyState
+              title="No settled positions to redeem"
+              description="The trade wallet holds no Round 1 outcome tokens."
+            />
+          ) : null}
+        </div>
+      )}
     </Dialog>
   );
 };

@@ -30,7 +30,10 @@ async function redeemOctant({
 
   // Octant is a single flat market — outcome tokens redeem straight to sUSDS,
   // with none of the parent-market phase the nested contests need.
-  onStateChange({ phase: "redeem", label: "Reading your settled balances" });
+  //
+  // No progress event for this read: it runs before the session key is
+  // authorised, and reporting it as the redeem phase made the ledger tick
+  // "Redeem settled positions" off while "Authorise the run" was still going.
   const balances = await fetchTokensBalances(tradeExecutor, wrappedTokens);
 
   const tokens: Address[] = [];

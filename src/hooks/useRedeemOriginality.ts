@@ -36,7 +36,9 @@ async function redeemOriginality({
   const submitBatches = isOldWallet ? toastifyBatchTxOwner : toastifyBatchTxSessionKey;
 
   // ── Phase 1: redeem conditional market tokens → receive parent outcome tokens ──
-  onStateChange({ phase: "redeem", label: "Reading your settled balances" });
+  // No progress event for this read: it runs before the session key is
+  // authorised, and reporting it as the redeem phase made the ledger tick
+  // "Redeem settled positions" off while "Authorise the run" was still going.
   const allConditionalTokens = closedMarkets.flatMap((m) => m.wrappedTokens);
   const conditionalBalances = await fetchTokensBalances(tradeExecutor, allConditionalTokens);
 

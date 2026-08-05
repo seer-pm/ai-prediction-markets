@@ -180,8 +180,6 @@ export const OctantMarkets = () => {
         predictionCount={predictions.length}
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
-        onExport={exportWeight}
-        exportDisabled={!tableData}
         actions={
           canTrade && (
             <>
@@ -198,11 +196,12 @@ export const OctantMarkets = () => {
               )}
               <Button
                 size="sm"
+                variant="success"
                 onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
                 disabled={isLoading || !account}
                 disabledReason={isLoading ? "Waiting for market data." : undefined}
               >
-                Redeem settled
+                Redeem to sUSDS
               </Button>
               {!finished && (
                 <Button
@@ -225,6 +224,8 @@ export const OctantMarkets = () => {
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
         emptyState={emptyState}
+        onExport={exportWeight}
+        exportDisabled={!tableData}
       />
 
       <GenericCSVUpload<OctantRow>

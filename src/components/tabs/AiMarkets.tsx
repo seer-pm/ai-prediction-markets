@@ -38,10 +38,10 @@ export const AiMarkets = () => {
             </Button>
             <Button
               size="sm"
-              variant="primary"
+              variant="success"
               onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
             >
-              Redeem settled
+              Redeem to sUSDS
             </Button>
           </div>
         </Card>

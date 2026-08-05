@@ -5,7 +5,9 @@ export const TX_PHASE_LABELS: Record<TxPhase, string> = {
   authorize: "Authorise the run",
   mint: "Mint complete sets",
   sell: "Sell overvalued outcomes",
-  requote: "Refresh quotes",
+  // Reads as the opening stage of a sell-all and as the mid-run refresh in a
+  // strategy, so it stays neutral about which.
+  requote: "Get quotes",
   merge: "Merge complete sets",
   buy: "Buy undervalued outcomes",
   redeem: "Redeem settled positions",
@@ -28,7 +30,9 @@ export const STRATEGY_PHASES: TxPhase[] = [
   "settle",
 ];
 
-export const SELL_ALL_PHASES: TxPhase[] = ["authorize", "sell", "merge", "settle"];
+// Quoting leads here: a sell-all prices every position off-chain before it asks
+// for a signature, and that read is the slowest part of the run.
+export const SELL_ALL_PHASES: TxPhase[] = ["requote", "authorize", "sell", "merge", "settle"];
 
 export const REDEEM_PHASES: TxPhase[] = ["authorize", "redeem", "settle"];
 

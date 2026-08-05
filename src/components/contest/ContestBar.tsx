@@ -1,13 +1,11 @@
 import { Button, Card } from "@/components/ui";
-import { DownloadIcon, TrashIcon, UploadIcon } from "@/components/ui/icons";
+import { TrashIcon, UploadIcon } from "@/components/ui/icons";
 import type { ReactNode } from "react";
 
 interface ContestBarProps {
   predictionCount: number;
   onUpload: () => void;
   onClear?: () => void;
-  onExport?: () => void;
-  exportDisabled?: boolean;
   /** Contest-specific trade actions, already gated by wallet readiness. */
   actions?: ReactNode;
 }
@@ -21,8 +19,6 @@ export function ContestBar({
   predictionCount,
   onUpload,
   onClear,
-  onExport,
-  exportDisabled,
   actions,
 }: ContestBarProps) {
   const hasPredictions = predictionCount > 0;
@@ -48,19 +44,6 @@ export function ContestBar({
         {hasPredictions && onClear && (
           <Button size="sm" variant="ghost" onClick={onClear} iconLeft={<TrashIcon />}>
             Clear
-          </Button>
-        )}
-
-        {onExport && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onExport}
-            disabled={exportDisabled}
-            disabledReason={exportDisabled ? "Market data is still loading." : undefined}
-            iconLeft={<DownloadIcon />}
-          >
-            Export market weights
           </Button>
         )}
       </div>

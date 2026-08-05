@@ -16,7 +16,7 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   footer?: ReactNode;
   size?: Size;
   /**
@@ -79,10 +79,22 @@ export function Dialog({
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          {/*
+            A body that renders nothing would otherwise leave an empty padded
+            band, and its own rule would stack against the header's. Callers
+            pass a falsy child when they have nothing to say.
+          */}
+          {children && (
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          )}
 
           {footer && (
-            <div className="flex flex-col-reverse gap-3 border-t border-rule px-6 py-5 sm:flex-row sm:justify-end">
+            <div
+              className={cn(
+                "flex flex-col-reverse gap-3 px-6 py-5 sm:flex-row sm:justify-end",
+                !!children && "border-t border-rule",
+              )}
+            >
               {footer}
             </div>
           )}

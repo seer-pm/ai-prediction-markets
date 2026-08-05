@@ -12,6 +12,7 @@ import {
   Thead,
   Tr,
 } from "@/components/ui";
+import { ExportWeightsButton } from "@/components/contest/ExportWeightsButton";
 import { TableData } from "@/types";
 import { DECIMALS } from "@/utils/constants";
 import { formatPercent, formatSignedPercent, formatTokenAmount, preciseValue,
@@ -24,6 +25,8 @@ interface MarketTableProps {
   isLoading: boolean;
   isLoadingBalances: boolean;
   emptyState?: ReactNode;
+  onExport?: () => void;
+  exportDisabled?: boolean;
 }
 
 const asPercent = (value: number | null | undefined) =>
@@ -34,6 +37,8 @@ const OctantMarketTableInner: React.FC<MarketTableProps> = ({
   isLoading,
   isLoadingBalances,
   emptyState,
+  onExport,
+  exportDisabled,
 }) => {
   const visibleRows = useMemo(
     () => rows.filter((row) => !row.repo.toLowerCase().includes("invalid result")),
@@ -50,6 +55,9 @@ const OctantMarketTableInner: React.FC<MarketTableProps> = ({
         eyebrow="Octant"
         title="Project funding share"
         description="Each project's share of the round, as a percentage."
+        actions={
+          onExport && <ExportWeightsButton onClick={onExport} disabled={exportDisabled} />
+        }
       />
 
       {isLoading ? (

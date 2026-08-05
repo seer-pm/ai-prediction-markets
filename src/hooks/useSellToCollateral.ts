@@ -23,6 +23,7 @@ async function sellToCollateral({
   onStateChange,
 }: SellAllProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
+  onStateChange({ phase: "requote", label: "Pricing your positions" });
   const sellAllQuotes = await getSellAllQuotes({
     account: tradeExecutor,
     tableData,

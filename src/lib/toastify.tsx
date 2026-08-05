@@ -288,6 +288,12 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
 
   let lastReceipt: TransactionReceipt | undefined;
 
+  // No batches means the loop below never runs; without this the spinner toast never resolves.
+  if (!batches.length) {
+    runToast.dismiss();
+    return { status: true, receipt: lastReceipt! };
+  }
+
   // Process each batch sequentially
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
@@ -312,11 +318,6 @@ export const toastifySendCallsTx: ToastifySendCalls = async (calls, wagmiConfig,
 
     if (isLastBatch) {
       runToast.succeed(config?.txSuccess?.title || "Transaction sent");
-    }
-
-    // If any batch fails, abort the entire process and return the error
-    if (!result.status) {
-      return result;
     }
 
     lastReceipt = result.receipt;
@@ -370,6 +371,12 @@ export const toastifyBatchTx = async (
   );
 
   let lastReceipt: TransactionReceipt | undefined;
+
+  // No batches means the loop below never runs; without this the spinner toast never resolves.
+  if (!batches.length) {
+    runToast.dismiss();
+    return { status: true, receipt: lastReceipt! };
+  }
 
   // Process each batch sequentially
   for (let i = 0; i < batches.length; i++) {
