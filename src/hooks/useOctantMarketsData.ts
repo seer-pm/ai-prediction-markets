@@ -1,5 +1,5 @@
 import { ChartWithMarketData, PoolInfo } from "@/types";
-import { getAppUrl } from "@/utils/common";
+import { fetchAppJson } from "@/utils/common";
 import { MarketStatus } from "@seer-pm/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
@@ -24,22 +24,9 @@ interface GetMarketsDataApiResult {
   } | null;
 }
 
-const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
-  try {
-    const response = await fetch(`${getAppUrl()}/.netlify/functions/get-octant-markets-data`);
-    return await response.json();
-  } catch {
-    return {
-      marketsData: {},
-      wrappedTokens: [],
-      payoutNumerators: [],
-      // Never let a failed fetch look like a resolved market to the redeem flow.
-      marketStatus: MarketStatus.NOT_OPEN,
-      charts: null,
-      totalVolumeMapping: null,
-    };
-  }
-};
+// Throwing rather than returning a stub also keeps the redeem flow honest: `data` is `undefined` on
+// failure, so nothing can read a `marketStatus` that looks like a resolved market.
+const fetchMarketsData = () => fetchAppJson<GetMarketsDataApiResult>("get-octant-markets-data");
 
 export const useOctantMarketsData = () => {
   return useQuery({

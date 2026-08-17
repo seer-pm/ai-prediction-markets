@@ -9,6 +9,31 @@ export function getAppUrl() {
   return import.meta.env.VITE_WEBSITE_URL || "https://deep-pm.netlify.app";
 }
 
+/**
+ * GET one of our Netlify functions and parse its JSON, throwing on a non-2xx.
+ *
+ * The `!response.ok` check is the whole point. Netlify answers a crashed function with a JSON error
+ * body (`{errorType, errorMessage, trace}`), which `response.json()` parses perfectly happily — so
+ * without this, a 502 resolves as a *successful* query whose data merely has every expected field
+ * missing. That is how a total backend outage rendered as an innocuous "No price history yet" empty
+ * state on every chart rather than an error. Throwing instead lets React Query surface `error`, and
+ * each contest tab already renders `ErrorPanel title="Market data could not be loaded"`.
+ */
+export async function fetchAppJson<T>(functionName: string): Promise<T> {
+  const response = await fetch(`${getAppUrl()}/.netlify/functions/${functionName}`);
+
+  if (!response.ok) {
+    // Our own functions report `{ error }`; a crashed one gets Netlify's `{ errorMessage }`.
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      errorMessage?: string;
+    };
+    throw new Error(body.error ?? body.errorMessage ?? `Request failed (${response.status})`);
+  }
+
+  return (await response.json()) as T;
+}
+
 export type Token0Token1 = { token1: Address; token0: Address };
 
 export function getToken0Token1(token0: Address, token1: Address): Token0Token1 {

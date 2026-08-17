@@ -1,4 +1,5 @@
 import {
+  AccountLabel,
   Badge,
   Table,
   TableScroller,
@@ -9,25 +10,16 @@ import {
   Thead,
   Tr,
 } from "@/components/ui";
+import { useEnsNames } from "@/hooks/useEnsNames";
 import type { LeaderboardApiRow } from "@/hooks/useLeaderboard";
 import { cn } from "@/utils/cn";
-import { CHAIN_ID } from "@/utils/constants";
-import {
-  EM_DASH,
-  MINUS,
-  formatAddress,
-  formatAmount,
-  formatPercent,
-  preciseValue,
-} from "@/utils/format";
-import { memo, type ReactNode, type RefObject } from "react";
+import { EM_DASH, MINUS, formatAmount, formatPercent, preciseValue } from "@/utils/format";
+import { memo, useMemo, type ReactNode, type RefObject } from "react";
 
 /**
  * The ranking table itself — no filters, no fetching. Both the full leaderboard tab and the
  * compact per-contest card render this.
  */
-
-const EXPLORER = "https://optimistic.etherscan.io/address";
 
 /** Signed sUSDS with an explicit glyph: colour is never the only channel (see index.css). */
 function SignedAmount({ value }: { value: number }) {
@@ -75,6 +67,10 @@ export const LeaderboardTable = memo(function LeaderboardTable({
   emptyState,
   className,
 }: LeaderboardTableProps) {
+  // Above the early returns: hooks must run unconditionally. `rows` is empty in both of those
+  // cases, so no lookup is issued.
+  const ensNames = useEnsNames(useMemo(() => rows.map((row) => row.address), [rows]));
+
   if (isLoading) {
     return <TableSkeleton rows={8} columns={5} />;
   }
@@ -119,15 +115,7 @@ export const LeaderboardTable = memo(function LeaderboardTable({
                 </Td>
                 <Td>
                   <span className="flex items-center gap-2">
-                    <a
-                      href={`${EXPLORER}/${row.address}?chain=${CHAIN_ID}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-data text-ink transition-colors hover:text-primary"
-                      title={row.address}
-                    >
-                      {formatAddress(row.address)}
-                    </a>
+                    <AccountLabel address={row.address} name={ensNames[address]} />
                     {isOwn && <Badge tone="neutral">You</Badge>}
                   </span>
                 </Td>

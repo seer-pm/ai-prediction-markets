@@ -1,5 +1,5 @@
 import { PoolInfo } from "@/types";
-import { getAppUrl } from "@/utils/common";
+import { fetchAppJson } from "@/utils/common";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 
@@ -15,14 +15,7 @@ interface GetMarketsDataApiResult {
   payoutNumerators: string[]
 }
 
-const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
-  try {
-    const response = await fetch(`${getAppUrl()}/.netlify/functions/get-markets-data`);
-    return await response.json();
-  } catch {
-    return { marketsData: {}, wrappedTokens: [], payoutNumerators: [] };
-  }
-};
+const fetchMarketsData = () => fetchAppJson<GetMarketsDataApiResult>("get-markets-data");
 
 export const useMarketsData = () => {
   return useQuery({

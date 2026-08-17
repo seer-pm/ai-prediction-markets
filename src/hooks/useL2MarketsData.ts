@@ -1,5 +1,5 @@
 import { ChartWithMarketData, PoolInfo } from "@/types";
-import { getAppUrl } from "@/utils/common";
+import { fetchAppJson } from "@/utils/common";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 import { MarketStatus } from "@seer-pm/sdk";
@@ -27,22 +27,13 @@ interface GetL2MarketsDataApiResult {
   } | null;
 }
 
-const fetchL2MarketsData = async (retryCount = 1): Promise<GetL2MarketsDataApiResult> => {
-  try {
-    const response = await fetch(`${getAppUrl()}/.netlify/functions/get-l2-markets-data`);
-    return await response.json();
-  } catch {
-    // retry once
-    if (retryCount) {
-      return await fetchL2MarketsData(retryCount - 1);
-    }
-    return { marketsData: {}, markets: [], charts: null, totalVolumeMapping: null };
-  }
-};
+const fetchL2MarketsData = () => fetchAppJson<GetL2MarketsDataApiResult>("get-l2-markets-data");
 
 export const useL2MarketsData = () => {
   return useQuery({
-    retry: false,
+    // This one payload is by far the largest, so keep the retry-once the hand-rolled fetcher used
+    // to do — expressed as React Query's own retry now that a failure actually throws.
+    retry: 1,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     // Show persisted/cached data instantly, then refetch in the background on mount.

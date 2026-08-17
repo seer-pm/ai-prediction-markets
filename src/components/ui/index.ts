@@ -1,3 +1,4 @@
+export { AccountLabel } from "./AccountLabel";
 export { Badge, StatusDot } from "./Badge";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";

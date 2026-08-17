@@ -77,8 +77,11 @@ export const L1Markets = () => {
   }, [totalVolumeMapping]);
 
   const chartData = useMemo(() => {
-    if (!charts) return undefined;
-    return Object.values(charts)[0].filter(
+    // `charts` can be a present-but-empty object, so the first entry is not guaranteed — indexing
+    // straight into `[0].filter` threw and took the whole contest panel down with it.
+    const first = charts && Object.values(charts)[0];
+    if (!first) return undefined;
+    return first.filter(
       (x) =>
         !["invalid result", "other repositories"].some((name) =>
           x.outcomeName.toLowerCase().includes(name),

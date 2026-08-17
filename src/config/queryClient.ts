@@ -70,6 +70,9 @@ const PERSISTED_QUERY_KEYS = new Set([
   // matched at mount and they fall back to the loading container.
   "useCheckTradeExecutorCreated",
   "useCheckOldTradeExecutorCreated",
+  // Leaderboard ENS names. Safe to restore stale, unlike the deliberately-unpersisted
+  // `useLeaderboard` rank: a primary name is a cosmetic label, not a claimed fact.
+  "useEnsName",
 ]);
 
 export const shouldDehydrateQuery = (query: Parameters<typeof defaultShouldDehydrateQuery>[0]) =>

@@ -1,5 +1,5 @@
 import { ChartWithMarketData, PoolInfo } from "@/types";
-import { getAppUrl } from "@/utils/common";
+import { fetchAppJson } from "@/utils/common";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
 
@@ -22,20 +22,7 @@ interface GetMarketsDataApiResult {
   } | null;
 }
 
-const fetchMarketsData = async (): Promise<GetMarketsDataApiResult> => {
-  try {
-    const response = await fetch(`${getAppUrl()}/.netlify/functions/get-l1-markets-data`);
-    return await response.json();
-  } catch {
-    return {
-      marketsData: {},
-      wrappedTokens: [],
-      payoutNumerators: [],
-      charts: null,
-      totalVolumeMapping: null,
-    };
-  }
-};
+const fetchMarketsData = () => fetchAppJson<GetMarketsDataApiResult>("get-l1-markets-data");
 
 export const useL1MarketsData = () => {
   return useQuery({
