@@ -43,21 +43,16 @@ function formatUpdatedAt(updatedAt: string | null | undefined): string | null {
   return parsed.toLocaleString();
 }
 
-interface LeaderboardPanelProps {
-  /** Contest preselected by the "View full leaderboard" link on a contest card. */
-  initialScope?: LeaderboardScope;
-}
-
 /**
- * Profit & loss ranking across the deep markets.
+ * Profit & loss ranking across the deep markets — the whole of the Leaderboard page.
  *
- * `All deep markets` is Seer's materialized `deepfund` board; each contest chip is computed by
- * our own refresh job. Everything is denominated in sUSDS, like the rest of the app.
+ * Every board, including `All deep markets`, is computed by our own refresh job; the Market chips
+ * below scope it to one contest. Everything is denominated in sUSDS, like the rest of the app.
  */
-export function LeaderboardPanel({ initialScope = "global" }: LeaderboardPanelProps) {
+export function LeaderboardPanel() {
   const { account, tradeExecutor } = useTradeWalletStatus();
 
-  const [scope, setScope] = useState<LeaderboardScope>(initialScope);
+  const [scope, setScope] = useState<LeaderboardScope>("global");
   const [period, setPeriod] = useState<LeaderboardPeriod>("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");

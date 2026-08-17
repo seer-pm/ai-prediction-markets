@@ -22,7 +22,6 @@ import { Address } from "viem";
 import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { OctantMarketTable } from "../OctantMarketTable";
-import { ContestLeaderboardCard } from "@/components/leaderboard/ContestLeaderboardCard";
 import { OctantTradingInterface } from "../trade/OctantTradingInterface";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
@@ -136,7 +135,6 @@ export const OctantMarkets = () => {
     );
   }, [tableData]);
 
-
   // Memoised: the tables are React.memo'd, and a freshly built element
   // here would re-render every row each time a dialog opens.
   const emptyState = useMemo(
@@ -228,8 +226,6 @@ export const OctantMarkets = () => {
         onExport={exportWeight}
         exportDisabled={!tableData}
       />
-
-      <ContestLeaderboardCard contestId="octant" />
 
       <GenericCSVUpload<OctantRow>
         open={isCsvDialogOpen}

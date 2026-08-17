@@ -17,7 +17,6 @@ import { startTransition, useCallback, useMemo, useState } from "react";
 import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { L1MarketTable } from "../L1MarketTable";
-import { ContestLeaderboardCard } from "@/components/leaderboard/ContestLeaderboardCard";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
 
@@ -119,7 +118,6 @@ export const L1Markets = () => {
     );
   }, [tableData]);
 
-
   // Memoised: the tables are React.memo'd, and a freshly built element
   // here would re-render every row each time a dialog opens.
   const emptyState = useMemo(
@@ -196,8 +194,6 @@ export const L1Markets = () => {
         onExport={exportWeight}
         exportDisabled={!tableData}
       />
-
-      <ContestLeaderboardCard contestId="round2-l1" />
 
       <GenericCSVUpload<PredictionRow>
         open={isCsvDialogOpen}

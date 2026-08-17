@@ -7,7 +7,6 @@ import {
   Td,
   Th,
   Thead,
-  Tooltip,
   Tr,
 } from "@/components/ui";
 import type { LeaderboardApiRow } from "@/hooks/useLeaderboard";
@@ -19,7 +18,6 @@ import {
   formatAddress,
   formatAmount,
   formatPercent,
-  pluralize,
   preciseValue,
 } from "@/utils/format";
 import { memo, type ReactNode, type RefObject } from "react";
@@ -65,8 +63,6 @@ interface LeaderboardTableProps {
   highlightRef?: RefObject<HTMLTableRowElement | null>;
   /** Rendered in place of the table body when there are no rows. */
   emptyState: ReactNode;
-  /** Per-contest card: fewer skeleton rows. The columns stay the same as the full board. */
-  compact?: boolean;
   className?: string;
 }
 
@@ -77,11 +73,10 @@ export const LeaderboardTable = memo(function LeaderboardTable({
   highlightAddress,
   highlightRef,
   emptyState,
-  compact = false,
   className,
 }: LeaderboardTableProps) {
   if (isLoading) {
-    return <TableSkeleton rows={compact ? 5 : 8} columns={6} />;
+    return <TableSkeleton rows={8} columns={5} />;
   }
 
   if (rows.length === 0) {
@@ -93,7 +88,7 @@ export const LeaderboardTable = memo(function LeaderboardTable({
 
   return (
     <TableScroller className={className}>
-      <Table minWidth={720}>
+      <Table minWidth={620}>
         <Thead>
           <Th pinned className="w-16">
             #
@@ -102,7 +97,6 @@ export const LeaderboardTable = memo(function LeaderboardTable({
           <Th numeric>Profit/Loss</Th>
           <Th numeric>Volume</Th>
           <Th numeric>ROI</Th>
-          <Th numeric>Markets</Th>
         </Thead>
         <Tbody>
           {rows.map((row) => {
@@ -135,25 +129,6 @@ export const LeaderboardTable = memo(function LeaderboardTable({
                       {formatAddress(row.address)}
                     </a>
                     {isOwn && <Badge tone="neutral">You</Badge>}
-                    {/* One participant, several wallets — say so rather than silently summing. */}
-                    {row.mergedWallets && row.mergedWallets.length > 0 && (
-                      <Tooltip
-                        content={
-                          <span className="block space-y-1">
-                            <span className="block">Includes this trader&apos;s other wallets:</span>
-                            {row.mergedWallets.map((wallet) => (
-                              <span key={wallet} className="block font-mono">
-                                {formatAddress(wallet)}
-                              </span>
-                            ))}
-                          </span>
-                        }
-                      >
-                        <span className="cursor-default rounded border border-rule px-1.5 py-0.5 text-micro text-ink-4">
-                          +{pluralize(row.mergedWallets.length, "wallet")}
-                        </span>
-                      </Tooltip>
-                    )}
                   </span>
                 </Td>
                 <Td numeric className="font-semibold" title={preciseValue(row.pnl)}>
@@ -165,7 +140,6 @@ export const LeaderboardTable = memo(function LeaderboardTable({
                 <Td numeric title={preciseValue(row.roi)}>
                   <Roi value={row.roi} />
                 </Td>
-                <Td numeric>{row.marketCount}</Td>
               </Tr>
             );
           })}

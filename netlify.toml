@@ -5,3 +5,11 @@
 [functions]
   node_bundler = "esbuild"
   directory = "netlify/functions"
+
+# Client-side routing: the header nav pushes real paths (`/leaderboard`), which exist only in
+# the bundle. Without this, a direct hit or a refresh on one 404s. Netlify matches
+# `/.netlify/functions/*` before redirects, so the API is unaffected.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
