@@ -3,6 +3,7 @@ import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
+import { ContestLeaderboardCard } from "@/components/leaderboard/ContestLeaderboardCard";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
@@ -286,6 +287,8 @@ export const OriginalityMarkets = () => {
         onExport={exportWeight}
         exportDisabled={!tableData}
       />
+
+      <ContestLeaderboardCard contestId="round2" />
 
       <GenericCSVUpload<OriginalityRow>
         open={isCsvDialogOpen}

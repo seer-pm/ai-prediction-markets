@@ -1,5 +1,5 @@
 import { cn } from "@/utils/cn";
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes } from "react";
+import type { ReactNode, Ref, ThHTMLAttributes, TdHTMLAttributes } from "react";
 import { Skeleton } from "./Skeleton";
 
 /**
@@ -98,8 +98,21 @@ export function Tbody({ children }: { children: ReactNode }) {
   return <tbody>{children}</tbody>;
 }
 
-export function Tr({ children, className }: { children: ReactNode; className?: string }) {
-  return <tr className={cn("group transition-colors hover:bg-sunken", className)}>{children}</tr>;
+export function Tr({
+  children,
+  className,
+  ref,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Used by the leaderboard to scroll a jumped-to rank into view. */
+  ref?: Ref<HTMLTableRowElement>;
+}) {
+  return (
+    <tr ref={ref} className={cn("group transition-colors hover:bg-sunken", className)}>
+      {children}
+    </tr>
+  );
 }
 
 interface TdProps extends TdHTMLAttributes<HTMLTableCellElement> {

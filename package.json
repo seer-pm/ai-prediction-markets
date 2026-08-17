@@ -20,7 +20,7 @@
     "@reown/appkit": "^1.8.4",
     "@reown/appkit-adapter-wagmi": "^1.8.4",
     "@seer-pm/react": "^0.0.9",
-    "@seer-pm/sdk": "^0.0.9",
+    "@seer-pm/sdk": "^0.0.18",
     "@supabase/supabase-js": "^2.57.4",
     "@swapr/sdk": "https://github.com/seer-pm/swapr-sdk#4a521db50bcdfafc89ef838356791e02ebc609cd",
     "@tailwindcss/vite": "^4.1.13",

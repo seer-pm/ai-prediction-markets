@@ -4,24 +4,45 @@ import { CheckIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { ContestProvider } from "./contest/ContestContext";
 import ErrorBoundary from "./ErrorBoundary";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useLeaderboardStore } from "@/stores/leaderboardStore";
 import { cn } from "@/utils/cn";
-import { startTransition, useState } from "react";
+import { DEEP_CONTESTS } from "@/utils/contests";
+import { startTransition, useEffect, useState, type ComponentType } from "react";
 import { AiMarkets } from "./tabs/AiMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
+import { Leaderboard } from "./tabs/Leaderboard";
 import { OctantMarkets } from "./tabs/OctantMarkets";
 import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 
-const TABS = [
-  { id: "octant", label: "Octant", Component: OctantMarkets, finished: true },
-  { id: "round2-l2", label: "Round 2 · L2", Component: L2Markets, finished: true },
-  { id: "round2-l1", label: "Round 2 · L1", Component: L1Markets, finished: false },
-  { id: "round2", label: "Round 2 · Originality", Component: OriginalityMarkets, finished: true },
-  { id: "round1", label: "Round 1", Component: AiMarkets, finished: true },
-] as const;
+/**
+ * Which component renders each contest. The id / label / finished flag come from the shared
+ * registry (`@/utils/contests`) so the leaderboard job and this tab bar cannot disagree about
+ * what the contests are.
+ */
+const CONTEST_COMPONENTS: Record<string, ComponentType> = {
+  octant: OctantMarkets,
+  "round2-l2": L2Markets,
+  "round2-l1": L1Markets,
+  round2: OriginalityMarkets,
+  round1: AiMarkets,
+};
+
+const TABS = DEEP_CONTESTS.map((contest) => ({
+  ...contest,
+  Component: CONTEST_COMPONENTS[contest.id],
+}));
 
 const LIVE_TABS = TABS.filter((tab) => !tab.finished);
 const ARCHIVED_TABS = TABS.filter((tab) => tab.finished);
+
+const LEADERBOARD_TAB = "leaderboard";
+
+/** Every mountable panel: the contests, plus the cross-contest leaderboard. */
+const PANELS = [
+  ...TABS.map(({ id, Component, finished }) => ({ id, Component, finished })),
+  { id: LEADERBOARD_TAB, Component: Leaderboard, finished: true },
+];
 
 const DEFAULT_TAB: string = "round2-l1";
 
@@ -32,7 +53,7 @@ const DEFAULT_TAB: string = "round2-l1";
  */
 export const Tab = () => {
   const [storedTab, setStoredTab] = useLocalStorage<string>("active-contest", DEFAULT_TAB);
-  const initial = TABS.some((tab) => tab.id === storedTab) ? storedTab : DEFAULT_TAB;
+  const initial = PANELS.some((panel) => panel.id === storedTab) ? storedTab : DEFAULT_TAB;
 
   const [activeTab, setActiveTab] = useState<string>(initial);
   // Lazy-mount: only render a tab once it's been visited.
@@ -47,7 +68,18 @@ export const Tab = () => {
     }
   };
 
+  // "View full leaderboard" on a contest card asks for the leaderboard tab, scoped to that
+  // contest. `requestId` (not `scope`) is the trigger, so asking twice for the same contest
+  // still switches back.
+  const leaderboardRequestId = useLeaderboardStore((state) => state.requestId);
+  useEffect(() => {
+    if (leaderboardRequestId === 0) return;
+    handleTabClick(LEADERBOARD_TAB);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaderboardRequestId]);
+
   const activeArchived = ARCHIVED_TABS.find((tab) => tab.id === activeTab);
+  const leaderboardActive = activeTab === LEADERBOARD_TAB;
 
   return (
     <div className="w-full">
@@ -113,23 +145,40 @@ export const Tab = () => {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
+
+        {/* Not a contest, so it sits apart from them rather than as a sixth peer. */}
+        <button
+          onClick={() => handleTabClick(LEADERBOARD_TAB)}
+          className={cn(
+            "-mb-px ml-auto inline-flex cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-lede font-semibold transition-colors",
+            leaderboardActive
+              ? "border-primary text-primary"
+              : "border-transparent text-ink-3 hover:text-ink",
+          )}
+        >
+          Leaderboard
+        </button>
       </div>
 
       {/* Tab content — lazy-mount on first visit, then keep alive hidden */}
       <div>
-        {TABS.map(({ id, Component, finished }) =>
+        {PANELS.map(({ id, Component, finished }) =>
           visited.has(id) ? (
             <div
               key={id}
               style={{ display: id === activeTab ? "block" : "none" }}
               className="space-y-6 pt-6"
             >
-              {/* One contest crashing shouldn't take the whole app with it. */}
+              {/* One panel crashing shouldn't take the whole app with it. */}
               <ErrorBoundary
                 fallback={(error) => (
                   <Card>
                     <EmptyState
-                      title="This contest could not be displayed"
+                      title={
+                        id === LEADERBOARD_TAB
+                          ? "The leaderboard could not be displayed"
+                          : "This contest could not be displayed"
+                      }
                       description={error.message}
                       actions={
                         <Button onClick={() => window.location.reload()}>Reload the page</Button>

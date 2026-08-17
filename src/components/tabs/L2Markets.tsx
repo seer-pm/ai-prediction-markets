@@ -21,6 +21,7 @@ import { Address } from "viem";
 import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { L2MarketTable } from "../L2MarketTable";
+import { ContestLeaderboardCard } from "@/components/leaderboard/ContestLeaderboardCard";
 import { L2TradingInterface } from "../trade/L2TradingInterface";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
@@ -245,6 +246,8 @@ export const L2Markets = () => {
         onExport={exportWeight}
         exportDisabled={!tableData}
       />
+
+      <ContestLeaderboardCard contestId="round2-l2" />
 
       <GenericCSVUpload<L2Row>
         open={isCsvDialogOpen}

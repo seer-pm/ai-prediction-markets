@@ -1,4 +1,5 @@
 import { MarketTable } from "@/components/MarketTable";
+import { ContestLeaderboardCard } from "@/components/leaderboard/ContestLeaderboardCard";
 import { RedeemInterface } from "@/components/trade/RedeemInterface";
 import { WithdrawOutcomeTokensInterface } from "@/components/trade/WithdrawOutcomeTokensInterface";
 import { Button, Card, ErrorPanel } from "@/components/ui";
@@ -52,6 +53,8 @@ export const AiMarkets = () => {
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
       />
+
+      <ContestLeaderboardCard contestId="round1" />
 
       {account && tradeExecutor && (
         <>
