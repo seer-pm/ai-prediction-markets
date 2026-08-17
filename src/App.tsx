@@ -29,10 +29,10 @@ const CONTAINER = "mx-auto w-full max-w-[86rem] px-4 sm:px-6 lg:px-8";
  */
 type View = "markets" | "leaderboard";
 
-const NAV: { id: View; label: string; path: string }[] = [
-  { id: "markets", label: "Markets", path: "/" },
-  { id: "leaderboard", label: "Leaderboard", path: "/leaderboard" },
-];
+const PATHS: Record<View, string> = {
+  markets: "/",
+  leaderboard: "/leaderboard",
+};
 
 function viewFromPath(pathname: string): View {
   // Tolerate a trailing slash so `/leaderboard/` is not silently the markets page.
@@ -61,9 +61,15 @@ const AppContent: React.FC = () => {
     setMounted((prev) => (prev.has(next) ? prev : new Set([...prev, next])));
   }, []);
 
+  /**
+   * Buttons, not `<a href>`s. An anchor navigates for real whenever the click is not
+   * intercepted, which turns an in-app view switch into a full page load; `pushState` keeps the
+   * URL linkable without ever handing the click back to the browser.
+   */
   const goTo = (next: View) => {
-    const path = NAV.find((item) => item.id === next)!.path;
-    if (window.location.pathname !== path) window.history.pushState(null, "", path);
+    if (window.location.pathname !== PATHS[next]) {
+      window.history.pushState(null, "", PATHS[next]);
+    }
     show(next);
   };
 
@@ -83,32 +89,38 @@ const AppContent: React.FC = () => {
       <header className="sticky top-0 z-30 bg-surface shadow-raised">
         <div className={`${CONTAINER} flex h-16 items-center justify-between gap-4`}>
           <div className="flex min-w-0 items-baseline gap-3">
-            <h1 className="truncate text-title font-bold text-ink">AI Prediction Markets</h1>
+            {/* The title doubles as the way home, so the markets need no nav item of their own. */}
+            <h1 className="truncate text-title font-bold">
+              <button
+                onClick={() => goTo("markets")}
+                aria-current={view === "markets" ? "page" : undefined}
+                className="cursor-pointer text-ink transition-colors hover:text-primary"
+              >
+                AI Prediction Markets
+              </button>
+            </h1>
             <span className="hidden text-label font-semibold tracking-wider text-ink-4 uppercase sm:inline">
               Optimism
             </span>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {/* In-app pages, ahead of the external Guide link so internal and outbound
-                navigation do not read as the same kind of thing. */}
-            <nav className="flex items-center gap-1">
-              {NAV.map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => goTo(id)}
-                  aria-current={view === id ? "page" : undefined}
-                  className={cn(
-                    "cursor-pointer rounded-md px-2.5 py-1.5 text-body font-semibold transition-colors",
-                    // Same selected-chip vocabulary as the leaderboard's market selector, so
-                    // "current page" reads at a glance against the primary-coloured Guide link.
-                    view === id ? "bg-primary-bg text-primary" : "text-ink-3 hover:text-ink",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
+            {/* Ahead of the external Guide link so internal and outbound navigation do not read
+                as the same kind of thing. */}
+            <button
+              onClick={() => goTo("leaderboard")}
+              aria-current={view === "leaderboard" ? "page" : undefined}
+              className={cn(
+                "cursor-pointer rounded-md px-2.5 py-1.5 text-body font-semibold transition-colors",
+                // Same selected-chip vocabulary as the leaderboard's market selector, so
+                // "current page" reads at a glance against the primary-coloured Guide link.
+                view === "leaderboard"
+                  ? "bg-primary-bg text-primary"
+                  : "text-ink-3 hover:text-ink",
+              )}
+            >
+              Leaderboard
+            </button>
 
             <a
               className="hidden items-center gap-1.5 rounded-md px-2 py-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover sm:inline-flex"
