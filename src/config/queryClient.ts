@@ -73,6 +73,9 @@ const PERSISTED_QUERY_KEYS = new Set([
   // Leaderboard ENS names. Safe to restore stale, unlike the deliberately-unpersisted
   // `useLeaderboard` rank: a primary name is a cosmetic label, not a claimed fact.
   "useEnsName",
+  // Wallet profiles, for the same reason. These store URLs, never image bytes, so they cost the
+  // localStorage budget almost nothing — see the `charts` note above for what does.
+  "useProfiles",
 ]);
 
 export const shouldDehydrateQuery = (query: Parameters<typeof defaultShouldDehydrateQuery>[0]) =>

@@ -1,8 +1,6 @@
 import { Button, Dialog, EmptyState, ErrorPanel, Panel } from "@/components/ui";
-import { useGetRedeemStatus } from "@/hooks/useGetRedeemStatus";
-import { useMarketsData } from "@/hooks/useMarketsData";
+import { useAiRedeemable } from "@/hooks/useAiRedeemable";
 import { useRedeemToTradeExecutor } from "@/hooks/useRedeemToTradeExecutor";
-import { useTokensBalances } from "@/hooks/useTokensBalances";
 import React from "react";
 import { Address } from "viem";
 
@@ -19,18 +17,13 @@ export const RedeemInterface: React.FC<RedeemInterfaceProps> = ({
   account,
   tradeExecutor,
 }) => {
-  const { data } = useMarketsData();
   const redeem = useRedeemToTradeExecutor(() => onOpenChange(false));
 
-  const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
-    tradeExecutor,
-    data?.wrappedTokens,
-  );
-  const { data: redeemStatusData, isLoading: isLoadingRedeemStatus } = useGetRedeemStatus();
-
-  const isLoading = isLoadingBalances || isLoadingRedeemStatus;
-  const sumBalances = balances?.reduce((acc, curr) => acc + curr, 0n) ?? 0n;
-  const canRedeem = !!redeemStatusData?.isRedeemable && sumBalances > 0n;
+  // Same hook the banner uses, so what it decided to show and what this dialog says cannot
+  // disagree. React Query dedupes the underlying reads.
+  const { wrappedTokens, balances, isRedeemable, sumBalances, isLoading } =
+    useAiRedeemable(tradeExecutor);
+  const canRedeem = isRedeemable && sumBalances > 0n;
 
   // Nothing to say once the balances are in and there is something to redeem —
   // the header already framed the action. Skipping the body keeps the dialog
@@ -60,7 +53,7 @@ export const RedeemInterface: React.FC<RedeemInterfaceProps> = ({
                 balances &&
                 redeem.mutate({
                   account,
-                  tokens: data?.wrappedTokens ?? [],
+                  tokens: wrappedTokens,
                   amounts: balances,
                   tradeExecutor,
                 })
@@ -87,7 +80,7 @@ export const RedeemInterface: React.FC<RedeemInterfaceProps> = ({
             <Panel tone="working" title="Checking whether this round can be redeemed">
               Reading the resolution status and your balances.
             </Panel>
-          ) : !redeemStatusData?.isRedeemable ? (
+          ) : !isRedeemable ? (
             <EmptyState
               title="Redemptions are not open yet"
               description="This round has to finish resolving before payouts can be claimed. Check back later."

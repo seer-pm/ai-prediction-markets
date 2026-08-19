@@ -48,7 +48,12 @@ export function ContestBar({
         )}
       </div>
 
-      {actions && <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+      {/* `empty:hidden` because `actions` is a fragment whose children gate themselves — on a
+          finished contest with nothing to redeem every one renders false, and the wrapper
+          would otherwise still claim a `gap-4` row of its own on narrow screens. */}
+      {actions && (
+        <div className="flex flex-wrap items-center gap-3 empty:hidden">{actions}</div>
+      )}
     </Card>
   );
 }

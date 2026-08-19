@@ -15,6 +15,8 @@ import {
   useLeaderboard,
   type LeaderboardPeriod,
   type LeaderboardScope,
+  type LeaderboardSort,
+  type LeaderboardSortDir,
 } from "@/hooks/useLeaderboard";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { cn } from "@/utils/cn";
@@ -31,6 +33,13 @@ const PERIODS: { id: LeaderboardPeriod; label: string }[] = [
   { id: "1m", label: "1M" },
   { id: "all", label: "All" },
 ];
+
+/** Used in the card description so it never claims a ranking the table is not showing. */
+const SORT_LABELS: Record<LeaderboardSort, string> = {
+  pnl: "profit/loss",
+  volume: "volume",
+  roi: "ROI",
+};
 
 function scopeLabel(scope: LeaderboardScope): string {
   return scope === "global" ? "All deep markets" : (getContest(scope)?.label ?? scope);
@@ -54,6 +63,8 @@ export function LeaderboardPanel() {
 
   const [scope, setScope] = useState<LeaderboardScope>("global");
   const [period, setPeriod] = useState<LeaderboardPeriod>("all");
+  const [sortBy, setSortBy] = useState<LeaderboardSort>("pnl");
+  const [sortDir, setSortDir] = useState<LeaderboardSortDir>("desc");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -64,6 +75,8 @@ export function LeaderboardPanel() {
   const query = useLeaderboard({
     scope,
     period,
+    sortBy,
+    sortDir,
     search,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
@@ -94,7 +107,7 @@ export function LeaderboardPanel() {
     if (!account) return;
     setRankStatus("loading");
     try {
-      const result = await fetchLeaderboardRank(scope, period, account);
+      const result = await fetchLeaderboardRank(scope, period, account, sortBy, sortDir);
       if (result.rank === null) {
         setRankStatus("missing");
         setHighlightAddress(undefined);
@@ -123,8 +136,8 @@ export function LeaderboardPanel() {
         title={scopeLabel(scope)}
         description={
           scope === "global"
-            ? "Every wallet ranked by realised and marked-to-market profit across all deep markets, in sUSDS."
-            : "Wallets ranked by profit in this contest and its child markets, in sUSDS."
+            ? `Every wallet across all deep markets, ranked by ${SORT_LABELS[sortBy]}. Profit is realised and marked-to-market, in sUSDS.`
+            : `Wallets in this contest and its child markets, ranked by ${SORT_LABELS[sortBy]}, in sUSDS.`
         }
         actions={
           <SegmentedControl
@@ -227,6 +240,13 @@ export function LeaderboardPanel() {
       <LeaderboardTable
         rows={query.data?.rows ?? []}
         isLoading={query.isLoading}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSortChange={(nextSortBy, nextSortDir) => {
+          setSortBy(nextSortBy);
+          setSortDir(nextSortDir);
+          resetView();
+        }}
         ownAddresses={ownAddresses}
         highlightAddress={highlightAddress}
         highlightRef={highlightRef}

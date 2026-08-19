@@ -2,6 +2,7 @@ import { MarketTable } from "@/components/MarketTable";
 import { RedeemInterface } from "@/components/trade/RedeemInterface";
 import { WithdrawOutcomeTokensInterface } from "@/components/trade/WithdrawOutcomeTokensInterface";
 import { Button, Card, ErrorPanel } from "@/components/ui";
+import { useAiRedeemable } from "@/hooks/useAiRedeemable";
 import { useMarketsData } from "@/hooks/useMarketsData";
 import { useProcessPredictions } from "@/hooks/useProcessPredictions";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
@@ -17,6 +18,8 @@ export const AiMarkets = () => {
   const { data: marketsData } = useMarketsData();
   const withdrawTokens = useMemo(() => marketsData?.wrappedTokens, [marketsData?.wrappedTokens]);
 
+  const { isRedeemable, availability: redeemState } = useAiRedeemable(tradeExecutor);
+
   if (error) {
     return <ErrorPanel title="Market data could not be loaded" error={error} />;
   }
@@ -25,8 +28,14 @@ export const AiMarkets = () => {
     <>
       {isCreated && (
         <Card className="flex flex-col gap-3 !p-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* The copy used to promise payouts unconditionally, including to wallets holding
+              nothing and before the round had even resolved. */}
           <p className="px-1 text-data text-ink-3">
-            This contest has settled — you can claim payouts or move the tokens out.
+            {redeemState === "none"
+              ? isRedeemable
+                ? "This contest has settled. You hold nothing left to claim here, but any tokens can still be moved out."
+                : "This contest is still resolving. Payouts open once it settles; tokens can be moved out now."
+              : "This contest has settled — you can claim payouts or move the tokens out."}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -36,13 +45,19 @@ export const AiMarkets = () => {
             >
               Withdraw tokens
             </Button>
-            <Button
-              size="sm"
-              variant="success"
-              onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-            >
-              Redeem to sUSDS
-            </Button>
+            {redeemState !== "none" && (
+              <Button
+                size="sm"
+                variant="success"
+                onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                disabled={redeemState === "unknown"}
+                disabledReason={
+                  redeemState === "unknown" ? "Checking what you can claim." : undefined
+                }
+              >
+                Redeem to sUSDS
+              </Button>
+            )}
           </div>
         </Card>
       )}

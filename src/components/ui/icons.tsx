@@ -126,3 +126,13 @@ export const TrashIcon = (props: IconProps) => (
     <path d="M4.3 4.5 5 13a.8.8 0 0 0 .8.7h4.4a.8.8 0 0 0 .8-.7l.7-8.5" />
   </svg>
 );
+
+/**
+ * The one brand mark in this set. Unlike its neighbours it is a filled glyph, not a stroked one —
+ * the X logo has no stroked form — but it still inherits `currentColor` and sits on the 16 grid.
+ */
+export const XLogoIcon = (props: IconProps) => (
+  <svg {...base(props)} stroke="none" fill="currentColor">
+    <path d="M12.6 1.5h2.45l-5.36 6.13L16 14.5h-4.94l-3.87-5.06-4.43 5.06H.31l5.73-6.55L0 1.5h5.06l3.5 4.63L12.6 1.5Zm-.86 11.54h1.36L4.32 2.89H2.86l8.88 10.15Z" />
+  </svg>
+);

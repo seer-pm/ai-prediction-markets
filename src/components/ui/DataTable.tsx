@@ -1,5 +1,6 @@
 import { cn } from "@/utils/cn";
 import type { ReactNode, Ref, ThHTMLAttributes, TdHTMLAttributes } from "react";
+import { ChevronDownIcon } from "./icons";
 import { Skeleton } from "./Skeleton";
 
 /**
@@ -74,12 +75,37 @@ interface ThProps extends ThHTMLAttributes<HTMLTableCellElement> {
   numeric?: boolean;
   /** Pins this header cell when the table scrolls horizontally. */
   pinned?: boolean;
+  /**
+   * Turns the label into a sort control. `sortDirection` is null when the column is sortable but
+   * not the one currently sorted on. Without these props the cell renders exactly as before, so
+   * the tables that do not sort are unaffected.
+   */
+  onSort?: () => void;
+  sortDirection?: "asc" | "desc" | null;
 }
 
-export function Th({ numeric, pinned, className, children, ...rest }: ThProps) {
+export function Th({
+  numeric,
+  pinned,
+  onSort,
+  sortDirection,
+  className,
+  children,
+  ...rest
+}: ThProps) {
   return (
     <th
       scope="col"
+      // `aria-sort` belongs on the header cell, not the button inside it.
+      aria-sort={
+        onSort
+          ? sortDirection === "asc"
+            ? "ascending"
+            : sortDirection === "desc"
+              ? "descending"
+              : "none"
+          : undefined
+      }
       className={cn(
         "border-b border-rule bg-sunken px-3 py-3 text-label font-semibold tracking-wider whitespace-nowrap text-ink-3 uppercase sm:px-6",
         numeric ? "text-right" : "text-left",
@@ -89,7 +115,33 @@ export function Th({ numeric, pinned, className, children, ...rest }: ThProps) {
       )}
       {...rest}
     >
-      {children}
+      {onSort ? (
+        <button
+          type="button"
+          onClick={onSort}
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1 uppercase transition-colors hover:text-ink",
+            // The active column is the one the rank numbers follow, so it carries the emphasis.
+            sortDirection && "text-ink",
+          )}
+        >
+          {children}
+          {/* Always drawn, dimmed when this is not the active column — a caret that only
+              appears on hover leaves the affordance invisible on touch. */}
+          <ChevronDownIcon
+            width={12}
+            height={12}
+            strokeWidth={2.5}
+            className={cn(
+              "shrink-0 transition-transform",
+              sortDirection === "asc" && "rotate-180",
+              !sortDirection && "opacity-30",
+            )}
+          />
+        </button>
+      ) : (
+        children
+      )}
     </th>
   );
 }

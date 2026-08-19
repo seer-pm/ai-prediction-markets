@@ -1,12 +1,13 @@
 import * as Popover from "@radix-ui/react-popover";
-import { Badge, Button, Skeleton } from "@/components/ui";
+import { Avatar, Badge, Button, Skeleton } from "@/components/ui";
 import { ChevronDownIcon, ExternalIcon } from "@/components/ui/icons";
 import { useCheckOldTradeExecutorCreated } from "@/hooks/useCheckTradeExecutorCreated";
+import { useProfiles } from "@/hooks/useProfiles";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { useWalletStore } from "@/stores/walletStore";
 import { collateral } from "@/utils/constants";
 import { formatAddress, formatTokenAmount } from "@/utils/format";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useDisconnect } from "wagmi";
 import { DepositInterface } from "./DepositInterface";
 import { WithdrawInterface } from "./WithdrawInterface";
@@ -30,6 +31,10 @@ export function TradeWalletMenu() {
   const [depositOpen, setDepositOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
 
+  // Above the early return, like every other hook here. An undefined account looks up nothing.
+  const profiles = useProfiles(useMemo(() => (account ? [account] : []), [account]));
+  const profile = account ? profiles[account.toLowerCase()] : undefined;
+
   if (!account) return null;
 
   const explorer = chain?.blockExplorers?.default?.url;
@@ -37,7 +42,8 @@ export function TradeWalletMenu() {
   return (
     <>
       <Popover.Root>
-        <Popover.Trigger className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-rule-strong bg-surface pr-2.5 pl-3 text-body shadow-raised transition-colors hover:border-ink-4">
+        <Popover.Trigger className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-rule-strong bg-surface pr-2.5 pl-2 text-body shadow-raised transition-colors hover:border-ink-4">
+          <Avatar address={account} src={profile?.avatarUrl} size={22} />
           {isCreated ? (
             isBalanceLoading ? (
               <Skeleton width={64} height={14} />
@@ -64,7 +70,17 @@ export function TradeWalletMenu() {
               <p className="text-label font-semibold tracking-wider text-ink-3 uppercase">
                 Connected account
               </p>
-              <p className="mt-1 font-mono text-body text-ink">{formatAddress(account, 10, 8)}</p>
+              <div className="mt-2 flex items-center gap-2.5">
+                <Avatar address={account} src={profile?.avatarUrl} size={32} />
+                <div className="min-w-0">
+                  {profile?.displayName && (
+                    <p className="truncate text-body font-semibold text-ink">
+                      {profile.displayName}
+                    </p>
+                  )}
+                  <p className="font-mono text-body text-ink-3">{formatAddress(account, 10, 8)}</p>
+                </div>
+              </div>
             </div>
 
             {isCreated && tradeExecutor && (

@@ -1,6 +1,7 @@
 import { ContestBar } from "@/components/contest/ContestBar";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
+import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
@@ -87,6 +88,16 @@ export const OctantMarkets = () => {
       (outcomeBalances ?? []).some((b) => b > 0n),
     [octantMarketData?.marketStatus, outcomeBalances],
   );
+
+  // Only a *confident* "nothing to claim" hides the button — see `@/utils/redeem`.
+  const redeemState = redeemAvailability({
+    hasRedeemable,
+    isResolved:
+      !isLoading &&
+      !isLoadingBalances &&
+      octantMarketData?.marketStatus !== undefined &&
+      balancesResolved(outcomeBalances, wrappedTokens),
+  });
 
   const volumeLabel = useMemo(() => {
     const volumeString = Object.values(totalVolumeMapping ?? {})[0];
@@ -193,15 +204,19 @@ export const OctantMarkets = () => {
                   Sell all positions
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="success"
-                onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-                disabled={isLoading || !account}
-                disabledReason={isLoading ? "Waiting for market data." : undefined}
-              >
-                Redeem to sUSDS
-              </Button>
+              {redeemState !== "none" && (
+                <Button
+                  size="sm"
+                  variant="success"
+                  onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                  disabled={redeemState === "unknown" || !account}
+                  disabledReason={
+                    redeemState === "unknown" ? "Checking what you can claim." : undefined
+                  }
+                >
+                  Redeem to sUSDS
+                </Button>
+              )}
               {!finished && (
                 <Button
                   size="sm"

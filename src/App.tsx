@@ -6,6 +6,7 @@ import { useAccount, WagmiProvider } from "wagmi";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Footer from "./components/Footer";
 import { LeaderboardPanel } from "./components/leaderboard/LeaderboardPanel";
+import { ProfileDialog } from "./components/profile/ProfileDialog";
 import { ReadinessRail } from "./components/ReadinessRail";
 import { Tab } from "./components/Tab";
 import { OldTradeWallet } from "./components/trade/OldTradeWallet";
@@ -40,7 +41,8 @@ function viewFromPath(pathname: string): View {
 }
 
 const AppContent: React.FC = () => {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [view, setView] = useState<View>(() => viewFromPath(window.location.pathname));
   /**
@@ -122,6 +124,17 @@ const AppContent: React.FC = () => {
               Leaderboard
             </button>
 
+            {/* Only once there is an account to attach a profile to. It opens a dialog rather
+                than navigating, so it never takes the `aria-current` treatment above. */}
+            {isConnected && address && (
+              <button
+                onClick={() => setProfileOpen(true)}
+                className="cursor-pointer rounded-md px-2.5 py-1.5 text-body font-semibold text-ink-3 transition-colors hover:text-ink"
+              >
+                Profile
+              </button>
+            )}
+
             <a
               className="hidden items-center gap-1.5 rounded-md px-2 py-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover sm:inline-flex"
               href="https://deep-pm.gitbook.io/seer-docs"
@@ -192,6 +205,10 @@ const AppContent: React.FC = () => {
       </main>
 
       <Footer />
+
+      {address && (
+        <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} account={address} />
+      )}
     </div>
   );
 };

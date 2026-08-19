@@ -6,6 +6,10 @@ export type LeaderboardPeriod = "1d" | "1w" | "1m" | "all";
 /** `global` spans every deep market; anything else is a contest id from `@/utils/contests`. */
 export type LeaderboardScope = "global" | string;
 
+/** The three ranked columns. Kept in sync with `netlify/functions/utils/leaderboard.ts`. */
+export type LeaderboardSort = "pnl" | "volume" | "roi";
+export type LeaderboardSortDir = "desc" | "asc";
+
 export interface LeaderboardApiRow {
   rank: number;
   address: string;
@@ -23,6 +27,8 @@ export interface LeaderboardApiRow {
 export interface LeaderboardApiResult {
   scope: LeaderboardScope;
   period: LeaderboardPeriod;
+  sortBy: LeaderboardSort;
+  sortDir: LeaderboardSortDir;
   unit: string;
   updatedAt: string | null;
   total: number;
@@ -40,6 +46,8 @@ export interface LeaderboardRankResult {
 interface LeaderboardQuery {
   scope: LeaderboardScope;
   period: LeaderboardPeriod;
+  sortBy?: LeaderboardSort;
+  sortDir?: LeaderboardSortDir;
   search?: string;
   limit?: number;
   offset?: number;
@@ -53,6 +61,8 @@ async function fetchLeaderboard(query: LeaderboardQuery): Promise<LeaderboardApi
   const params: Record<string, string> = {
     scope: query.scope,
     period: query.period,
+    sortBy: query.sortBy ?? "pnl",
+    sortDir: query.sortDir ?? "desc",
     limit: String(query.limit ?? 25),
     offset: String(query.offset ?? 0),
   };
@@ -71,9 +81,11 @@ export async function fetchLeaderboardRank(
   scope: LeaderboardScope,
   period: LeaderboardPeriod,
   address: string,
+  sortBy: LeaderboardSort = "pnl",
+  sortDir: LeaderboardSortDir = "desc",
 ): Promise<LeaderboardRankResult> {
   const response = await fetch(
-    leaderboardUrl({ scope, period, rankFor: address.toLowerCase() }),
+    leaderboardUrl({ scope, period, sortBy, sortDir, rankFor: address.toLowerCase() }),
   );
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -100,6 +112,8 @@ export const useLeaderboard = (query: LeaderboardQuery) => {
       "useLeaderboard",
       query.scope,
       query.period,
+      query.sortBy ?? "pnl",
+      query.sortDir ?? "desc",
       query.search ?? "",
       query.limit ?? 25,
       query.offset ?? 0,

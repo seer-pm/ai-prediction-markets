@@ -1,4 +1,5 @@
 export { AccountLabel } from "./AccountLabel";
+export { Avatar } from "./Avatar";
 export { Badge, StatusDot } from "./Badge";
 export { Button } from "./Button";
 export type { ButtonProps } from "./Button";

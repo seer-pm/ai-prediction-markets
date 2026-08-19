@@ -80,6 +80,16 @@ const PATTERNS: Array<{ test: RegExp; headline: string; recovery?: string }> = [
     recovery: "Check the block explorer before retrying — the transaction may still have landed.",
   },
   {
+    // A cross-origin request the browser blocked, or a host it could not reach, surfaces only as
+    // `TypeError: Failed to fetch` with no detail at all. The usual cause here is one of our own
+    // Netlify functions not being deployed yet: the SPA catch-all in `netlify.toml` answers the
+    // preflight with `index.html` and no CORS headers, so the browser refuses the real request.
+    test: /failed to fetch|networkerror when attempting|load failed/i,
+    headline: "Could not reach the server.",
+    recovery:
+      "Check your connection. If this is a new feature, its Netlify function may not be deployed yet.",
+  },
+  {
     test: /too many requests|rate limit|429/i,
     headline: "The RPC provider is rate limiting this session.",
     recovery: "Wait a moment and try again.",

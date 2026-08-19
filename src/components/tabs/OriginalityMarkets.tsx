@@ -1,6 +1,7 @@
 import { ContestBar } from "@/components/contest/ContestBar";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
+import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
@@ -156,6 +157,17 @@ export const OriginalityMarkets = () => {
     [closedBalances, parentBalances],
   );
 
+  // Only a *confident* "nothing to claim" hides the button — see `@/utils/redeem`.
+  const redeemState = redeemAvailability({
+    hasRedeemable,
+    isResolved:
+      !isLoading &&
+      !isLoadingBalances &&
+      !!originalityMarketData &&
+      balancesResolved(closedBalances, closedTokens) &&
+      balancesResolved(parentBalances, parentTokens),
+  });
+
   const tradableCount = useMemo(
     () => tableData?.filter((row) => row.upDifference || row.downDifference).length ?? 0,
     [tableData],
@@ -209,13 +221,15 @@ export const OriginalityMarkets = () => {
     isLoading,
   });
 
-  const redeemButton = (
+  // Rendered at two sites below (the normal bar and the deprecated-wallet one), so the
+  // "nothing to claim" guard lives on the element rather than at either call site.
+  const redeemButton = redeemState !== "none" && (
     <Button
       size="sm"
       variant="success"
       onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-      disabled={isLoading || !account}
-      disabledReason={isLoading ? "Waiting for market data." : undefined}
+      disabled={redeemState === "unknown" || !account}
+      disabledReason={redeemState === "unknown" ? "Checking what you can claim." : undefined}
     >
       Redeem to sUSDS
     </Button>

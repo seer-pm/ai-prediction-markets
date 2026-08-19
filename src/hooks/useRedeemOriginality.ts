@@ -164,7 +164,9 @@ export const useRedeemOriginality = (onSuccess?: () => unknown) => {
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
-      queryClient.invalidateQueries({ queryKey: ["useTokensBalances"] });
+      // Refetch, not invalidate: the redeem CTA now hides itself on a zero balance, and a
+      // lazily-invalidated cache would leave it on screen until the next mount.
+      queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
       queryClient.refetchQueries({ queryKey: ["fetchOriginalityMarketsData"] });
     },
   });

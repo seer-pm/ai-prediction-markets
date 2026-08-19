@@ -11,7 +11,12 @@ import {
   Tr,
 } from "@/components/ui";
 import { useEnsNames } from "@/hooks/useEnsNames";
-import type { LeaderboardApiRow } from "@/hooks/useLeaderboard";
+import { useProfiles } from "@/hooks/useProfiles";
+import type {
+  LeaderboardApiRow,
+  LeaderboardSort,
+  LeaderboardSortDir,
+} from "@/hooks/useLeaderboard";
 import { cn } from "@/utils/cn";
 import { EM_DASH, MINUS, formatAmount, formatPercent, preciseValue } from "@/utils/format";
 import { memo, useMemo, type ReactNode, type RefObject } from "react";
@@ -48,6 +53,10 @@ function Roi({ value }: { value: number | null }) {
 interface LeaderboardTableProps {
   rows: LeaderboardApiRow[];
   isLoading: boolean;
+  /** The column the ranking follows. The `#` column renumbers with it. */
+  sortBy: LeaderboardSort;
+  sortDir: LeaderboardSortDir;
+  onSortChange: (sortBy: LeaderboardSort, sortDir: LeaderboardSortDir) => void;
   /** Addresses belonging to the connected user — their EOA and its trade executor. */
   ownAddresses?: string[];
   /** Row to scroll to after a "Your rank" jump. */
@@ -61,6 +70,9 @@ interface LeaderboardTableProps {
 export const LeaderboardTable = memo(function LeaderboardTable({
   rows,
   isLoading,
+  sortBy,
+  sortDir,
+  onSortChange,
   ownAddresses = [],
   highlightAddress,
   highlightRef,
@@ -69,7 +81,9 @@ export const LeaderboardTable = memo(function LeaderboardTable({
 }: LeaderboardTableProps) {
   // Above the early returns: hooks must run unconditionally. `rows` is empty in both of those
   // cases, so no lookup is issued.
-  const ensNames = useEnsNames(useMemo(() => rows.map((row) => row.address), [rows]));
+  const addresses = useMemo(() => rows.map((row) => row.address), [rows]);
+  const ensNames = useEnsNames(addresses);
+  const profiles = useProfiles(addresses);
 
   if (isLoading) {
     return <TableSkeleton rows={8} columns={5} />;
@@ -82,17 +96,29 @@ export const LeaderboardTable = memo(function LeaderboardTable({
   const own = new Set(ownAddresses.filter(Boolean).map((address) => address.toLowerCase()));
   const highlight = highlightAddress?.toLowerCase();
 
+  // A fresh column starts on its most interesting end (desc); the active one toggles.
+  const sortProps = (column: LeaderboardSort) => ({
+    sortDirection: sortBy === column ? sortDir : null,
+    onSort: () => onSortChange(column, sortBy === column && sortDir === "desc" ? "asc" : "desc"),
+  });
+
   return (
     <TableScroller className={className}>
-      <Table minWidth={620}>
+      <Table minWidth={680}>
         <Thead>
           <Th pinned className="w-16">
             #
           </Th>
           <Th>Account</Th>
-          <Th numeric>Profit/Loss</Th>
-          <Th numeric>Volume</Th>
-          <Th numeric>ROI</Th>
+          <Th numeric {...sortProps("pnl")}>
+            Profit/Loss
+          </Th>
+          <Th numeric {...sortProps("volume")}>
+            Volume
+          </Th>
+          <Th numeric {...sortProps("roi")}>
+            ROI
+          </Th>
         </Thead>
         <Tbody>
           {rows.map((row) => {
@@ -115,7 +141,11 @@ export const LeaderboardTable = memo(function LeaderboardTable({
                 </Td>
                 <Td>
                   <span className="flex items-center gap-2">
-                    <AccountLabel address={row.address} name={ensNames[address]} />
+                    <AccountLabel
+                      address={row.address}
+                      name={ensNames[address]}
+                      profile={profiles[address]}
+                    />
                     {isOwn && <Badge tone="neutral">You</Badge>}
                   </span>
                 </Td>
