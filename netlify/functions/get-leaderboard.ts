@@ -8,10 +8,13 @@ import {
   type LeaderboardRow,
   type RolledUpRow,
   isLeaderboardPeriod,
+  isLeaderboardSort,
+  isLeaderboardSortDir,
   oldestComputedAt,
   readAllContestLeaderboards,
   readContestLeaderboard,
   rollUpRows,
+  sortRows,
   sumContestRows,
 } from "./utils/leaderboard";
 import type { PortfolioPlPeriod } from "./utils/pnl/seerIndexerPortfolio";
@@ -37,7 +40,8 @@ const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUP
  * sent the transaction, never to the contract actually holding the outcome tokens.
  *
  * Both paths then roll trade-executor contracts into the EOA that owns them (see
- * `utils/executorOwners.ts`) so one participant is one row, and rank the result. That rollup is
+ * `utils/executorOwners.ts`) so one participant is one row, and rank the result by `sortBy`
+ * (P/L, volume or ROI — the three columns the table shows). That rollup is
  * why neither path can paginate in SQL: two rows that merge may sit on different pages. The
  * sets are small — 121 wallets globally, at most 70 in a contest — so both are sorted and
  * sliced in memory, behind a 60 s edge cache.
@@ -180,9 +184,17 @@ export default async (req: Request) => {
     const period = (url.searchParams.get("period") ?? "all").toLowerCase();
     const search = normalizeSearch(url.searchParams.get("search") ?? "");
     const rankForRaw = (url.searchParams.get("rankFor") ?? "").trim().toLowerCase();
+    const sortBy = (url.searchParams.get("sortBy") ?? "pnl").toLowerCase();
+    const sortDir = (url.searchParams.get("sortDir") ?? "desc").toLowerCase();
 
     if (!isLeaderboardPeriod(period)) {
       return jsonResponse({ error: "period must be one of: 1d, 1w, 1m, all" }, 400, corsHeaders);
+    }
+    if (!isLeaderboardSort(sortBy)) {
+      return jsonResponse({ error: "sortBy must be one of: pnl, volume, roi" }, 400, corsHeaders);
+    }
+    if (!isLeaderboardSortDir(sortDir)) {
+      return jsonResponse({ error: "sortDir must be one of: desc, asc" }, 400, corsHeaders);
     }
     if (scope !== "global" && !isContestId(scope)) {
       return jsonResponse({ error: `unknown scope: ${scope}` }, 400, corsHeaders);
@@ -198,10 +210,14 @@ export default async (req: Request) => {
     const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
 
     const owners = await readOwnerMap();
-    const { rows, updatedAt } =
+    const { rows: unsorted, updatedAt } =
       scope === "global"
         ? await loadGlobalRows(period, owners)
         : await loadContestRows(scope, period, owners);
+
+    // Ranked before both `rankFor` and `paginate`, so "Your rank" answers for the board the user
+    // is actually looking at rather than always for the P/L one.
+    const rows = sortRows(unsorted, sortBy, sortDir);
 
     if (rankForRaw) {
       // A connected trade-executor ranks where its owner does.
@@ -216,6 +232,8 @@ export default async (req: Request) => {
       {
         scope,
         period,
+        sortBy,
+        sortDir,
         unit: "sUSDS",
         updatedAt,
         total: page.total,

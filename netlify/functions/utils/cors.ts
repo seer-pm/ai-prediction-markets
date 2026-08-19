@@ -13,14 +13,20 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/[a-z0-9-]+\.netlify\.app$/,
 ];
 
-export function getCorsHeaders(req: Request): Record<string, string> {
+/**
+ * The read functions are all GET. `save-profile` passes "POST, OPTIONS" so it is the only
+ * endpoint that advertises a write method.
+ */
+const DEFAULT_METHODS = "GET, OPTIONS";
+
+export function getCorsHeaders(req: Request, methods = DEFAULT_METHODS): Record<string, string> {
   const origin = req.headers.get("origin");
   if (origin && ALLOWED_ORIGIN_PATTERNS.some((re) => re.test(origin))) {
     return {
       "Access-Control-Allow-Origin": origin,
       // Cache per-origin so the CDN doesn't serve one origin's ACAO header to another.
       Vary: "Origin",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Methods": methods,
       "Access-Control-Allow-Headers": "Content-Type",
     };
   }
@@ -28,9 +34,9 @@ export function getCorsHeaders(req: Request): Record<string, string> {
 }
 
 /** Returns a 204 preflight response when the request is an OPTIONS preflight, else null. */
-export function handleCorsPreflight(req: Request): Response | null {
+export function handleCorsPreflight(req: Request, methods = DEFAULT_METHODS): Response | null {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: getCorsHeaders(req) });
+    return new Response(null, { status: 204, headers: getCorsHeaders(req, methods) });
   }
   return null;
 }

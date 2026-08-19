@@ -111,6 +111,46 @@ export function computeRoi(args: {
   return args.pnl / capital;
 }
 
+export type LeaderboardSort = "pnl" | "volume" | "roi";
+export type LeaderboardSortDir = "desc" | "asc";
+
+export const LEADERBOARD_SORTS: LeaderboardSort[] = ["pnl", "volume", "roi"];
+
+export function isLeaderboardSort(value: string): value is LeaderboardSort {
+  return (LEADERBOARD_SORTS as string[]).includes(value);
+}
+
+export function isLeaderboardSortDir(value: string): value is LeaderboardSortDir {
+  return value === "desc" || value === "asc";
+}
+
+/**
+ * Rank the board by one of the three columns the table shows.
+ *
+ * A null `roi` (the `ROI_CAPITAL_DUST` guard) sinks to the bottom in *both* directions: it means
+ * the wallet deployed no measurable capital, which is unknown rather than worst, and the column
+ * renders it as an em-dash. Sorting it as -Infinity would put those rows at the top of an
+ * ascending board, which reads as a ranking of the worst traders.
+ *
+ * Same address tiebreak as before, so paging is stable across requests.
+ */
+export function sortRows(
+  rows: RolledUpRow[],
+  by: LeaderboardSort,
+  dir: LeaderboardSortDir,
+): RolledUpRow[] {
+  const sign = dir === "asc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    if (by === "roi") {
+      if (a.roi === null && b.roi === null) return a.address.localeCompare(b.address);
+      if (a.roi === null) return 1;
+      if (b.roi === null) return -1;
+      return sign * (b.roi - a.roi) || a.address.localeCompare(b.address);
+    }
+    return sign * (b[by] - a[by]) || a.address.localeCompare(b.address);
+  });
+}
+
 /** A ranked row plus the addresses that were merged into it. */
 export interface RolledUpRow extends LeaderboardRow {
   /** Every address this row aggregates, including its own. Used so a search for an executor
