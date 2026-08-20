@@ -3,17 +3,20 @@ import { MarketTypes, getMarketStatus, getMarketType, getQuestionParts, getRedee
 import { getCollateralByIndex } from "@seer-pm/sdk/market-pools";
 import type { Market } from "@seer-pm/sdk/market-types";
 import { MarketStatus } from "@seer-pm/sdk/market-types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { type Address, formatUnits } from "viem";
-import { getCurrentTokensPricesForPortfolio } from "./dexPoolPricesFromDb";
 import { getMarketsMappings, searchAllMarkets } from "./markets";
+import { getCurrentOutcomePrices } from "./onchainOutcomePrices";
 import { fetchTokenBalances } from "./seerIndexerPortfolio";
-import type { Database } from "./supabase";
 import { getTokenDecimalsList } from "./tokenDecimals";
+
+/** Zero-balance rows are worth nothing whatever the price, so they never need a pool read. */
+function pricedPositions(positions: PortfolioPosition[]): PortfolioPosition[] {
+  return positions.filter((position) => position.tokenBalance > 0);
+}
 
 function enrichPositionsWithTokenValues(
   positions: PortfolioPosition[],
-  tokenIdToCurrentPrice: Record<string, number | undefined>,
+  tokenIdToCurrentPrice: Record<string, number>,
 ): PortfolioPosition[] {
   return positions.map((position) => {
     let tokenPrice = tokenIdToCurrentPrice[position.tokenId.toLowerCase()] ?? 0;
@@ -31,7 +34,6 @@ function enrichPositionsWithTokenValues(
  * Builds portfolio positions from pre-resolved tokens, balances, and markets (caller loads markets).
  */
 export async function buildPortfolioPositionsCore(
-  supabase: SupabaseClient<Database>,
   chainId: SupportedChain,
   allTokensIds: Address[],
   balances: bigint[],
@@ -108,7 +110,7 @@ export async function buildPortfolioPositionsCore(
     return acumm;
   }, [] as PortfolioPosition[]);
 
-  const currentPrices = await getCurrentTokensPricesForPortfolio(supabase, positions, chainId);
+  const currentPrices = await getCurrentOutcomePrices(pricedPositions(positions), chainId);
   return enrichPositionsWithTokenValues(positions, currentPrices);
 }
 
@@ -116,7 +118,6 @@ export async function buildPortfolioPositionsCore(
  * Positions from indexer balances: intersection of market wrappedTokens with `relevantTokens` ∪ holdings keys.
  */
 export async function buildPortfolioPositionsFromBalances(
-  supabase: SupabaseClient<Database>,
   chainId: SupportedChain,
   markets: Market[],
   relevantTokens: Address[],
@@ -132,12 +133,11 @@ export async function buildPortfolioPositionsFromBalances(
   ] as Address[];
   const balances = allTokenIds.map((t) => holdings.get(t.toLowerCase()) ?? 0n);
 
-  return buildPortfolioPositionsCore(supabase, chainId, allTokenIds, balances, markets, true);
+  return buildPortfolioPositionsCore(chainId, allTokenIds, balances, markets, true);
 }
 
 /** Current portfolio UI: TokenBalance rows with balance > 0 from HyperIndex. */
 export async function buildCurrentPortfolioPositions(
-  supabase: SupabaseClient<Database>,
   address: Address,
   chainId: SupportedChain,
   collateralProfile: string,
@@ -150,5 +150,5 @@ export async function buildCurrentPortfolioPositions(
   const balances = tokens.map((t) => holdings.get(t.toLowerCase()) ?? 0n);
 
   const { markets } = await searchAllMarkets({ chainIds: [chainId], tokens, collateralProfile });
-  return buildPortfolioPositionsCore(supabase, chainId, tokens, balances, markets, false);
+  return buildPortfolioPositionsCore(chainId, tokens, balances, markets, false);
 }

@@ -31,13 +31,20 @@ const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUP
  *   are the whole of deep funding, and every stored component is additive, so summing them *is*
  *   the all-markets board.
  *
- * Seer's materialized `pnl_leaderboard` (`app_id='deepfund'`) is kept only as a fallback, for
- * addresses our contest blobs have no row for at all. It used to be the primary source for the
- * global scope, but Seer's job stopped writing chain 10 on 2026-08-14 (every `app_id` on that
- * chain is frozen at the same timestamp while chain 100 keeps updating), so a board built on it
- * would be permanently stale. It also structurally cannot contain trade-executor contracts:
- * their candidate selection keys off indexed account activity, which attributes to the EOA that
- * sent the transaction, never to the contract actually holding the outcome tokens.
+ * Seer's materialized `pnl_leaderboard` (`app_id='deepfund'`) is kept as a top-up, for addresses
+ * our contest blobs have no row for at all. Our blobs lead because Seer models deep funding as a
+ * single `deepfund` app allowlist, which cannot express the five per-contest boards the tabs
+ * need, and its rows carry neither `marketIds` nor a per-wallet `computedAt`. Deriving both
+ * scopes from one pipeline is what keeps the global tab consistent with the contest tabs.
+ *
+ * A frozen `updated_at` on Seer's rows is not staleness. Its refresh only considers wallets with
+ * analytics activity in the last `PNL_LEADERBOARD_RECENT_DAYS` (5) UTC days, so an idle chain
+ * stops being recomputed by design — PnL that cannot change is not recalculated. Chain 10 froze
+ * at 2026-08-14T23:51Z because the last Optimism outcome-token transfer was ~08-09: that was the
+ * final day the activity still fell inside the 5-day window, which is also why every `app_id` on
+ * the chain froze at the same instant while chain 100 kept moving. Those rows are current, not
+ * dead. (Seer's job also grew trade-executor support upstream in 2026-08, so its rows are no
+ * longer EOA-only either.)
  *
  * Both paths then roll trade-executor contracts into the EOA that owns them (see
  * `utils/executorOwners.ts`) so one participant is one row, and rank the result by `sortBy`
@@ -153,7 +160,10 @@ async function loadGlobalRows(period: PortfolioPlPeriod, owners: OwnerMap) {
     }))
     .filter((row) => !covered.has(row.address));
 
-  // The board is as fresh as its worst row, so borrowed rows drag the timestamp down with them.
+  // The board is as fresh as its worst row. A borrowed row's `updated_at` is Seer's last *write*,
+  // not a bound on correctness (see the note above on the 5-day refresh window), so on an idle
+  // chain this reports older than the data really is. Kept deliberately: understating freshness
+  // is the safe direction, and these rows are a top-up for wallets we do not score ourselves.
   const timestamps = [
     oldestComputedAt(boards, period),
     ...fallback.map((row) => row.updatedAt),
