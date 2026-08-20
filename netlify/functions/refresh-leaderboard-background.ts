@@ -223,11 +223,13 @@ async function computeWallet(
         marketIds: snapshot.tradedMarketIds,
         valueStart: snapshot.valueStart,
         tradingCollateralNetOut: snapshot.tradingCollateralNetOut,
+        capitalDeployed: snapshot.capitalDeployed,
         roi: computeRoi({
           pnl: snapshot.pnl,
           valueStart: snapshot.valueStart,
           volume: snapshot.volume,
           tradingCollateralNetOut: snapshot.tradingCollateralNetOut,
+          capitalDeployed: snapshot.capitalDeployed,
         }),
       };
     }

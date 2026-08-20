@@ -113,7 +113,15 @@ export const LeaderboardTable = memo(function LeaderboardTable({
           <Th numeric {...sortProps("pnl")}>
             Profit/Loss
           </Th>
-          <Th numeric {...sortProps("volume")}>
+          <Th
+            numeric
+            // Conditional contests (Round 2 · L2, Originality) trade against a parent outcome
+            // token, which has no sUSDS pool of its own; those legs are valued at what the parent
+            // outcome settled for. Legs against an outcome that lost are worth nothing and do not
+            // register.
+            title="Gross traded notional in sUSDS; on conditional markets the parent outcome token is valued at its settlement price"
+            {...sortProps("volume")}
+          >
             Volume
           </Th>
           <Th numeric {...sortProps("roi")}>

@@ -27,6 +27,14 @@ export interface LeaderboardRow {
   valueStart: number;
   tradingCollateralNetOut: number;
   /**
+   * Primary collateral the wallet put to work: swap buys plus router splits. The ROI denominator
+   * on top of `valueStart`.
+   *
+   * Absent on rows written before this field existed and on Seer's `pnl_leaderboard`; `rowCapital`
+   * falls back to recovering buys from the swap aggregates there.
+   */
+  capitalDeployed?: number;
+  /**
    * The markets behind `marketCount`. Kept so merging a participant's wallets unions the
    * markets instead of adding the counts — two wallets that traded the same market are one
    * market, and adding them produced counts larger than the contest itself.
@@ -79,9 +87,16 @@ export const LEADERBOARD_CURSOR_KEY = `deep_pm_leaderboard_cursor_${CHAIN_ID}`;
 export const ROI_CAPITAL_DUST = 0.01;
 
 /**
- * Deployed capital for ROI: `valueStart + buys`.
+ * The capital half of ROI's denominator, without `valueStart`.
  *
- * Buys (primary collateral spent as `tokenIn`) is recovered from the two swap aggregates:
+ * `capitalDeployed` is what the compute measured: primary spent on swap buys plus primary split
+ * through the router. The split leg matters here — on the conditional contests (Round 2 · L2 and
+ * Originality) collateral enters through a split and is then traded in parent outcome tokens, so a
+ * wallet can trade all contest long without ever spending primary on a swap.
+ *
+ * Rows that predate the field — stored blobs, and Seer's `pnl_leaderboard`, which stores neither —
+ * fall back to recovering buys from the two swap aggregates, which holds while volume counts
+ * primary legs only:
  *   volume = primary_in + primary_out
  *   tradingCollateralNetOut = primary_in − primary_out
  *   ⇒ buys = (volume + tradingCollateralNetOut) / 2
@@ -90,13 +105,24 @@ export const ROI_CAPITAL_DUST = 0.01;
  * PnL and volume would otherwise get capital 0 and an undefined ROI. Mirrors
  * `capitalUsdFromRow` in Seer's `utils/pnlLeaderboard.ts`, in sUSDS instead of USD.
  */
+export function rowCapital(args: {
+  volume: number;
+  tradingCollateralNetOut: number;
+  capitalDeployed?: number;
+}): number {
+  if (args.capitalDeployed !== undefined) return Math.max(Number(args.capitalDeployed) || 0, 0);
+  const buys = ((Number(args.volume) || 0) + (Number(args.tradingCollateralNetOut) || 0)) / 2;
+  return Math.max(buys, 0);
+}
+
+/** Deployed capital for ROI: `valueStart + capital`. */
 export function capitalFromRow(args: {
   valueStart: number;
   volume: number;
   tradingCollateralNetOut: number;
+  capitalDeployed?: number;
 }): number {
-  const buys = ((Number(args.volume) || 0) + (Number(args.tradingCollateralNetOut) || 0)) / 2;
-  return (Number(args.valueStart) || 0) + Math.max(buys, 0);
+  return (Number(args.valueStart) || 0) + rowCapital(args);
 }
 
 /** `pnl / capital`, or null when capital is dust (avoids ÷0 and "infinite" ROI). */
@@ -105,6 +131,7 @@ export function computeRoi(args: {
   valueStart: number;
   volume: number;
   tradingCollateralNetOut: number;
+  capitalDeployed?: number;
 }): number | null {
   const capital = capitalFromRow(args);
   if (capital < ROI_CAPITAL_DUST) return null;
@@ -186,6 +213,9 @@ export function rollUpRows(rows: LeaderboardRow[], owners: OwnerMap): RolledUpRo
         volume: group.reduce((total, row) => total + row.volume, 0),
         valueStart: group.reduce((total, row) => total + row.valueStart, 0),
         tradingCollateralNetOut: group.reduce((total, row) => total + row.tradingCollateralNetOut, 0),
+        // Summed through `rowCapital` so a group mixing our rows with a borrowed `pnl_leaderboard`
+        // one still adds like for like: each row contributes the capital it can account for.
+        capitalDeployed: group.reduce((total, row) => total + rowCapital(row), 0),
         ...mergeMarketCount(group),
         roi: null,
         members: group.map((row) => row.address),
@@ -332,6 +362,7 @@ export function sumContestRows(
       volume: group.reduce((total, row) => total + row.volume, 0),
       valueStart: group.reduce((total, row) => total + row.valueStart, 0),
       tradingCollateralNetOut: group.reduce((total, row) => total + row.tradingCollateralNetOut, 0),
+      capitalDeployed: group.reduce((total, row) => total + rowCapital(row), 0),
       ...mergeMarketCount(group),
       roi: null,
     };
