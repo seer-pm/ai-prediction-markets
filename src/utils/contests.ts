@@ -17,13 +17,17 @@ import {
  * The deep markets, in one place.
  *
  * The id, the label and the finished flag used to live in `TABS` (Tab.tsx) while the market
- * id lived in `constants.ts`, so adding a contest meant editing both — and now the netlify
- * leaderboard job needs the same list a third time. Everything that enumerates contests
+ * id lived in `constants.ts`, so adding a contest meant editing both — and the netlify
+ * leaderboard function needs the same list a third time. Everything that enumerates contests
  * reads this array; registering a new deep market is one entry here.
  *
+ * The ids double as Seer's leaderboard sub-ids: `id` is what
+ * `netlify/functions/utils/seerLeaderboard.ts` prefixes with `deepfund:`, and it matches
+ * `SEER_APPS.deepfund.markets` upstream. A new contest has to be registered there too before its
+ * board exists.
+ *
  * `marketId` is the PARENT market. Trading happens on its children, so anything touching
- * on-chain activity has to expand parent → children first (see
- * `netlify/functions/utils/leaderboard.ts`).
+ * on-chain activity has to expand parent → children first.
  */
 export interface Contest {
   id: string;

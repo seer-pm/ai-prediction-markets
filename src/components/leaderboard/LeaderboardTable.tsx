@@ -26,7 +26,7 @@ import { memo, useMemo, type ReactNode, type RefObject } from "react";
  * compact per-contest card render this.
  */
 
-/** Signed sUSDS with an explicit glyph: colour is never the only channel (see index.css). */
+/** Signed USD with an explicit glyph: colour is never the only channel (see index.css). */
 function SignedAmount({ value }: { value: number }) {
   if (!Number.isFinite(value) || value === 0) return <span className="text-ink-4">{EM_DASH}</span>;
   const sign = value > 0 ? "+" : MINUS;
@@ -116,10 +116,10 @@ export const LeaderboardTable = memo(function LeaderboardTable({
           <Th
             numeric
             // Conditional contests (Round 2 · L2, Originality) trade against a parent outcome
-            // token, which has no sUSDS pool of its own; those legs are valued at what the parent
-            // outcome settled for. Legs against an outcome that lost are worth nothing and do not
-            // register.
-            title="Gross traded notional in sUSDS; on conditional markets the parent outcome token is valued at its settlement price"
+            // token, which has no pool against the collateral. Seer counts only the collateral leg
+            // of a swap, so every one of those trades drops out and the whole column — along with
+            // the ROI beside it — reads as an em-dash there.
+            title="Gross traded notional in USD. Not yet available on the conditional contests (Round 2 · L2, Originality)."
             {...sortProps("volume")}
           >
             Volume

@@ -55,8 +55,9 @@ function formatUpdatedAt(updatedAt: string | null | undefined): string | null {
 /**
  * Profit & loss ranking across the deep markets — the whole of the Leaderboard page.
  *
- * Every board, including `All deep markets`, is computed by our own refresh job; the Market chips
- * below scope it to one contest. Everything is denominated in sUSDS, like the rest of the app.
+ * Every board, including `All deep markets`, comes from Seer's leaderboard (see
+ * `netlify/functions/utils/seerLeaderboard.ts`); the Market chips below scope it to one contest.
+ * Everything is denominated in USD, which is what Seer materializes.
  */
 export function LeaderboardPanel() {
   const { account, tradeExecutor } = useTradeWalletStatus();
@@ -136,8 +137,8 @@ export function LeaderboardPanel() {
         title={scopeLabel(scope)}
         description={
           scope === "global"
-            ? `Every wallet across all deep markets, ranked by ${SORT_LABELS[sortBy]}. Profit is realised and marked-to-market, in sUSDS.`
-            : `Wallets in this contest and its child markets, ranked by ${SORT_LABELS[sortBy]}, in sUSDS.`
+            ? `Every wallet across all deep markets, ranked by ${SORT_LABELS[sortBy]}. Profit is realised and marked-to-market, in USD.`
+            : `Wallets in this contest and its child markets, ranked by ${SORT_LABELS[sortBy]}, in USD.`
         }
         actions={
           <SegmentedControl

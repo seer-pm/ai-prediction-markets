@@ -1,64 +1,33 @@
-import { CHAIN_ID } from "@/utils/constants";
 import { isContestId } from "@/utils/contests";
-import { createClient } from "@supabase/supabase-js";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
-import { canonicalAddress, readOwnerMap, type OwnerMap } from "./utils/executorOwners";
 import {
-  type LeaderboardRow,
-  type RolledUpRow,
+  type BoardRow,
+  fetchSeerBoard,
   isLeaderboardPeriod,
   isLeaderboardSort,
   isLeaderboardSortDir,
-  oldestComputedAt,
-  readAllContestLeaderboards,
-  readContestLeaderboard,
-  rollUpRows,
   sortRows,
-  sumContestRows,
-} from "./utils/leaderboard";
-import type { PortfolioPlPeriod } from "./utils/pnl/seerIndexerPortfolio";
-
-const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
+} from "./utils/seerLeaderboard";
 
 /**
- * P/L leaderboard, in sUSDS.
+ * P/L leaderboard, in USD.
  *
- * Both scopes read the blobs our own background job writes (`refresh-leaderboard-background`):
+ * Both scopes are Seer's — `scope=global` is its `deepfund` board, `scope=<contestId>` its
+ * `deepfund:<contestId>` one (see `utils/seerLeaderboard.ts` for why we stopped computing these
+ * ourselves). Seer already folds a participant's trade-executor contracts into the EOA that owns
+ * them, so one participant is one row before we ever see it.
  *
- * - `scope=<contestId>` is one blob.
- * - `scope=global` is the sum of all five. The contests are disjoint market sets that together
- *   are the whole of deep funding, and every stored component is additive, so summing them *is*
- *   the all-markets board.
- *
- * Seer's materialized `pnl_leaderboard` (`app_id='deepfund'`) is kept as a top-up, for addresses
- * our contest blobs have no row for at all. Our blobs lead because Seer models deep funding as a
- * single `deepfund` app allowlist, which cannot express the five per-contest boards the tabs
- * need, and its rows carry neither `marketIds` nor a per-wallet `computedAt`. Deriving both
- * scopes from one pipeline is what keeps the global tab consistent with the contest tabs.
- *
- * A frozen `updated_at` on Seer's rows is not staleness. Its refresh only considers wallets with
- * analytics activity in the last `PNL_LEADERBOARD_RECENT_DAYS` (5) UTC days, so an idle chain
- * stops being recomputed by design — PnL that cannot change is not recalculated. Chain 10 froze
- * at 2026-08-14T23:51Z because the last Optimism outcome-token transfer was ~08-09: that was the
- * final day the activity still fell inside the 5-day window, which is also why every `app_id` on
- * the chain froze at the same instant while chain 100 kept moving. Those rows are current, not
- * dead. (Seer's job also grew trade-executor support upstream in 2026-08, so its rows are no
- * longer EOA-only either.)
- *
- * Both paths then roll trade-executor contracts into the EOA that owns them (see
- * `utils/executorOwners.ts`) so one participant is one row, and rank the result by `sortBy`
- * (P/L, volume or ROI — the three columns the table shows). That rollup is
- * why neither path can paginate in SQL: two rows that merge may sit on different pages. The
- * sets are small — 121 wallets globally, at most 70 in a contest — so both are sorted and
- * sliced in memory, behind a 60 s edge cache.
+ * What this function still owns is the shape the table needs and Seer's endpoint does not offer:
+ * ranking by `sortBy` (P/L, volume or ROI — the three sortable columns), a `search` that filters
+ * without renumbering the board, and `rankFor` answering for whichever column is being ranked
+ * rather than always for P/L. All three need the whole board, which is why nothing here paginates
+ * upstream: the sets are small — 121 wallets globally, at most ~70 in a contest — so the board is
+ * pulled once, sorted and sliced in memory, behind a 60 s edge cache.
  */
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 200;
-
-/** Seer's app id for deep funding — the five contests, expanded to their children. */
-const DEEPFUND_APP_ID = "deepfund";
 
 type ApiRow = {
   rank: number;
@@ -87,7 +56,7 @@ function normalizeSearch(raw: string): string | null {
   return fragment;
 }
 
-function toApiRow(row: RolledUpRow, rank: number): ApiRow {
+function toApiRow(row: BoardRow, rank: number): ApiRow {
   const merged = row.members.filter((member) => member !== row.address);
   return {
     rank,
@@ -101,12 +70,12 @@ function toApiRow(row: RolledUpRow, rank: number): ApiRow {
 }
 
 /** Every wallet the participant trades from is searchable, not just the one they rank under. */
-function matchesSearch(row: RolledUpRow, search: string): boolean {
+function matchesSearch(row: BoardRow, search: string): boolean {
   return row.members.some((member) => member.includes(search));
 }
 
 function paginate(args: {
-  rows: RolledUpRow[];
+  rows: BoardRow[];
   limit: number;
   offset: number;
   search: string | null;
@@ -121,66 +90,10 @@ function paginate(args: {
   };
 }
 
-function rankFor(rows: RolledUpRow[], address: string) {
-  const index = rows.findIndex((row) => row.members.includes(address) || row.address === address);
+/** A connected trade-executor ranks where its owner does — `members` carries both. */
+function rankFor(rows: BoardRow[], address: string) {
+  const index = rows.findIndex((row) => row.members.includes(address));
   return { address, rank: index === -1 ? null : index + 1, total: rows.length };
-}
-
-/**
- * The global board: our five contest blobs summed, topped up from Seer's `deepfund` rows for any
- * address we have not scored at all, then rolled up by owner.
- *
- * Taking only uncovered addresses from Seer is what keeps a wallet from being counted twice —
- * the same guarantee as before, with the filter on the other side now that our own data leads.
- */
-async function loadGlobalRows(period: PortfolioPlPeriod, owners: OwnerMap) {
-  const boards = await readAllContestLeaderboards();
-  const ours = sumContestRows(boards, period);
-  const covered = new Set(ours.map((row) => row.address));
-
-  const { data, error } = await supabase
-    .from("pnl_leaderboard")
-    .select("address, pnl, volume, market_count, value_start, trading_collateral_net_out, updated_at")
-    .eq("app_id", DEEPFUND_APP_ID)
-    .eq("chain_id", CHAIN_ID)
-    .eq("period", period);
-  if (error) throw error;
-
-  const fallback: (LeaderboardRow & { updatedAt: string | null })[] = (data ?? [])
-    .map((row) => ({
-      address: String(row.address).toLowerCase(),
-      pnl: Number(row.pnl) || 0,
-      volume: Number(row.volume) || 0,
-      // Recomputed from the summed components after the rollup, so the stored value is not read.
-      roi: null,
-      marketCount: Number(row.market_count) || 0,
-      valueStart: Number(row.value_start) || 0,
-      tradingCollateralNetOut: Number(row.trading_collateral_net_out) || 0,
-      updatedAt: (row.updated_at as string | null) ?? null,
-    }))
-    .filter((row) => !covered.has(row.address));
-
-  // The board is as fresh as its worst row. A borrowed row's `updated_at` is Seer's last *write*,
-  // not a bound on correctness (see the note above on the 5-day refresh window), so on an idle
-  // chain this reports older than the data really is. Kept deliberately: understating freshness
-  // is the safe direction, and these rows are a top-up for wallets we do not score ourselves.
-  const timestamps = [
-    oldestComputedAt(boards, period),
-    ...fallback.map((row) => row.updatedAt),
-  ].filter((at): at is string => !!at);
-
-  return {
-    rows: rollUpRows([...ours, ...fallback], owners),
-    updatedAt: timestamps.length > 0 ? timestamps.sort()[0] : null,
-  };
-}
-
-async function loadContestRows(contestId: string, period: PortfolioPlPeriod, owners: OwnerMap) {
-  const board = await readContestLeaderboard(contestId);
-  return {
-    rows: rollUpRows(board.rowsByPeriod[period] ?? [], owners),
-    updatedAt: oldestComputedAt([board], period),
-  };
 }
 
 export default async (req: Request) => {
@@ -219,19 +132,14 @@ export default async (req: Request) => {
     );
     const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
 
-    const owners = await readOwnerMap();
-    const { rows: unsorted, updatedAt } =
-      scope === "global"
-        ? await loadGlobalRows(period, owners)
-        : await loadContestRows(scope, period, owners);
+    const board = await fetchSeerBoard(scope, period);
 
     // Ranked before both `rankFor` and `paginate`, so "Your rank" answers for the board the user
     // is actually looking at rather than always for the P/L one.
-    const rows = sortRows(unsorted, sortBy, sortDir);
+    const rows = sortRows(board.rows, sortBy, sortDir);
 
     if (rankForRaw) {
-      // A connected trade-executor ranks where its owner does.
-      return jsonResponse(rankFor(rows, canonicalAddress(rankForRaw, owners)), 200, {
+      return jsonResponse(rankFor(rows, rankForRaw), 200, {
         ...EDGE_CACHE_HEADERS,
         ...corsHeaders,
       });
@@ -244,8 +152,8 @@ export default async (req: Request) => {
         period,
         sortBy,
         sortDir,
-        unit: "sUSDS",
-        updatedAt,
+        unit: "USD",
+        updatedAt: board.updatedAt,
         total: page.total,
         limit,
         offset,
