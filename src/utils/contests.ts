@@ -11,6 +11,7 @@ import {
   L2_PARENT_MARKET_ID,
   OCTANT_MARKET_ID,
   ORIGINALITY_PARENT_MARKET_ID,
+  ZCASH_MARKET_IDS,
 } from "./constants";
 
 /**
@@ -32,12 +33,31 @@ import {
 export interface Contest {
   id: string;
   label: string;
-  marketId: string;
+  /**
+   * The PARENT market. Absent for a contest that has none — Zcash is 37 independent top-level
+   * markets, so it carries `marketIds` instead.
+   */
+  marketId?: string;
+  /** Every market in the contest, for contests with no single parent to expand. */
+  marketIds?: readonly string[];
   /** The contest has ended: trading is closed, only redeeming remains. */
   finished: boolean;
+  /**
+   * Whether Seer materializes a leaderboard for this contest. Defaults to true; set false while
+   * the contest is missing from `SEER_APPS.deepfund.markets` upstream, so the scope button is not
+   * offered for a board that would come back empty.
+   */
+  leaderboard?: boolean;
 }
 
 export const DEEP_CONTESTS = [
+  {
+    id: "zcash",
+    label: "Zcash",
+    marketIds: ZCASH_MARKET_IDS,
+    finished: false,
+    leaderboard: false,
+  },
   { id: "octant", label: "Octant", marketId: OCTANT_MARKET_ID, finished: true },
   { id: "round2-l2", label: "Round 2 · L2", marketId: L2_PARENT_MARKET_ID, finished: true },
   { id: "round2-l1", label: "Round 2 · L1", marketId: L1_MARKET_ID, finished: false },
@@ -59,3 +79,8 @@ export function getContest(id: string): Contest | undefined {
 export function isContestId(id: string): id is ContestId {
   return DEEP_CONTESTS.some((contest) => contest.id === id);
 }
+
+/** Contests Seer has a board for — the only ones worth offering as a leaderboard scope. */
+export const LEADERBOARD_CONTESTS = DEEP_CONTESTS.filter(
+  (contest) => (contest as Contest).leaderboard !== false,
+);

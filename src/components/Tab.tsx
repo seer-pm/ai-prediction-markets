@@ -12,6 +12,7 @@ import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
 import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
+import { ZcashMarkets } from "./tabs/ZcashMarkets";
 
 /**
  * Which component renders each contest. The id / label / finished flag come from the shared
@@ -19,6 +20,7 @@ import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
  * what the contests are.
  */
 const CONTEST_COMPONENTS: Record<string, ComponentType> = {
+  zcash: ZcashMarkets,
   octant: OctantMarkets,
   "round2-l2": L2Markets,
   "round2-l1": L1Markets,

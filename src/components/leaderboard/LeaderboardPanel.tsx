@@ -20,7 +20,7 @@ import {
 } from "@/hooks/useLeaderboard";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { cn } from "@/utils/cn";
-import { DEEP_CONTESTS, getContest } from "@/utils/contests";
+import { getContest, LEADERBOARD_CONTESTS } from "@/utils/contests";
 import { pluralize } from "@/utils/format";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LeaderboardTable } from "./LeaderboardTable";
@@ -158,7 +158,7 @@ export function LeaderboardPanel() {
           <span className="text-label font-semibold tracking-wider text-ink-4 uppercase">
             Market
           </span>
-          {[{ id: "global", label: "All" }, ...DEEP_CONTESTS].map((option) => {
+          {[{ id: "global", label: "All" }, ...LEADERBOARD_CONTESTS].map((option) => {
             const active = scope === option.id;
             return (
               <button

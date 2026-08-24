@@ -14,6 +14,11 @@ export const OTHER_TOKEN_ID = "0x63a4f76ef5846f68d069054c271465b7118e8ed9";
 export const L2_PARENT_MARKET_ID = "0x2d05454c1b4387b5d8be84bee20d58390a01ca64";
 export const OCTANT_MARKET_ID = "0xe85ada7cd6d33cb41ac596fb4749e3f94d836ece";
 
+// Zcash Q3 2026 is the first contest with no parent market: 37 independent top-level binaries,
+// collateralized in sUSDS directly. The ids live in `zcashMarkets.ts` next to the ballot metadata
+// the predictions CSV joins against; re-exported here so `contests.ts` has one import site.
+export { ZCASH_MARKET_IDS } from "./zcashMarkets";
+
 export const CHAIN_ID = 10 as SupportedChain;
 
 // Optimism enforces a hard per-transaction gas-limit cap of 2^24. Any tx with a
@@ -31,6 +36,15 @@ export const MIN_PRICE = 0.00000001;
 // Minimum UP+DOWN excess over 1 for the mint-and-sell-both arbitrage to clear
 // the ~2% round-trip Uniswap fee (1% per leg).
 export const ARB_SUM_THRESHOLD = 0.02;
+
+/**
+ * The price a Zcash prediction aims a pool at.
+ *
+ * A yes/no call carries no number, but `getVolumeUntilPrice` needs a target. 1.0 is unusable: the
+ * volume to push a pool to certainty is unbounded. 0.95 is confident without being degenerate, and
+ * it still leaves a real gap on a market trading at 0.9 — which is where the remaining money is.
+ */
+export const ZCASH_TARGET_PRICE = 0.95;
 
 type CollateralTokensMap = Record<
   SupportedChain,

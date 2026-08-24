@@ -62,6 +62,7 @@ const PERSISTED_QUERY_KEYS = new Set([
   "useL1MarketsData", // Round 2 L1
   "fetchOriginalityMarketsData", // Round 2 Originality
   "fetchL2MarketsData", // Round 2 L2 (default tab)
+  "fetchZcashMarketsData", // Zcash Q3 2026
   "useTokensBalances", // L2 table balances
   "useTokenBalance", // sUSDS wallet balance
   // Persist the executor-check queries so predictedAddress is restored from

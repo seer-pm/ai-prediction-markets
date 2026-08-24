@@ -24,6 +24,12 @@ export interface OctantRow {
   weight: number;
 }
 
+export interface ZcashRow {
+  project: string;
+  /** The user's call: will coinholders approve this grant? */
+  approved: boolean;
+}
+
 export interface TableData {
   repo: string;
   parent: string | null;
@@ -57,6 +63,56 @@ export interface OriginalityTableData {
   wrappedTokens: Address[];
   collateralToken: Address;
   amount?: string;
+}
+
+/**
+ * One Zcash market's row. Unlike `OriginalityTableData` these markets are top-level and
+ * collateralized in sUSDS, so `collateralToken` is always the primary collateral and the mint
+ * budget has to be divided across rows rather than replicated into each.
+ */
+export interface ZcashTableData {
+  /** Proposal title — the predictions CSV joins on this. */
+  project: string;
+  applicant: string;
+  requestedUsd: number;
+  tier: string;
+  yesPrice: number | null;
+  noPrice: number | null;
+  /** The user's call from the CSV: approve, reject, or no view. */
+  predictedApproved: boolean | null;
+  yesDifference: number | null;
+  noDifference: number | null;
+  marketId: string;
+  hasPrediction: boolean;
+  volumeUntilYesPrice: number;
+  volumeUntilNoPrice: number;
+  // Prediction-independent sell bounds used by the YES+NO>1 arbitrage:
+  // volume to push each pool to its proportional share of 1.
+  volumeUntilYesEqual: number;
+  volumeUntilNoEqual: number;
+  yesBalance?: bigint;
+  noBalance?: bigint;
+  /** `[YES, NO, INVALID]` — see `YES_INDEX`/`NO_INDEX` in `utils/zcashMarkets`. */
+  wrappedTokens: Address[];
+  collateralToken: Address;
+  /** sUSDS this row may spend: its slice of the mint budget plus its own sell proceeds. */
+  amount?: string;
+}
+
+export type ZcashQuoteType = "arb-sell" | "paired";
+
+export interface ZcashQuoteResult {
+  quoteType: ZcashQuoteType;
+  quotes: UniswapQuoteTradeResult[];
+  row: ZcashTableData;
+  /** Complete sets to mint for this row before its sell legs can settle. */
+  mintAmount?: string;
+}
+
+export interface ZcashTradeProps {
+  tradeExecutor: Address;
+  amount: string;
+  tableData: ZcashTableData[];
 }
 
 export interface OriginalityQuoteResult {

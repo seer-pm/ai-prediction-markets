@@ -10,7 +10,8 @@ import {
 } from "@/utils/constants";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
-import { getChartData } from "./utils/getChartData";
+import { getChartData, getPoolIds } from "./utils/getChartData";
+import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
 import { GetSwapsQuery } from "@seer-pm/sdk/subgraph/swapr";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
@@ -150,6 +151,66 @@ const getOctantPairs = async (
   );
   if (upsertError) {
     console.log("insert octant error", upsertError.message);
+  }
+};
+
+/**
+ * Zcash is 37 separate top-level markets, so unlike the single-market contests above this writes 37
+ * chart blobs — one per proposal — and reads the market set from chain rather than Supabase, which
+ * has no rows for it.
+ *
+ * A market with no pool data in the index is skipped rather than upserted empty: until
+ * `add-zcash-liquidity.js` runs there are no pools at all, and 37 empty blobs would only mask that.
+ */
+const getZcashPairs = async (
+  poolIndex: Map<string, PoolHourData[]>,
+  volumeIndex: Map<string, PoolVolumeData>,
+) => {
+  const markets = await fetchZcashMarketsOnChain();
+  const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
+
+  for (const market of markets) {
+    const { id: marketId, wrappedTokens, outcomes } = market;
+    const chartDataMarket = wrappedTokens.map(
+      (token) => poolIndex.get(pairKey(token, collateral)) ?? [],
+    );
+    if (chartDataMarket.every((series) => series.length === 0)) {
+      continue;
+    }
+    const totalVolumeMarket = wrappedTokens.reduce((acc, token) => {
+      const volumeByPair = volumeIndex.get(pairKey(token, collateral));
+      if (!volumeByPair) return acc;
+      const { totalVolume0, totalVolume1, token0 } = volumeByPair;
+      return (acc += isTwoStringsEqual(collateral, token0) ? totalVolume0 : totalVolume1);
+    }, 0);
+    const poolData = volumeIndex.get(pairKey(wrappedTokens[0], collateral));
+    const collateralSymbol = poolData
+      ? isTwoStringsEqual(collateral, poolData.token0)
+        ? poolData.token0Name
+        : poolData.token1Name
+      : "";
+    const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => ({
+      poolHourDatas,
+      outcomeName: outcomes[outcomeIndex],
+      outcomeId: wrappedTokens[outcomeIndex],
+      collateral,
+      marketId,
+    }));
+    const { error: upsertError } = await supabase.from("key_value").upsert(
+      {
+        key: `market_chart_hour_data_${marketId}_${CHAIN_ID}_deep_pm`,
+        value: {
+          chartData: chartWithMarketData,
+          timestamp: Date.now(),
+          marketId,
+          totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
+        },
+      },
+      { onConflict: "key" },
+    );
+    if (upsertError) {
+      console.log("insert zcash error", upsertError.message);
+    }
   }
 };
 
@@ -388,13 +449,35 @@ export default async () => {
     .select("value")
     .eq("key", `deep_pm_pool_ids`)
     .single();
-  const poolIds = poolIdsData?.value?.poolIds;
+  const poolIds: string[] = poolIdsData?.value?.poolIds;
   if (!poolIds) {
     throw new Error("Pool ids not found");
   }
-  console.log(poolIds.length);
+
+  // `deep_pm_pool_ids` is maintained outside this repo, so a newly seeded market set is not in it.
+  // Rather than wait for that to be updated by hand, resolve the Zcash pools from their token pairs
+  // and union them in — otherwise the tab renders "No price history yet" indefinitely even though
+  // the pools exist. Deduped because a pool present in both lists would be fetched twice.
+  let allPoolIds = poolIds;
+  try {
+    const zcashMarkets = await fetchZcashMarketsOnChain();
+    const zcashCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address as Address;
+    const zcashPoolIds = await getPoolIds(
+      zcashMarkets.flatMap(({ wrappedTokens }) =>
+        // Invalid is never seeded, so only YES and NO have pools.
+        wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, zcashCollateral)),
+      ),
+    );
+    allPoolIds = [...new Set([...poolIds, ...zcashPoolIds.map((id) => id.toLowerCase())])];
+    console.log(`zcash pools: ${zcashPoolIds.length}, total after union: ${allPoolIds.length}`);
+  } catch (e) {
+    // A failure here must not cost the other four contests their charts.
+    console.log("could not resolve zcash pool ids", e);
+  }
+
+  console.log(allPoolIds.length);
   console.time("get chart");
-  const { chartData, swapsData } = await getChartData(poolIds);
+  const { chartData, swapsData } = await getChartData(allPoolIds);
   console.timeEnd("get chart");
   console.log(chartData.length);
   const poolIndex = buildPoolIndex(chartData);
@@ -420,6 +503,12 @@ export default async () => {
   try {
     console.log("getting l2 chart");
     await getL2Pairs(poolIndex, volumeIndex);
+  } catch (e) {
+    console.log(e);
+  }
+  try {
+    console.log("getting zcash chart");
+    await getZcashPairs(poolIndex, volumeIndex);
   } catch (e) {
     console.log(e);
   }

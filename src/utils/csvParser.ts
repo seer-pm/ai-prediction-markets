@@ -1,4 +1,5 @@
-import { L2Row, OctantRow, OriginalityRow, PredictionRow } from "@/types";
+import { L2Row, OctantRow, OriginalityRow, PredictionRow, ZcashRow } from "@/types";
+import { getZcashMarketByTitle } from "@/utils/zcashMarkets";
 
 export const parseCSV = (csvText: string): PredictionRow[] => {
   const lines = csvText.trim().split("\n");
@@ -264,6 +265,93 @@ export const parseL2CSV = (csvText: string): L2Row[] => {
       dependency,
       repo,
       weight,
+    });
+  }
+
+  if (results.length === 0) {
+    throw new Error("CSV contains no valid data rows");
+  }
+
+  return results;
+};
+
+/**
+ * The accepted spellings of a yes/no call. Whatever a spreadsheet exports — a TRUE from a checkbox
+ * column, a 1 from a numeric one, the word someone typed — should not be a parse error.
+ */
+const APPROVED_VALUES = new Set(["yes", "y", "true", "1", "approve", "approved"]);
+const REJECTED_VALUES = new Set(["no", "n", "false", "0", "reject", "rejected"]);
+
+/**
+ * Zcash predictions: one row per proposal, and whether you think coinholders will approve it.
+ *
+ * A yes/no call rather than a probability, because that is the only decision on the ballot. Rows may
+ * be left out entirely: a proposal with no row gets no prediction and is never traded, which is how
+ * you say "no view" without inventing a number. The project name is validated against the ballot
+ * (`ZCASH_MARKETS`) rather than being matched loosely later — a typo here would otherwise surface as
+ * a silently untraded row.
+ */
+export const parseZcashCSV = (csvText: string): ZcashRow[] => {
+  const lines = csvText.trim().split("\n");
+
+  if (lines.length < 2) {
+    throw new Error("CSV must have at least a header row and one data row");
+  }
+
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+
+  if (headers.length !== 2) {
+    throw new Error("CSV must have exactly 2 columns: project, approved");
+  }
+
+  if (!headers.includes("project") || !headers.includes("approved")) {
+    throw new Error("CSV must have columns: project, approved");
+  }
+
+  const seenProjects = new Set<string>();
+  const results: ZcashRow[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
+
+    const values = line.split(",").map((v) => v.trim());
+
+    if (values.length !== 2) {
+      throw new Error(`Row ${i + 1}: Expected 2 columns, found ${values.length}`);
+    }
+
+    const project = values[0];
+    const approvedStr = values[1];
+
+    if (!project || !approvedStr) {
+      throw new Error(`Row ${i + 1}: All columns must have values`);
+    }
+
+    const market = getZcashMarketByTitle(project);
+    if (!market) {
+      throw new Error(
+        `Row ${i + 1}: "${project}" is not a proposal in the Q3 2026 ballot. Download the sample CSV for the exact titles.`,
+      );
+    }
+
+    // Key on the canonical title so casing and stray whitespace in the file cannot split one
+    // proposal across two rows.
+    if (seenProjects.has(market.title)) {
+      throw new Error(`Row ${i + 1}: Duplicate project "${project}"`);
+    }
+    seenProjects.add(market.title);
+
+    const answer = approvedStr.toLowerCase();
+    if (!APPROVED_VALUES.has(answer) && !REJECTED_VALUES.has(answer)) {
+      throw new Error(
+        `Row ${i + 1}: "${approvedStr}" is not a yes or no. Use yes if you think the grant gets approved, no if you don't.`,
+      );
+    }
+
+    results.push({
+      project: market.title,
+      approved: APPROVED_VALUES.has(answer),
     });
   }
 

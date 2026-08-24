@@ -22,6 +22,7 @@ export { Dialog } from "./Dialog";
 export { EmptyState } from "./EmptyState";
 export { AmountInput, Field, TextInput } from "./Field";
 export { ErrorPanel, Panel } from "./Panel";
+export { OutcomeBar } from "./OutcomeBar";
 export { MultiSelect, Select } from "./Select";
 export type { Option } from "./Select";
 export { Skeleton } from "./Skeleton";
