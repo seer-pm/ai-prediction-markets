@@ -223,13 +223,12 @@ export const OriginalityMarkets = () => {
 
   // Rendered at two sites below (the normal bar and the deprecated-wallet one), so the
   // "nothing to claim" guard lives on the element rather than at either call site.
-  const redeemButton = redeemState !== "none" && (
+  const redeemButton = redeemState === "some" && (
     <Button
       size="sm"
       variant="success"
       onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-      disabled={redeemState === "unknown" || !account}
-      disabledReason={redeemState === "unknown" ? "Checking what you can claim." : undefined}
+      disabled={!account}
     >
       Redeem to sUSDS
     </Button>

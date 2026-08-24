@@ -20,7 +20,7 @@ import { formatAmount } from "@/utils/format";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { isZcashRowFundable } from "@/utils/zcashBudget";
 import { sampleZcashPredictions } from "@/utils/sampleZcashPredictions";
-import { YES_INDEX, ZCASH_TOTAL_REQUESTED_USD } from "@/utils/zcashMarkets";
+import { YES_INDEX } from "@/utils/zcashMarkets";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import { Address } from "viem";
@@ -48,12 +48,6 @@ const ZCASH_SAMPLE_CONFIG: SampleCsvConfig = {
   sampleData: sampleZcashPredictions,
   filename: "zcash-predictions",
 };
-
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
 
 export const ZcashMarkets = () => {
   const [predictions, setPredictions] = useLocalStorage<ZcashRow[]>("zcash-approved", []);
@@ -254,15 +248,12 @@ export const ZcashMarkets = () => {
                   Sell all positions
                 </Button>
               )}
-              {redeemState !== "none" && (
+              {redeemState === "some" && (
                 <Button
                   size="sm"
                   variant="success"
                   onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-                  disabled={redeemState === "unknown" || !account}
-                  disabledReason={
-                    redeemState === "unknown" ? "Checking what you can claim." : undefined
-                  }
+                  disabled={!account}
                 >
                   Redeem to sUSDS
                 </Button>
@@ -291,11 +282,6 @@ export const ZcashMarkets = () => {
         onExport={exportMarketView}
         exportDisabled={!tableData || hasNoLiquidity}
       />
-
-      <p className="mt-3 text-body text-ink-3">
-        {usdFormatter.format(ZCASH_TOTAL_REQUESTED_USD)} requested across 37 proposals in the Q3
-        2026 Coinholder-Directed Retroactive Grants Program.
-      </p>
 
       <GenericCSVUpload<ZcashRow>
         open={isCsvDialogOpen}

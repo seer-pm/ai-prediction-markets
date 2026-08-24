@@ -1,16 +1,18 @@
 /**
  * Whether to offer "Redeem to sUSDS" at all.
  *
- * The button used to be unconditional: you clicked it and only then learned there was nothing to
- * claim. Hiding it is easy to get dangerously wrong, though, because "no redeemable balance" and
- * "we could not read the balances" look identical from the outside — `fetchTokensBalances`
- * swallows RPC failures and returns `[]` (see `@/hooks/useTokensBalances`), and a TanStack query
- * that is not enabled yet reports `isLoading: false` with `data: undefined`. A naive
- * `hasRedeemable && <Button/>` therefore flashes the button away on mount and, worse, removes the
- * user's only route to their money whenever an RPC hiccups.
+ * The button is only rendered on a *confident* positive: we have read every balance the answer
+ * depends on and at least one of them is claimable. Anything else hides it.
  *
- * So this is deliberately tri-state: hide only on a *confident* negative, and keep showing the
- * button (disabled, with a reason) while we do not know.
+ * The distinction that matters is between "really nothing to claim" and "we could not read the
+ * balances" — `fetchTokensBalances` swallows RPC failures and returns `[]` (see
+ * `@/hooks/useTokensBalances`), and a TanStack query that is not enabled yet reports
+ * `isLoading: false` with `data: undefined`. Both look exactly like an empty wallet. That is why
+ * this stays tri-state rather than collapsing to a boolean: `"unknown"` still means "we do not
+ * know", it just no longer renders a placeholder CTA. Showing the button while unknown made it
+ * flash in on load and vanish a moment later, which reads as broken; a half-read balance set must
+ * not advertise a claim. Callers that also render explanatory copy (see `AiMarkets`) can still key
+ * off `"unknown"` to avoid promising a payout they have not confirmed.
  */
 export type RedeemAvailability = "unknown" | "none" | "some";
 

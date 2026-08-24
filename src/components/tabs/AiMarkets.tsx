@@ -31,11 +31,13 @@ export const AiMarkets = () => {
           {/* The copy used to promise payouts unconditionally, including to wallets holding
               nothing and before the round had even resolved. */}
           <p className="px-1 text-data text-ink-3">
-            {redeemState === "none"
-              ? isRedeemable
-                ? "This contest has settled. You hold nothing left to claim here, but any tokens can still be moved out."
-                : "This contest is still resolving. Payouts open once it settles; tokens can be moved out now."
-              : "This contest has settled — you can claim payouts or move the tokens out."}
+            {redeemState === "some"
+              ? "This contest has settled — you can claim payouts or move the tokens out."
+              : redeemState === "none"
+                ? isRedeemable
+                  ? "This contest has settled. You hold nothing left to claim here, but any tokens can still be moved out."
+                  : "This contest is still resolving. Payouts open once it settles; tokens can be moved out now."
+                : "Tokens from this contest can be moved out at any time."}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -45,15 +47,11 @@ export const AiMarkets = () => {
             >
               Withdraw tokens
             </Button>
-            {redeemState !== "none" && (
+            {redeemState === "some" && (
               <Button
                 size="sm"
                 variant="success"
                 onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-                disabled={redeemState === "unknown"}
-                disabledReason={
-                  redeemState === "unknown" ? "Checking what you can claim." : undefined
-                }
               >
                 Redeem to sUSDS
               </Button>

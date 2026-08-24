@@ -204,15 +204,12 @@ export const OctantMarkets = () => {
                   Sell all positions
                 </Button>
               )}
-              {redeemState !== "none" && (
+              {redeemState === "some" && (
                 <Button
                   size="sm"
                   variant="success"
                   onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-                  disabled={redeemState === "unknown" || !account}
-                  disabledReason={
-                    redeemState === "unknown" ? "Checking what you can claim." : undefined
-                  }
+                  disabled={!account}
                 >
                   Redeem to sUSDS
                 </Button>
