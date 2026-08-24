@@ -5,7 +5,7 @@ import { ContestProvider } from "./contest/ContestContext";
 import ErrorBoundary from "./ErrorBoundary";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { cn } from "@/utils/cn";
-import { DEEP_CONTESTS } from "@/utils/contests";
+import { DEEP_CONTESTS, type Contest } from "@/utils/contests";
 import { startTransition, useState, type ComponentType } from "react";
 import { AiMarkets } from "./tabs/AiMarkets";
 import { L1Markets } from "./tabs/L1Markets";
@@ -28,7 +28,7 @@ const CONTEST_COMPONENTS: Record<string, ComponentType> = {
   round1: AiMarkets,
 };
 
-const TABS = DEEP_CONTESTS.map((contest) => ({
+const TABS = DEEP_CONTESTS.filter((contest) => !(contest as Contest).hidden).map((contest) => ({
   ...contest,
   Component: CONTEST_COMPONENTS[contest.id],
 }));

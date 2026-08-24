@@ -48,6 +48,12 @@ export interface Contest {
    * offered for a board that would come back empty.
    */
   leaderboard?: boolean;
+  /**
+   * Temporarily hide the contest from the tab bar without unregistering it. Everything else —
+   * market ids, the component wiring in `Tab.tsx`, the netlify functions — stays intact, so
+   * bringing the contest back is deleting the flag.
+   */
+  hidden?: boolean;
 }
 
 export const DEEP_CONTESTS = [
@@ -57,6 +63,8 @@ export const DEEP_CONTESTS = [
     marketIds: ZCASH_MARKET_IDS,
     finished: false,
     leaderboard: false,
+    // Hidden pending a business update; remove this line to bring the tab back.
+    hidden: true,
   },
   { id: "octant", label: "Octant", marketId: OCTANT_MARKET_ID, finished: true },
   { id: "round2-l2", label: "Round 2 · L2", marketId: L2_PARENT_MARKET_ID, finished: true },
