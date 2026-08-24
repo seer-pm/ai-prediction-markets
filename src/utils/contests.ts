@@ -63,8 +63,6 @@ export const DEEP_CONTESTS = [
     marketIds: ZCASH_MARKET_IDS,
     finished: false,
     leaderboard: false,
-    // Hidden pending a business update; remove this line to bring the tab back.
-    hidden: true,
   },
   { id: "octant", label: "Octant", marketId: OCTANT_MARKET_ID, finished: true },
   { id: "round2-l2", label: "Round 2 · L2", marketId: L2_PARENT_MARKET_ID, finished: true },
