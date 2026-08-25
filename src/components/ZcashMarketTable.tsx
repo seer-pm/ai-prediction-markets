@@ -101,6 +101,15 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
                   >
                     {market.project}
                   </span>
+                  <a
+                    href={`https://app.seer.pm/markets/10/${market.marketId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-label font-semibold text-primary transition-colors hover:text-primary-hover"
+                  >
+                    Open Seer
+                    <ExternalIcon width={12} height={12} />
+                  </a>
                 </Td>
                 <Td>
                   <OutcomeBar yes={market.yesPrice} no={market.noPrice} />

@@ -12,7 +12,7 @@ import { Tab } from "./components/Tab";
 import { OldTradeWallet } from "./components/trade/OldTradeWallet";
 import { TradeWalletMenu } from "./components/trade/TradeWalletMenu";
 import { Button, Card, EmptyState, TooltipProvider } from "./components/ui";
-import { BookIcon, ExternalIcon } from "./components/ui/icons";
+import { BookIcon } from "./components/ui/icons";
 import { WalletConnect } from "./components/WalletConnect";
 import { localStoragePersister, queryClient, shouldDehydrateQuery } from "./config/queryClient";
 import { config } from "./config/wagmi";
@@ -161,24 +161,6 @@ const AppContent: React.FC = () => {
             <div style={{ display: view === "markets" ? "block" : "none" }} className="space-y-6">
               <ReadinessRail />
               <Tab />
-
-              <div className="flex flex-col gap-3 rounded-lg bg-surface px-6 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-lede font-semibold text-ink">Trading one market at a time?</p>
-                  <p className="mt-1 text-body text-ink-3">
-                    Seer has the individual market view, liquidity provision and full analytics.
-                  </p>
-                </div>
-                <a
-                  href="https://app.seer.pm/markets/10/what-will-be-the-juror-weight-computed-through-huber-loss-minimization-in-the-lo-2"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover"
-                >
-                  Open Seer
-                  <ExternalIcon width={13} height={13} />
-                </a>
-              </div>
             </div>
           )}
 

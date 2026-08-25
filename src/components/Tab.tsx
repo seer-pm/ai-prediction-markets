@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Badge, Button, Card, EmptyState, StatusDot } from "@/components/ui";
-import { CheckIcon, ChevronDownIcon } from "@/components/ui/icons";
+import { CheckIcon, ChevronDownIcon, ExternalIcon } from "@/components/ui/icons";
 import { ContestProvider } from "./contest/ContestContext";
 import ErrorBoundary from "./ErrorBoundary";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -61,6 +61,10 @@ export const Tab = () => {
   };
 
   const activeArchived = ARCHIVED_TABS.find((tab) => tab.id === activeTab);
+  const activeContest = TABS.find((tab) => tab.id === activeTab);
+  // If the contest is a collection of markets, it will contain marketIds instead
+  const activeMarketId =
+    activeContest && "marketId" in activeContest ? activeContest.marketId : undefined;
 
   return (
     <div className="w-full">
@@ -159,6 +163,29 @@ export const Tab = () => {
           ) : null,
         )}
       </div>
+
+      {/* Seer's address route redirects to its canonical title URL. Using the address means this
+          CTA stays correct even when Seer changes a market's title/slug. Contests that are a collection of markets, 
+          eg Zcash, intentionally has no single market destination here. */}
+      {activeMarketId && (
+        <div className="mt-6 flex flex-col gap-3 rounded-lg bg-surface px-6 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-lede font-semibold text-ink">Trading one market at a time?</p>
+            <p className="mt-1 text-body text-ink-3">
+              Seer has the individual market view, liquidity provision and full analytics.
+            </p>
+          </div>
+          <a
+            href={`https://app.seer.pm/markets/10/${activeMarketId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover"
+          >
+            Open Seer
+            <ExternalIcon width={13} height={13} />
+          </a>
+        </div>
+      )}
     </div>
   );
 };
