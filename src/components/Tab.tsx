@@ -164,9 +164,8 @@ export const Tab = () => {
         )}
       </div>
 
-      {/* Seer's address route redirects to its canonical title URL. Using the address means this
-          CTA stays correct even when Seer changes a market's title/slug. Contests that are a collection of markets, 
-          eg Zcash, intentionally has no single market destination here. */}
+      {/* Link directly to the host market id. Contests that are a collection of markets, 
+          eg Zcash, intentionally has no single market destination here, and instead link in their table */}
       {activeMarketId && (
         <div className="mt-6 flex flex-col gap-3 rounded-lg bg-surface px-6 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
           <div>
