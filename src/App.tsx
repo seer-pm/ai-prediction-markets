@@ -18,6 +18,7 @@ import { localStoragePersister, queryClient, shouldDehydrateQuery } from "./conf
 import { config } from "./config/wagmi";
 import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
 import { cn } from "./utils/cn";
+import { SEER_MARKETS_URL } from "./utils/constants";
 
 const CONTAINER = "mx-auto w-full max-w-[86rem] px-4 sm:px-6 lg:px-8";
 
@@ -170,12 +171,12 @@ const AppContent: React.FC = () => {
                   </p>
                 </div>
                 <a
-                  href="https://app.seer.pm/markets/10/what-will-be-the-juror-weight-computed-through-huber-loss-minimization-in-the-lo-2"
+                  href={SEER_MARKETS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex shrink-0 items-center gap-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover"
                 >
-                  Open Seer
+                  Browse on Seer
                   <ExternalIcon width={13} height={13} />
                 </a>
               </div>

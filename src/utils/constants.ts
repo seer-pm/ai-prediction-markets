@@ -21,6 +21,18 @@ export { ZCASH_MARKET_IDS } from "./zcashMarkets";
 
 export const CHAIN_ID = 10 as SupportedChain;
 
+/**
+ * Seer's market list, filtered to our chain. The list page reads a repeatable `chains` param, so
+ * this is the whole filter.
+ *
+ * Deliberately not a link to a specific market. Slugs live in Seer's Supabase `markets` table and
+ * are written by a cron over the rows it has; the 37 Zcash markets are not in that table, so they
+ * have no slug — Seer's own `paths.market` falls back to `markets/<chainId>/<address>` for exactly
+ * this case. A contest-level link would have to pick one of the 37 arbitrarily, so it points at the
+ * list instead.
+ */
+export const SEER_MARKETS_URL = `https://app.seer.pm/?chains=${CHAIN_ID}`;
+
 // Optimism enforces a hard per-transaction gas-limit cap of 2^24. Any tx with a
 // higher gas limit is rejected by the sequencer with "gas limit too high".
 export const OPTIMISM_MAX_TX_GAS = 16_777_216n; // 2^24
