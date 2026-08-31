@@ -16,7 +16,7 @@ import {
 } from "@/components/ui";
 import { ExternalIcon } from "@/components/ui/icons";
 import { ZcashTableData } from "@/types";
-import { DECIMALS } from "@/utils/constants";
+import { DECIMALS, getSeerMarketUrl } from "@/utils/constants";
 import { formatTokenAmount } from "@/utils/format";
 import { ZCASH_FORUM_URL } from "@/utils/zcashMarkets";
 import React, { type ReactNode } from "react";
@@ -93,14 +93,24 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
             {markets.map((market) => (
               <Tr key={market.marketId}>
                 <Td pinned>
-                  <span
-                    className="block max-w-[220px] truncate sm:max-w-sm"
+                  {/* The row's title doubles as the link to the market on Seer — the icon is what
+                      says so, since the truncation already eats any trailing affordance. */}
+                  <a
+                    href={getSeerMarketUrl(market.marketId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group/link inline-flex max-w-[220px] items-center gap-1.5 text-ink transition-colors hover:text-primary sm:max-w-sm"
                     title={
                       market.applicant ? `${market.project} — ${market.applicant}` : market.project
                     }
                   >
-                    {market.project}
-                  </span>
+                    <span className="truncate">{market.project}</span>
+                    <ExternalIcon
+                      width={13}
+                      height={13}
+                      className="shrink-0 text-ink-4 transition-colors group-hover/link:text-primary"
+                    />
+                  </a>
                 </Td>
                 <Td>
                   <OutcomeBar yes={market.yesPrice} no={market.noPrice} />
