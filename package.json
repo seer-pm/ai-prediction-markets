@@ -8,7 +8,8 @@
     "build": "npm run codegen && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "codegen": "graphql-codegen --config codegen.ts"
+    "codegen": "graphql-codegen --config codegen.ts",
+    "export:l1-pnl": "esbuild scripts/exportL1Pnl.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=scripts/.exportL1Pnl.mjs --log-level=warning && node scripts/.exportL1Pnl.mjs"
   },
   "dependencies": {
     "@apollo/client": "^4.0.4",
