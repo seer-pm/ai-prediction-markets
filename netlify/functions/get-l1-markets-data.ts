@@ -2,9 +2,10 @@ import { UniswapGraphQLClient } from "@/config/apollo";
 import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
 import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
-import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID } from "@/utils/constants";
+import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID, OTHER_MARKET_ID } from "@/utils/constants";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
+import { fetchMarketsOnChain } from "./utils/marketView";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 
@@ -21,6 +22,7 @@ export default async (req: Request) => {
       { data, error },
       { data: otherMarketData, error: otherMarketError },
       { data: chartData, error: chartError },
+      [onChainParent, onChainOther],
     ] = await Promise.all([
       supabase
         .from("markets")
@@ -43,6 +45,12 @@ export default async (req: Request) => {
         .select("value")
         .eq("key", `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`)
         .single(),
+      // Resolution state comes from the chain, not Supabase. Seer's indexer stalled on Optimism at
+      // block 156,195,946 (2026-08-29) and never saw these markets resolve two days later, so the
+      // row below still reports all-zero payouts — which would keep the redeem CTA hidden for as
+      // long as that lasts. Everything else here (outcomes, tokens, pools) is unaffected by a
+      // resolution, so it keeps coming from the table.
+      fetchMarketsOnChain([L1_MARKET_ID, OTHER_MARKET_ID]),
     ]);
     if (error) {
       throw error;
@@ -158,7 +166,22 @@ export default async (req: Request) => {
         marketsData: repoToPriceMapping,
         charts,
         wrappedTokens,
-        payoutNumerators: data.payoutNumerators,
+        // On-chain, so this is real the moment the market resolves rather than whenever Seer's
+        // indexer catches up.
+        payoutNumerators: onChainParent.payoutNumerators,
+        // The redeem walks these two levels in turn, and needs each one's tokens in outcome order
+        // (`wrappedTokens` above is a flat parent+child concat that `marketsData` is indexed
+        // against, so it cannot be split back apart here).
+        parentMarket: {
+          id: onChainParent.id,
+          wrappedTokens: onChainParent.wrappedTokens,
+          marketStatus: onChainParent.marketStatus,
+        },
+        otherMarket: {
+          id: onChainOther.id,
+          wrappedTokens: onChainOther.wrappedTokens,
+          marketStatus: onChainOther.marketStatus,
+        },
         totalVolumeMapping,
       }),
       {

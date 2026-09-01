@@ -1,7 +1,15 @@
 import { ChartWithMarketData, PoolInfo } from "@/types";
 import { fetchAppJson } from "@/utils/common";
+import { MarketStatus } from "@seer-pm/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
+
+/** One level of the L1 contest, as the redeem needs it: tokens in outcome order, plus its status. */
+interface L1MarketLevel {
+  id: Address;
+  wrappedTokens: Address[];
+  marketStatus: MarketStatus;
+}
 
 interface GetMarketsDataApiResult {
   marketsData: {
@@ -12,8 +20,13 @@ interface GetMarketsDataApiResult {
       marketId: Address;
     };
   };
+  /** Parent tokens followed by child tokens — indexed against `marketsData`, never reordered. */
   wrappedTokens: Address[];
   payoutNumerators: string[];
+  /** Read on chain, so these are current even while Seer's indexer lags. */
+  parentMarket: L1MarketLevel;
+  /** The nested "Other repositories" market, collateralized in the parent's outcome-66 token. */
+  otherMarket: L1MarketLevel;
   charts: {
     [key: string]: ChartWithMarketData;
   } | null;

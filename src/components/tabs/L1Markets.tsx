@@ -4,19 +4,26 @@ import { tradeDisabledReason } from "@/utils/contest";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
+import { useL1MarketsData } from "@/hooks/useL1MarketsData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
+import { useRedeemL1 } from "@/hooks/useRedeemL1";
 import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
+import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { PredictionRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
 import { parseCSV } from "@/utils/csvParser";
 import { formatAmount } from "@/utils/format";
+import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { sampleL1Predictions } from "@/utils/sampleL1Predictions";
+import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
+import { Address } from "viem";
 import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { L1MarketTable } from "../L1MarketTable";
+import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
 
@@ -52,6 +59,7 @@ export const L1Markets = () => {
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
 
   const {
     data: tableData,
@@ -64,6 +72,40 @@ export const L1Markets = () => {
   } = useProcessL1Predictions(predictions);
 
   const sellAll = useSellL1ToCollateral();
+  const redeem = useRedeemL1();
+
+  // Redeem needs each level's tokens in outcome order. `tableData` is sorted by price and mixes
+  // both markets, so a row index no longer matches an on-chain outcome index.
+  // React Query dedupes this read with useProcessL1Predictions.
+  const { data: l1Data } = useL1MarketsData();
+  const parentTokens = useMemo(
+    () => l1Data?.parentMarket.wrappedTokens ?? [],
+    [l1Data?.parentMarket.wrappedTokens],
+  );
+  const otherTokens = useMemo(
+    () => l1Data?.otherMarket.wrappedTokens ?? [],
+    [l1Data?.otherMarket.wrappedTokens],
+  );
+
+  const { data: parentBalances, isLoading: isLoadingParentBalances } = useTokensBalances(
+    tradeExecutor as Address,
+    parentTokens,
+  );
+  const { data: otherBalances, isLoading: isLoadingOtherBalances } = useTokensBalances(
+    tradeExecutor as Address,
+    otherTokens,
+  );
+
+  // Each level settles on its own Reality questions, so each is gated on its own status.
+  const parentClosed = l1Data?.parentMarket.marketStatus === MarketStatus.CLOSED;
+  const otherClosed = l1Data?.otherMarket.marketStatus === MarketStatus.CLOSED;
+
+  const hasRedeemable = useMemo(
+    () =>
+      (parentClosed && (parentBalances ?? []).some((b) => b > 0n)) ||
+      (otherClosed && (otherBalances ?? []).some((b) => b > 0n)),
+    [parentClosed, otherClosed, parentBalances, otherBalances],
+  );
 
   const volumeLabel = useMemo(() => {
     const volumeString = Object.values(totalVolumeMapping ?? {})[0];
@@ -98,6 +140,16 @@ export const L1Markets = () => {
     () => !!tableData?.filter((row) => row.currentPrice && row.balance)?.length,
     [tableData],
   );
+
+  const handleRedeem = useCallback(() => {
+    if (!tradeExecutor) return;
+    // A level that has not closed is left out entirely rather than attempted and reverted.
+    redeem.mutate({
+      tradeExecutor,
+      otherMarket: otherClosed && l1Data ? l1Data.otherMarket : undefined,
+      parentTokens: parentClosed ? parentTokens : undefined,
+    });
+  }, [tradeExecutor, redeem, otherClosed, parentClosed, l1Data, parentTokens]);
 
   const handleSellAll = useCallback(() => {
     if (!tableData || !tradeExecutor) return;
@@ -150,6 +202,17 @@ export const L1Markets = () => {
     isLoading,
   });
 
+  // Only a *confident* "nothing to claim" hides the button — see `@/utils/redeem`.
+  const redeemState = redeemAvailability({
+    hasRedeemable,
+    isResolved:
+      !isLoading &&
+      !isLoadingBalances &&
+      l1Data !== undefined &&
+      balancesResolved(parentBalances, parentTokens) &&
+      balancesResolved(otherBalances, otherTokens),
+  });
+
   return (
     <>
       <ContestChart
@@ -165,25 +228,40 @@ export const L1Markets = () => {
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
         actions={
-          canTrade && !finished && (
+          canTrade && (
             <>
-              <Button
-                size="sm"
-                onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
-                disabled={!hasSellTokens}
-                disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
-              >
-                Sell all positions
-              </Button>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => startTransition(() => setIsTradeDialogOpen(true))}
-                disabled={!!disabledReason || !account}
-                disabledReason={disabledReason}
-              >
-                Start trading
-              </Button>
+              {/* Trading stops with the contest; claiming what you already hold does not. */}
+              {!finished && (
+                <Button
+                  size="sm"
+                  onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
+                  disabled={!hasSellTokens}
+                  disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
+                >
+                  Sell all positions
+                </Button>
+              )}
+              {redeemState === "some" && (
+                <Button
+                  size="sm"
+                  variant="success"
+                  onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                  disabled={!account}
+                >
+                  Redeem to sUSDS
+                </Button>
+              )}
+              {!finished && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => startTransition(() => setIsTradeDialogOpen(true))}
+                  disabled={!!disabledReason || !account}
+                  disabledReason={disabledReason}
+                >
+                  Start trading
+                </Button>
+              )}
             </>
           )
         }
@@ -229,6 +307,22 @@ export const L1Markets = () => {
         onSellAll={handleSellAll}
         isLoading={isLoading || isLoadingBalances}
         hasTokens={hasSellTokens}
+      />
+
+      <RedeemL2Interface
+        open={isRedeemDialogOpen}
+        onOpenChange={setIsRedeemDialogOpen}
+        isError={redeem.isError}
+        error={redeem.error}
+        isPending={redeem.isPending}
+        isSuccess={redeem.isSuccess}
+        progress={redeem.progress}
+        reset={redeem.reset}
+        onRedeem={handleRedeem}
+        isLoading={
+          isLoading || isLoadingBalances || isLoadingParentBalances || isLoadingOtherBalances
+        }
+        hasRedeemable={hasRedeemable}
       />
     </>
   );
