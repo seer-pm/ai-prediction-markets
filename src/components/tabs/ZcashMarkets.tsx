@@ -30,27 +30,27 @@ import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 
 const ZCASH_CSV_FORMAT: CSVFormatInfo = {
-  headers: "project,approved",
-  exampleRows: ["Zcash Grants Hub,yes", "ZODL Q1 2026 Core Protocol Development,no"],
+  headers: "project,probability",
+  exampleRows: ["Zcash Grants Hub,0.82", "ZODL Q1 2026 Core Protocol Development,0.15"],
   description:
-    "One row per proposal. Put yes if you think coinholders will fund it, no if you don't. Leave a proposal out of the file if you have no view on it and it will not be traded.",
+    "One row per proposal, and how likely you think coinholders are to fund it — a number between 0 and 1, so 0.82 means 82%. Leave a proposal out of the file if you have no view on it and it will not be traded.",
 };
 
 const ZCASH_SAMPLE_CONFIG: SampleCsvConfig = {
   columns: [
     { key: "project", title: "project" },
-    { key: "approved", title: "approved" },
+    { key: "probability", title: "probability" },
   ],
   dataMapper: (row) => ({
     project: row.project,
-    approved: row.approved ? "yes" : "no",
+    probability: row.probability,
   }),
   sampleData: sampleZcashPredictions,
   filename: "zcash-predictions",
 };
 
 export const ZcashMarkets = () => {
-  const [predictions, setPredictions] = useLocalStorage<ZcashRow[]>("zcash-approved", []);
+  const [predictions, setPredictions] = useLocalStorage<ZcashRow[]>("zcash-probability", []);
   const { finished } = useContest();
   const { account, tradeExecutor, canTrade } = useTradeWalletStatus();
 
@@ -167,13 +167,13 @@ export const ZcashMarkets = () => {
     downloadCsv(
       [
         { key: "project", title: "project" },
-        { key: "approved", title: "approved" },
+        { key: "probability", title: "probability" },
       ],
-      // The market's own call, written in the format the upload expects: download it, edit the rows
-      // you disagree with, upload it back.
+      // The market's own number, written in the format the upload expects: download it, edit the
+      // rows you disagree with, upload it back.
       tableData.map((row) => ({
         project: row.project,
-        approved: (row.yesPrice ?? 0) >= 0.5 ? "yes" : "no",
+        probability: Number((row.yesPrice ?? 0).toFixed(4)),
       })),
       "zcash-market-view",
     );
@@ -184,8 +184,8 @@ export const ZcashMarkets = () => {
   const emptyState = useMemo(
     () => (
       <EmptyState
-        title="Say which grants get funded"
-        description="Upload a file marking each proposal yes or no. It sits next to the market price so you can see where you disagree."
+        title="Say how likely each grant is to get funded"
+        description="Upload a file giving each proposal a probability between 0 and 1. It sits next to the market price so you can see where you disagree."
       >
         <PredictionDropzone
           className="w-full max-w-lg"

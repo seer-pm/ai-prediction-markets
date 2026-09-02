@@ -177,6 +177,16 @@ const executeTradeStrategyContract = async ({
     await withdrawFundSessionKey();
     throw mintResult.error;
   }
+  // A stage with nothing to do says so, at the moment it is passed over. Staying silent left its
+  // row unchecked until the run finished and then ticked it along with every other silent stage,
+  // which reads as a ledger that was never running at all.
+  if (!didMint) {
+    onStateChange({
+      phase: "mint",
+      skipped: true,
+      label: "No sUSDS added — trading with the tokens you already hold.",
+    });
+  }
   const [balanceBefore] = await fetchTokensBalancesOrThrow(tradeExecutor, [collateral.address]);
   const sellInput = await getSellTradeExecutorCalls({
     amount,
@@ -184,6 +194,13 @@ const executeTradeStrategyContract = async ({
     tradeExecutor,
     tableData,
   });
+  if (!sellInput.length) {
+    onStateChange({
+      phase: "sell",
+      skipped: true,
+      label: "Nothing is priced above your weights.",
+    });
+  }
   const sellResult = await toastifyBatchTxSessionKey(
     tradeExecutor,
     sellInput,
@@ -213,6 +230,14 @@ const executeTradeStrategyContract = async ({
     tradeExecutor,
     tableData,
   });
+  // `buyInput` interleaves both stages, so which of them has work is known before it runs.
+  if (!buyInput.some((batch) => batch.phase === "merge")) {
+    onStateChange({
+      phase: "merge",
+      skipped: true,
+      label: "No complete sets left over to merge.",
+    });
+  }
   const buyResult = await toastifyBatchTxSessionKey(
     tradeExecutor,
     buyInput,
@@ -223,6 +248,16 @@ const executeTradeStrategyContract = async ({
     await withdrawFundSessionKey();
     throw buyResult.error;
   }
+  if (!buyInput.some((batch) => batch.phase === "buy")) {
+    onStateChange({
+      phase: "buy",
+      skipped: true,
+      label: "Nothing is priced below your weights.",
+    });
+  }
+  // The refund is the last thing the run does and it takes a few seconds. Reporting it is what
+  // makes the ledger finish one row at a time instead of flipping the tail of the list at once.
+  onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
   toastSuccess({ title: "Strategy executed" });
   return buyResult;

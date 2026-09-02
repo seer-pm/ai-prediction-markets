@@ -1,8 +1,9 @@
 import { UniswapQuoteTradeResult, ZcashQuoteResult, ZcashTableData } from "@/types";
 import { CHAIN_ID, DECIMALS, VOLUME_MIN } from "@/utils/constants";
+import type { DualBuyPlan, DualSellPlan, PairedPlan } from "@/utils/zcashBudget";
 import {
   hasZcashEdge,
-  planPairedLegs,
+  planZcashLegs,
   sideBalance,
   sideDifference,
   sideIndex,
@@ -17,12 +18,13 @@ import { getUniswapQuote } from "./getQuote";
  *
  * Two things make this different from every other contest's quote builder:
  *
- * 1. **Paired two-leg trades.** Each market has two pools (YES/sUSDS and NO/sUSDS) that price the
+ * 1. **Two-leg trades, always.** Each market has two pools (YES/sUSDS and NO/sUSDS) that price the
  *    same question. Moving only one of them leaves YES+NO away from 1 — an arbitrage handed to
- *    whoever notices first. So the normal branch moves *both* pools toward the call: buy the side
- *    the user picked with cash, and mint-then-sell the side they picked against. When the budget
- *    cannot fund the full move, both legs are scaled by the same factor so a partial move still
- *    lands near a sum of 1.
+ *    whoever notices first. So every branch moves *both* pools toward the user's number: sell a
+ *    side trading above it, buy a side trading below it, and mint complete sets when a sell needs
+ *    tokens that are not already held. Which of the three shapes a row takes is decided by
+ *    `planZcashLegs`. When the budget cannot fund the full move, both legs are scaled by the same
+ *    factor so a partial move still lands near a sum of 1.
  *
  * 2. **No parent market.** These are top-level markets collateralized in sUSDS, so minting a
  *    complete set in one market does nothing for the other 36. The mint budget is divided across
@@ -116,20 +118,18 @@ const arbSellZcashQuotes = async ({
 };
 
 /**
- * The normal case: the side the user picked is cheaper than their call, the other side is richer.
- * Move both pools. Sizing lives in `planPairedLegs` (`utils/zcashBudget`); this only turns the plan
- * into quotes.
+ * The pools straddle the user's number: one side is cheap, the other is rich. Move both. Sizing
+ * lives in `planPaired` (`utils/zcashBudget`); this only turns the plan into quotes.
  */
 const pairedZcashQuotes = async ({
   account,
   row,
+  plan,
 }: {
   account: Address;
   row: ZcashTableData;
+  plan: PairedPlan;
 }): Promise<ZcashQuoteResult | null> => {
-  const plan = planPairedLegs(row);
-  if (!plan) return null;
-
   const sellQuote = await quoteLeg({
     account,
     row,
@@ -160,12 +160,62 @@ const pairedZcashQuotes = async ({
 };
 
 /**
+ * Both pools trade below the user's number, so both sides are cheap: buy each with cash. No mint —
+ * a complete set costs exactly 1, and the pair together costs less than that, which is the whole
+ * reason this shape exists.
+ */
+const dualBuyZcashQuotes = async ({
+  account,
+  row,
+  plan,
+}: {
+  account: Address;
+  row: ZcashTableData;
+  plan: DualBuyPlan;
+}): Promise<ZcashQuoteResult | null> => {
+  const [yesQuote, noQuote] = await Promise.all([
+    quoteLeg({ account, row, side: "YES", action: "buy", volume: plan.yesVolume }),
+    quoteLeg({ account, row, side: "NO", action: "buy", volume: plan.noVolume }),
+  ]);
+
+  const quotes = [yesQuote, noQuote].filter(Boolean) as UniswapQuoteTradeResult[];
+  if (!quotes.length) return null;
+
+  return { quoteType: "dual-buy", quotes, row };
+};
+
+/**
+ * Both pools trade above the user's number, so both sides are rich: sell each down toward it.
+ * `planDualSell` has already decided how much of that comes from balance and how much has to be
+ * minted, so this only turns the plan into quotes.
+ */
+const dualSellZcashQuotes = async ({
+  account,
+  row,
+  plan,
+}: {
+  account: Address;
+  row: ZcashTableData;
+  plan: DualSellPlan;
+}): Promise<ZcashQuoteResult | null> => {
+  const [yesQuote, noQuote] = await Promise.all([
+    quoteLeg({ account, row, side: "YES", action: "sell", volume: plan.yesVolume }),
+    quoteLeg({ account, row, side: "NO", action: "sell", volume: plan.noVolume }),
+  ]);
+
+  const quotes = [yesQuote, noQuote].filter(Boolean) as UniswapQuoteTradeResult[];
+  if (!quotes.length) return null;
+
+  return { quoteType: "dual-sell", quotes, row, mintAmount: toAmount(plan.mintAmount) };
+};
+
+/**
  * Pick one plan per market. The arbitrage is tried first because its profit does not depend on the
- * call being right; only if there is no arb to take does the call decide anything.
+ * user's number being right; only if there is no arb to take does the number decide anything.
  *
- * There are only two plans. A yes/no call is clamped by direction in `useProcessZcashPredictions`,
- * so the two differences can never share a sign — the "both sides cheap" and "both sides rich"
- * cases the probability model could produce are unreachable here.
+ * Which of the three prediction-driven shapes applies is `planZcashLegs`'s call — a probability can
+ * land on either side of either pool, so all three sign pairs are reachable here in a way they were
+ * not under the old yes/no model.
  */
 const compareZcashQuotes = async ({
   account,
@@ -179,7 +229,17 @@ const compareZcashQuotes = async ({
 
   if (!row.hasPrediction) return null;
 
-  return pairedZcashQuotes({ account, row });
+  const plan = planZcashLegs(row);
+  if (!plan) return null;
+
+  switch (plan.kind) {
+    case "dual-buy":
+      return dualBuyZcashQuotes({ account, row, plan });
+    case "dual-sell":
+      return dualSellZcashQuotes({ account, row, plan });
+    case "paired":
+      return pairedZcashQuotes({ account, row, plan });
+  }
 };
 
 /**

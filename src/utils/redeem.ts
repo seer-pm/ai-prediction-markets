@@ -33,3 +33,49 @@ export function redeemAvailability(args: {
 export function balancesResolved(balances: readonly bigint[] | undefined, tokens: readonly unknown[]): boolean {
   return tokens.length === 0 || balances?.length === tokens.length;
 }
+
+/**
+ * What one outcome token of a market settles at, per outcome, as a fraction of the market's
+ * collateral.
+ *
+ * The denominator is the sum of the reported numerators — that is exactly what the CTF stores in
+ * `payoutDenominator` when `reportPayouts` runs, so this needs no extra chain read. An unresolved
+ * market reports all-zero numerators, which falls out as all-zero ratios rather than a division by
+ * zero.
+ */
+export function payoutRatios(payoutNumerators: readonly string[] | undefined): number[] {
+  if (!payoutNumerators?.length) return [];
+  const denominator = payoutNumerators.reduce((sum, numerator) => sum + Number(numerator), 0);
+  if (!denominator) return payoutNumerators.map(() => 0);
+  return payoutNumerators.map((numerator) => Number(numerator) / denominator);
+}
+
+/**
+ * Settlement value of a held balance set, in whole collateral units.
+ *
+ * `balances` and `ratios` are both indexed by outcome, which is the order `wrappedTokens` comes
+ * back in. Positions with a zero payout contribute nothing, so losing outcomes drop out on their
+ * own — no filtering needed at the call site.
+ */
+export function redeemableValue(
+  balances: readonly bigint[] | undefined,
+  ratios: readonly number[],
+  decimals: number,
+): number {
+  if (!balances?.length) return 0;
+  const unit = 10 ** decimals;
+  return balances.reduce((sum, balance, index) => {
+    const ratio = ratios[index] ?? 0;
+    if (ratio <= 0 || balance <= 0n) return sum;
+    return sum + (Number(balance) / unit) * ratio;
+  }, 0);
+}
+
+/** How many outcomes the wallet holds that actually pay out — what the estimate is made of. */
+export function winningPositionCount(
+  balances: readonly bigint[] | undefined,
+  ratios: readonly number[],
+): number {
+  if (!balances?.length) return 0;
+  return balances.filter((balance, index) => balance > 0n && (ratios[index] ?? 0) > 0).length;
+}

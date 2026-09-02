@@ -77,7 +77,10 @@ async function redeemL1({
       );
       const input: CallBatchesInput = batches.map((calls, i) => ({
         calls,
-        message: "Redeeming Other repositories to parent tokens",
+        // User-facing copy stays neutral about the two levels. L1 is one contest as far as anyone
+        // trading it is concerned; "Other repositories" and "parent tokens" are an implementation
+        // detail of how the claim is settled, and naming them mid-run only raises questions.
+        message: "Claiming your settled positions",
         phase: "redeem",
         step: i + 1,
         of: batches.length,
@@ -94,7 +97,7 @@ async function redeemL1({
   // ── Phase 2: parent outcome tokens → sUSDS ──
   // Read after phase 1, which mints the outcome-66 token this phase then redeems.
   if (parentTokens && parentTokens.length > 0) {
-    onStateChange({ phase: "redeem", label: "Reading parent token balances" });
+    onStateChange({ phase: "redeem", label: "Reading your balances" });
     const balances = await fetchTokensBalances(tradeExecutor, parentTokens);
     const { tokens, outcomeIndexes, amounts } = selectHeldOutcomes(parentTokens, balances);
 
@@ -110,7 +113,7 @@ async function redeemL1({
       );
       const input: CallBatchesInput = batches.map((calls, i) => ({
         calls,
-        message: "Redeeming parent market to sUSDS",
+        message: "Converting your payout to sUSDS",
         phase: "redeem",
         step: i + 1,
         of: batches.length,

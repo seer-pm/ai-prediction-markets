@@ -9,6 +9,13 @@ interface L1MarketLevel {
   id: Address;
   wrappedTokens: Address[];
   marketStatus: MarketStatus;
+  /**
+   * In outcome order, so `payoutRatios` can price a claim. Optional: the persisted cache can
+   * restore a snapshot written before this field existed.
+   */
+  payoutNumerators?: string[];
+  /** Child level only — the parent outcome whose token collateralizes it. */
+  parentOutcome?: number;
 }
 
 interface GetMarketsDataApiResult {

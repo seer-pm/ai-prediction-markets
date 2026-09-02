@@ -1,5 +1,5 @@
 import { ZcashRow, ZcashTableData } from "@/types";
-import { ARB_SUM_THRESHOLD, ZCASH_TARGET_PRICE } from "@/utils/constants";
+import { ARB_SUM_THRESHOLD, MIN_PRICE } from "@/utils/constants";
 import { getZcashMarketByTitle, NO_INDEX, YES_INDEX } from "@/utils/zcashMarkets";
 import { useMemo } from "react";
 import { zeroAddress } from "viem";
@@ -16,9 +16,10 @@ import { useZcashMarketsData } from "./useZcashMarketsData";
  * market* rather than across the contest. That is the Originality model, not the Octant/L1 one
  * where every outcome competes for a share of a single pot.
  *
- * The CSV carries a yes/no call, not a number. `ZCASH_TARGET_PRICE` turns that call into the price
- * each pool is aimed at, and the differences below are clamped so a row never trades against its
- * own call.
+ * The CSV carries a probability, so the prediction *is* the price the YES pool is aimed at and its
+ * complement is the NO target. Nothing is clamped by direction: unlike a yes/no call, a number can
+ * legitimately sit above one pool and below the other, and both differences can share a sign when
+ * YES+NO is away from 1. `getZcashQuote` is what decides which shape that is.
  */
 export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
   const { address: account } = useAccount();
@@ -119,7 +120,7 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
       if (!prediction) {
         return {
           ...base,
-          predictedApproved: null,
+          predictedProbability: null,
           yesDifference: null,
           noDifference: null,
           hasPrediction: false,
@@ -128,26 +129,22 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
         };
       }
 
-      // A yes/no call has no number of its own, so it aims each pool at `ZCASH_TARGET_PRICE`.
-      const target = prediction.approved ? ZCASH_TARGET_PRICE : 1 - ZCASH_TARGET_PRICE;
+      // The prediction is the YES target price outright. `MIN_PRICE` keeps the bound off the
+      // extremes — a pool cannot be sold to 0 — the same guard `useProcessOriginalityPredictions`
+      // applies to its scalar pairs.
+      const yesTarget = Math.min(Math.max(prediction.probability, MIN_PRICE), 1 - MIN_PRICE);
+      const noTarget = 1 - yesTarget;
 
-      // Clamped by direction so a call can never trade against itself. An approve on a market
-      // already above the target clamps to 0 on both sides, drops out of `isZcashRowFundable` and
-      // is skipped — rather than selling YES on a proposal the user just said would pass.
-      const rawYes = yesPrice === null ? null : target - yesPrice;
-      const rawNo = noPrice === null ? null : 1 - target - noPrice;
-      const yesDifference =
-        rawYes === null ? null : prediction.approved ? Math.max(0, rawYes) : Math.min(0, rawYes);
-      const noDifference =
-        rawNo === null ? null : prediction.approved ? Math.min(0, rawNo) : Math.max(0, rawNo);
+      const yesDifference = yesPrice === null ? null : yesTarget - yesPrice;
+      const noDifference = noPrice === null ? null : noTarget - noPrice;
       // `!= null` rather than a truthiness check: a difference of exactly 0 is a real answer
-      // ("this side is already where the call would put it") and must not be confused with "no
-      // price". With a clamped target that is the common case, not an edge case.
+      // ("this side is already where the number would put it") and must not be confused with "no
+      // price".
       const volumeUntilYesPrice =
         yesPool && yesDifference != null && yesDifference !== 0 && market
           ? getVolumeUntilPrice(
               yesPool,
-              target,
+              yesTarget,
               market.wrappedTokens[YES_INDEX],
               yesDifference > 0 ? "buy" : "sell",
             )
@@ -156,7 +153,7 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
         noPool && noDifference != null && noDifference !== 0 && market
           ? getVolumeUntilPrice(
               noPool,
-              1 - target,
+              noTarget,
               market.wrappedTokens[NO_INDEX],
               noDifference > 0 ? "buy" : "sell",
             )
@@ -164,7 +161,7 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
 
       return {
         ...base,
-        predictedApproved: prediction.approved,
+        predictedProbability: prediction.probability,
         yesDifference,
         noDifference,
         hasPrediction: true,

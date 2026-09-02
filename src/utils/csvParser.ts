@@ -276,20 +276,31 @@ export const parseL2CSV = (csvText: string): L2Row[] => {
 };
 
 /**
- * The accepted spellings of a yes/no call. Whatever a spreadsheet exports — a TRUE from a checkbox
- * column, a 1 from a numeric one, the word someone typed — should not be a parse error.
+ * The yes/no spellings this file used to accept. Kept only to recognise a stale file and say so
+ * plainly, rather than failing it with "not a valid number".
  */
-const APPROVED_VALUES = new Set(["yes", "y", "true", "1", "approve", "approved"]);
-const REJECTED_VALUES = new Set(["no", "n", "false", "0", "reject", "rejected"]);
+const LEGACY_YES_NO_VALUES = new Set([
+  "yes",
+  "y",
+  "true",
+  "approve",
+  "approved",
+  "no",
+  "n",
+  "false",
+  "reject",
+  "rejected",
+]);
 
 /**
- * Zcash predictions: one row per proposal, and whether you think coinholders will approve it.
+ * Zcash predictions: one row per proposal, and how likely you think coinholders are to approve it.
  *
- * A yes/no call rather than a probability, because that is the only decision on the ballot. Rows may
- * be left out entirely: a proposal with no row gets no prediction and is never traded, which is how
- * you say "no view" without inventing a number. The project name is validated against the ballot
- * (`ZCASH_MARKETS`) rather than being matched loosely later — a typo here would otherwise surface as
- * a silently untraded row.
+ * A probability in [0, 1] rather than a yes/no call — the number *is* the price each pool is aimed
+ * at, so 0.82 says "82% likely" and lands the YES pool there. Rows may be left out entirely: a
+ * proposal with no row gets no prediction and is never traded, which is how you say "no view"
+ * without inventing a number. The project name is validated against the ballot (`ZCASH_MARKETS`)
+ * rather than being matched loosely later — a typo here would otherwise surface as a silently
+ * untraded row.
  */
 export const parseZcashCSV = (csvText: string): ZcashRow[] => {
   const lines = csvText.trim().split("\n");
@@ -301,11 +312,11 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
   const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
 
   if (headers.length !== 2) {
-    throw new Error("CSV must have exactly 2 columns: project, approved");
+    throw new Error("CSV must have exactly 2 columns: project, probability");
   }
 
-  if (!headers.includes("project") || !headers.includes("approved")) {
-    throw new Error("CSV must have columns: project, approved");
+  if (!headers.includes("project") || !headers.includes("probability")) {
+    throw new Error("CSV must have columns: project, probability");
   }
 
   const seenProjects = new Set<string>();
@@ -322,9 +333,9 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
     }
 
     const project = values[0];
-    const approvedStr = values[1];
+    const probabilityStr = values[1];
 
-    if (!project || !approvedStr) {
+    if (!project || !probabilityStr) {
       throw new Error(`Row ${i + 1}: All columns must have values`);
     }
 
@@ -342,16 +353,28 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
     }
     seenProjects.add(market.title);
 
-    const answer = approvedStr.toLowerCase();
-    if (!APPROVED_VALUES.has(answer) && !REJECTED_VALUES.has(answer)) {
+    // A file from the old format would otherwise fail as "not a valid number", which says nothing
+    // about what changed.
+    if (LEGACY_YES_NO_VALUES.has(probabilityStr.toLowerCase())) {
       throw new Error(
-        `Row ${i + 1}: "${approvedStr}" is not a yes or no. Use yes if you think the grant gets approved, no if you don't.`,
+        `Row ${i + 1}: this file uses the old yes/no format. Give a probability between 0 and 1 instead — 0.82 means you think the grant is 82% likely to be approved.`,
+      );
+    }
+
+    const probability = parseFloat(probabilityStr);
+    if (isNaN(probability)) {
+      throw new Error(`Row ${i + 1}: Probability "${probabilityStr}" is not a valid number`);
+    }
+
+    if (probability < 0 || probability > 1) {
+      throw new Error(
+        `Row ${i + 1}: Probability must be between 0 and 1 — write 82% as 0.82, not 82`,
       );
     }
 
     results.push({
       project: market.title,
-      approved: APPROVED_VALUES.has(answer),
+      probability,
     });
   }
 

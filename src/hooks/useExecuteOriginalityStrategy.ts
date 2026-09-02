@@ -195,6 +195,7 @@ const executeOriginalityStrategy = async ({
     throw result.error;
   }
 
+  onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
   toastSuccess({ title: "Strategy executed" });
   return result;

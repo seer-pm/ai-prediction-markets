@@ -89,6 +89,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
             phases={SELL_ALL_PHASES}
             current={progress.current}
             completed={progress.completed}
+            skipped={progress.skipped}
             status={status}
           />
         )}

@@ -421,6 +421,9 @@ const executeL2StrategyContract = async ({
     await withdrawFundSessionKey();
     throw buyResult.error;
   }
+  // The gas refund is the run's last few seconds; unreported, the ledger's final row only ticked
+  // when the mutation resolved, taking every quiet stage with it. Same event as `useRedeemL1`.
+  onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
   toastSuccess({ title: "Strategy executed" });
   return buyResult;

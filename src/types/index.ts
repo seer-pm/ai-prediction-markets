@@ -26,8 +26,8 @@ export interface OctantRow {
 
 export interface ZcashRow {
   project: string;
-  /** The user's call: will coinholders approve this grant? */
-  approved: boolean;
+  /** The user's estimate, in [0, 1], that coinholders approve this grant. */
+  probability: number;
 }
 
 export interface TableData {
@@ -78,8 +78,8 @@ export interface ZcashTableData {
   tier: string;
   yesPrice: number | null;
   noPrice: number | null;
-  /** The user's call from the CSV: approve, reject, or no view. */
-  predictedApproved: boolean | null;
+  /** The user's number from the CSV, in [0, 1]. Null means no view. */
+  predictedProbability: number | null;
   yesDifference: number | null;
   noDifference: number | null;
   marketId: string;
@@ -99,7 +99,7 @@ export interface ZcashTableData {
   amount?: string;
 }
 
-export type ZcashQuoteType = "arb-sell" | "paired";
+export type ZcashQuoteType = "arb-sell" | "paired" | "dual-buy" | "dual-sell";
 
 export interface ZcashQuoteResult {
   quoteType: ZcashQuoteType;
@@ -252,6 +252,12 @@ export type TxProgress = {
   /** Batch counter within the phase, when there is more than one. */
   step?: number;
   of?: number;
+  /**
+   * This stage had nothing to do and was passed over. Reported explicitly so the ledger can say
+   * so at the moment it happens — a silent skip left the row unchecked until the run ended and
+   * then ticked it along with everything else, which reads as though nothing was happening.
+   */
+  skipped?: boolean;
 };
 
 export type TxStateChange = (progress: TxProgress) => void;

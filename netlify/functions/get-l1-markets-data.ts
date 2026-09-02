@@ -172,15 +172,22 @@ export default async (req: Request) => {
         // The redeem walks these two levels in turn, and needs each one's tokens in outcome order
         // (`wrappedTokens` above is a flat parent+child concat that `marketsData` is indexed
         // against, so it cannot be split back apart here).
+        // `payoutNumerators` and `parentOutcome` ride along per level so the redeem dialog can
+        // price what a claim pays out: a parent token settles at its share of the parent payout,
+        // and a child token at its share of the *carrier* — the parent's `parentOutcome` token
+        // that collateralizes the child.
         parentMarket: {
           id: onChainParent.id,
           wrappedTokens: onChainParent.wrappedTokens,
           marketStatus: onChainParent.marketStatus,
+          payoutNumerators: onChainParent.payoutNumerators,
         },
         otherMarket: {
           id: onChainOther.id,
           wrappedTokens: onChainOther.wrappedTokens,
           marketStatus: onChainOther.marketStatus,
+          payoutNumerators: onChainOther.payoutNumerators,
+          parentOutcome: onChainOther.parentOutcome,
         },
         totalVolumeMapping,
       }),

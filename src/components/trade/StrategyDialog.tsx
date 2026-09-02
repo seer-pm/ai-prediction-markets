@@ -180,6 +180,7 @@ export function StrategyDialog({
             phases={STRATEGY_PHASES}
             current={mutation.progress.current}
             completed={mutation.progress.completed}
+            skipped={mutation.progress.skipped}
             status={status}
           />
         )}

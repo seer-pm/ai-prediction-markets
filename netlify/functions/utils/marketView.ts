@@ -40,6 +40,8 @@ export interface MarketOnChain {
   collateralToken: Address;
   payoutReported: boolean;
   payoutNumerators: string[];
+  /** Which outcome of the parent market collateralizes this one. 0 when there is no parent. */
+  parentOutcome: number;
   marketStatus: ReturnType<typeof getMarketStatus>;
 }
 
@@ -68,6 +70,7 @@ export async function fetchMarketsOnChain(addresses: readonly Address[]): Promis
     collateralToken: market.collateralToken as Address,
     payoutReported: market.payoutReported,
     payoutNumerators: market.payoutNumerators.map((numerator) => numerator.toString()),
+    parentOutcome: Number(market.parentOutcome),
     // MarketView returns questions flat; `getMarketStatus` expects the subgraph's nested shape.
     marketStatus: getMarketStatus({
       payoutReported: market.payoutReported,

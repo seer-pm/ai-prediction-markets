@@ -13,9 +13,16 @@ import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { PredictionRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
+import { COLLATERAL_TOKENS, CHAIN_ID } from "@/utils/constants";
 import { parseCSV } from "@/utils/csvParser";
 import { formatAmount } from "@/utils/format";
-import { balancesResolved, redeemAvailability } from "@/utils/redeem";
+import {
+  balancesResolved,
+  payoutRatios,
+  redeemAvailability,
+  redeemableValue,
+  winningPositionCount,
+} from "@/utils/redeem";
 import { sampleL1Predictions } from "@/utils/sampleL1Predictions";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
@@ -104,6 +111,42 @@ export const L1Markets = () => {
   // Each level settles on its own Reality questions, so each is gated on its own status.
   const parentClosed = l1Data?.parentMarket?.marketStatus === MarketStatus.CLOSED;
   const otherClosed = l1Data?.otherMarket?.marketStatus === MarketStatus.CLOSED;
+
+  // What a claim is worth, level by level.
+  //
+  // A parent token settles at its share of the parent payout. A child token settles at its share of
+  // the *child* payout, but paid in the parent's outcome-`parentOutcome` token — the carrier that
+  // collateralizes the child — so its value chains through that outcome's own ratio. Same math as
+  // `scripts/exportL1Pnl.ts`; the redeem run does both hops back to back, so one figure covers it.
+  const parentRatios = useMemo(
+    () => payoutRatios(l1Data?.parentMarket?.payoutNumerators),
+    [l1Data?.parentMarket?.payoutNumerators],
+  );
+  const otherRatios = useMemo(() => {
+    const carrier = parentRatios[l1Data?.otherMarket?.parentOutcome ?? -1] ?? 0;
+    if (!carrier) return [];
+    return payoutRatios(l1Data?.otherMarket?.payoutNumerators).map((ratio) => ratio * carrier);
+  }, [parentRatios, l1Data?.otherMarket?.parentOutcome, l1Data?.otherMarket?.payoutNumerators]);
+
+  // Only a closed level is counted, matching exactly what `handleRedeem` will attempt.
+  const payout = useMemo(() => {
+    // No ratios for a level we would claim — a persisted snapshot written before the API carried
+    // them, or a child whose carrier outcome has not resolved, so its tokens cannot reach sUSDS in
+    // this run at all. We do not know what it pays, so the dialog says nothing rather than a zero.
+    if (parentClosed && parentRatios.length === 0) return undefined;
+    if (otherClosed && otherRatios.length === 0) return undefined;
+    const decimals = COLLATERAL_TOKENS[CHAIN_ID].primary.decimals;
+    const parent = parentClosed ? parentBalances : undefined;
+    const other = otherClosed ? otherBalances : undefined;
+    return {
+      amount:
+        redeemableValue(parent, parentRatios, decimals) +
+        redeemableValue(other, otherRatios, decimals),
+      positions:
+        winningPositionCount(parent, parentRatios) + winningPositionCount(other, otherRatios),
+      symbol: COLLATERAL_TOKENS[CHAIN_ID].primary.symbol,
+    };
+  }, [parentClosed, otherClosed, parentBalances, otherBalances, parentRatios, otherRatios]);
 
   const hasRedeemable = useMemo(
     () =>
@@ -331,6 +374,7 @@ export const L1Markets = () => {
           isLoading || isLoadingBalances || isLoadingParentBalances || isLoadingOtherBalances
         }
         hasRedeemable={hasRedeemable}
+        payout={payout}
       />
     </>
   );

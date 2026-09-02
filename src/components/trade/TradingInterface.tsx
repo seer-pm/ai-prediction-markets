@@ -87,10 +87,13 @@ export const TradingInterface: React.FC<TradingInterfaceProps> = ({
       }
       howItWorks={
         <ol className="list-inside list-decimal space-y-1.5 marker:font-medium marker:text-ink-3">
-          <li>Mint complete sets of the market with the sUSDS you supply.</li>
-          <li>Sell outcomes trading above your predicted weight, down to that weight.</li>
-          <li>Merge whatever complete sets remain back into sUSDS.</li>
-          <li>Spend the proceeds buying outcomes trading below your predicted weight.</li>
+          <li>Mint complete sets from your sUSDS input.</li>
+          <li>Sell repositories priced above your weight, down to your weight or your balance.</li>
+          <li>Merge leftover complete sets back to sUSDS.</li>
+          <li>
+            Split the proceeds across repositories priced below your weight, in proportion to the
+            gap, and buy each up to your weight.
+          </li>
         </ol>
       }
     />

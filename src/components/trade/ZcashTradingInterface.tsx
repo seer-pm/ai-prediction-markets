@@ -32,14 +32,15 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
   // the input; this is only ever read.
   const [amount, setAmount] = useState("");
 
-  // Counted over fundable rows only, so the three numbers reconcile: approve + reject = markets.
-  // A row the market already agrees with is in none of them.
-  const { fundableCount, approveCount, rejectCount } = useMemo(() => {
+  // Counted over fundable rows only. Unlike the old yes/no counts these do not have to sum to
+  // `fundableCount`: a row whose YES price already sits on the user's number, but whose NO side is
+  // rich enough to trade, is fundable and belongs to neither bucket.
+  const { fundableCount, aboveCount, belowCount } = useMemo(() => {
     const fundable = markets.filter(isZcashRowFundable);
     return {
       fundableCount: fundable.length,
-      approveCount: fundable.filter((market) => market.predictedApproved === true).length,
-      rejectCount: fundable.filter((market) => market.predictedApproved === false).length,
+      aboveCount: fundable.filter((market) => (market.yesDifference ?? 0) > 0).length,
+      belowCount: fundable.filter((market) => (market.yesDifference ?? 0) < 0).length,
     };
   }, [markets]);
 
@@ -52,8 +53,8 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
       title="Start trading"
       stats={[
         { label: "Markets", value: String(fundableCount) },
-        { label: "Approve", value: String(approveCount), tone: "long" },
-        { label: "Reject", value: String(rejectCount), tone: "short" },
+        { label: "Above market", value: String(aboveCount), tone: "long" },
+        { label: "Below market", value: String(belowCount), tone: "short" },
         {
           label: "Per market",
           value: Number(perMarket) > 0 ? `${formatAmount(perMarket)} ${collateral.symbol}` : "—",
@@ -65,7 +66,7 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
       onAmountChange={setAmount}
       blockedReason={
         fundableCount === 0
-          ? "The market already agrees with every call you made, so there is nothing to trade."
+          ? "Every prediction you gave already matches the market, so there is nothing to trade."
           : undefined
       }
       onSubmit={(value) =>
@@ -76,20 +77,29 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
         })
       }
       howItWorks={
-        <>
-          <p className="mb-2">
-            Your money is split evenly across the proposals you marked where the market still
-            disagrees with you.
-          </p>
-          <ol className="list-inside list-decimal space-y-1.5 marker:font-medium marker:text-ink-3">
-            <li>Sell anything you already hold on the side you are now betting against.</li>
-            <li>
-              Either buy the side you picked, or mint a complete set and sell the other side,
-              whichever leaves you with more outcome tokens.
-            </li>
-            <li>If yes and no together cost more than a dollar, mint and sell both.</li>
-          </ol>
-        </>
+        <ol className="list-inside list-decimal space-y-1.5 marker:font-medium marker:text-ink-3">
+          <li>
+            Sell tokens you already hold on a side priced above your prediction, down to your
+            prediction.
+          </li>
+          <li>
+            Divide the sUSDS input equally across the markets you predicted that are still off by
+            half a point or more. For each market, sUSDS from the first step will also be added
+            here, if any.
+          </li>
+          <li>
+            Where yes and no together cost more than 1.02, mint complete sets and sell both sides
+            until they sum to 1 — this ignores your prediction.
+          </li>
+          <li>
+            Otherwise move both pools to your prediction: buy a side priced below it, sell a side
+            priced above it, minting a complete set when your balance falls short.
+          </li>
+          <li>
+            When a market does not have enough sUSDS for the full move, both sides move the same
+            fraction of the way — never one side alone. Anything left over stays as sUSDS.
+          </li>
+        </ol>
       }
     />
   );

@@ -56,15 +56,6 @@ export const MIN_PRICE = 0.00000001;
 // the ~2% round-trip Uniswap fee (1% per leg).
 export const ARB_SUM_THRESHOLD = 0.02;
 
-/**
- * The price a Zcash prediction aims a pool at.
- *
- * A yes/no call carries no number, but `getVolumeUntilPrice` needs a target. 1.0 is unusable: the
- * volume to push a pool to certainty is unbounded. 0.95 is confident without being degenerate, and
- * it still leaves a real gap on a market trading at 0.9 — which is where the remaining money is.
- */
-export const ZCASH_TARGET_PRICE = 0.95;
-
 type CollateralTokensMap = Record<
   SupportedChain,
   { primary: Token; secondary: Token | undefined; swap?: Token[] }
