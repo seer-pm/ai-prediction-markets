@@ -81,11 +81,15 @@ export const shouldDehydrateQuery = (query: Parameters<typeof defaultShouldDehyd
   defaultShouldDehydrateQuery(query) && PERSISTED_QUERY_KEYS.has(query.queryKey[0] as string);
 
 /**
- * Bump on any shape change to a persisted query's data.
+ * Bump on any change to what a persisted query's data *means* — not just its shape.
  *
  * A restored snapshot is typed as the *current* shape but was written by whatever build stored it,
  * so a field added since then is missing at runtime and every unguarded read of it throws on first
  * paint — which is exactly how the L1 panel died when `parentMarket`/`otherMarket` were added.
  * A new buster makes the persister discard the old snapshot instead.
+ *
+ * Values count too, and that case is easier to miss because nothing crashes. Fixing how chart series
+ * are resampled left every client rendering its stored copy of the old curve, and a hard refresh does
+ * not help: IndexedDB survives it. The chart looked unfixed long after the fix shipped.
  */
-export const PERSIST_BUSTER = "charts-split-v1";
+export const PERSIST_BUSTER = "charts-series-v2";
