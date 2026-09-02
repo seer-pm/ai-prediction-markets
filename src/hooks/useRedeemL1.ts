@@ -8,6 +8,7 @@ import { Address } from "viem";
 import { chunkRedeemFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
 import { useTxProgress } from "./useTxProgress";
+import { REDEEMABLE_SCAN_KEY } from "./useRedeemableScan";
 
 interface RedeemL1Props {
   tradeExecutor: Address;
@@ -143,6 +144,9 @@ export const useRedeemL1 = (onSuccess?: () => unknown) => {
       // lazily-invalidated cache would leave it on screen until the next mount.
       queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
       queryClient.refetchQueries({ queryKey: ["useL1MarketsData"] });
+      // The wallet board advertises this claim from a cached scan; without this it keeps
+      // advertising one the user has just made.
+      queryClient.refetchQueries({ queryKey: [REDEEMABLE_SCAN_KEY] });
     },
   });
   return {

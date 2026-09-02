@@ -9,6 +9,7 @@ import { Address } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { chunkRedeemFromRouter, redeemFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalances } from "./useTokensBalances";
+import { REDEEMABLE_SCAN_KEY } from "./useRedeemableScan";
 
 interface RedeemOriginalityProps {
   tradeExecutor: Address;
@@ -168,6 +169,9 @@ export const useRedeemOriginality = (onSuccess?: () => unknown) => {
       // lazily-invalidated cache would leave it on screen until the next mount.
       queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
       queryClient.refetchQueries({ queryKey: ["fetchOriginalityMarketsData"] });
+      // The wallet board advertises this claim from a cached scan; without this it keeps
+      // advertising one the user has just made.
+      queryClient.refetchQueries({ queryKey: [REDEEMABLE_SCAN_KEY] });
     },
   });
   return {

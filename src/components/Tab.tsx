@@ -4,9 +4,10 @@ import { CheckIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { ContestProvider } from "./contest/ContestContext";
 import ErrorBoundary from "./ErrorBoundary";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useContestTabStore } from "@/stores/contestTabStore";
 import { cn } from "@/utils/cn";
 import { DEEP_CONTESTS, type Contest } from "@/utils/contests";
-import { startTransition, useState, type ComponentType } from "react";
+import { startTransition, useCallback, useEffect, useState, type ComponentType } from "react";
 import { AiMarkets } from "./tabs/AiMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
@@ -55,13 +56,30 @@ export const Tab = () => {
   // Once mounted, keep it alive (hidden) so useLocalStorage / useMemo state is preserved.
   const [visited, setVisited] = useState<Set<string>>(() => new Set([initial]));
 
-  const handleTabClick = (tabId: string) => {
-    startTransition(() => setActiveTab(tabId));
-    setStoredTab(tabId);
-    if (!visited.has(tabId)) {
-      setVisited((prev) => new Set([...prev, tabId]));
-    }
-  };
+  const handleTabClick = useCallback(
+    (tabId: string) => {
+      startTransition(() => setActiveTab(tabId));
+      setStoredTab(tabId);
+      if (!visited.has(tabId)) {
+        setVisited((prev) => new Set([...prev, tabId]));
+      }
+    },
+    [setStoredTab, visited],
+  );
+
+  /**
+   * Somewhere else asked for a contest — today the wallet board, pointing at an unclaimed payout.
+   * Routed through the same handler as a click so lazy-mounting and the stored tab cannot drift,
+   * and consumed immediately so it fires once rather than on every render.
+   */
+  const requestedTab = useContestTabStore((state) => state.requestedTab);
+  const clearRequest = useContestTabStore((state) => state.clearRequest);
+  useEffect(() => {
+    if (!requestedTab) return;
+    clearRequest();
+    // A contest hidden from the bar has no panel to show, so honouring it would blank the page.
+    if (TABS.some((tab) => tab.id === requestedTab)) handleTabClick(requestedTab);
+  }, [requestedTab, clearRequest, handleTabClick]);
 
   const activeArchived = ARCHIVED_TABS.find((tab) => tab.id === activeTab);
 

@@ -13,6 +13,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { writeContract } from "@wagmi/core";
 import { Address, encodeFunctionData } from "viem";
+import { REDEEMABLE_SCAN_KEY } from "./useRedeemableScan";
 
 interface RedeemProps {
   account: Address;
@@ -75,6 +76,9 @@ export const useRedeemToTradeExecutor = (onSuccess?: () => unknown) => {
       // Refetch, not invalidate: the redeem CTA now hides itself on a zero balance, and a
       // lazily-invalidated cache would leave it on screen until the next mount.
       queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
+      // The wallet board advertises this claim from a cached scan; without this it keeps
+      // advertising one the user has just made.
+      queryClient.refetchQueries({ queryKey: [REDEEMABLE_SCAN_KEY] });
     },
   });
 };

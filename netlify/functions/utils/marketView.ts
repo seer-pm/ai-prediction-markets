@@ -29,7 +29,7 @@ const MARKET_FACTORY = "0x886Ef0A78faBbAE942F1dA1791A8ed02a5aF8BC6" as const;
  * Deliberately not `readContractsInBatch` from `src/lib/on-chain`: that runs on the browser wagmi
  * config, which calls `createAppKit()` as an import side effect.
  */
-const publicClient = createPublicClient({ chain: optimism, transport: http(OPTIMISM_RPC) });
+export const publicClient = createPublicClient({ chain: optimism, transport: http(OPTIMISM_RPC) });
 
 export interface MarketOnChain {
   id: Address;

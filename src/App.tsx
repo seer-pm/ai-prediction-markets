@@ -9,7 +9,7 @@ import { LeaderboardPanel } from "./components/leaderboard/LeaderboardPanel";
 import { ProfileDialog } from "./components/profile/ProfileDialog";
 import { ReadinessRail } from "./components/ReadinessRail";
 import { Tab } from "./components/Tab";
-import { OldTradeWallet } from "./components/trade/OldTradeWallet";
+import { UnclaimedPayouts } from "./components/trade/UnclaimedPayouts";
 import { TradeWalletMenu } from "./components/trade/TradeWalletMenu";
 import { Button, Card, EmptyState, TooltipProvider } from "./components/ui";
 import { BookIcon } from "./components/ui/icons";
@@ -156,8 +156,10 @@ const AppContent: React.FC = () => {
 
       <main className={`${CONTAINER} flex-1 py-8`}>
         <div className="space-y-6 pb-16">
-          {/* Funds stranded in a deprecated wallet are worth surfacing on every page. */}
-          <OldTradeWallet />
+          {/* Settled payouts nobody has claimed. Renders nothing unless there are some, so it
+              costs no space on the common path — but nothing else in the app looks across
+              contests, so without it an archived contest's payout is never surfaced at all. */}
+          <UnclaimedPayouts onOpenMarkets={() => goTo("markets")} />
 
           {/* Once shown, a view stays mounted and toggles with `display`, like the contest panels
               inside Tab: unmounting would drop each contest's lazy-mount and local state, so a
