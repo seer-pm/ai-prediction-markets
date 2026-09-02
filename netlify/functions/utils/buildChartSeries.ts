@@ -109,22 +109,22 @@ function getLiquidityWindow(series: ChartWithMarketData[number]) {
   return { start: start as number, end: end as number };
 }
 
-function buildTimeline(all: ChartWithMarketData) {
-  let min = Infinity;
-  let max = -Infinity;
+/**
+ * The resampling grid for ONE series: from its first candle to the last hour it held liquidity.
+ *
+ * Deliberately per-series rather than per-chart. In the browser this grid used to span every series
+ * drawn together, which quietly made a series' extent depend on its neighbours — and the charts that
+ * merge one series per market (Zcash, Originality) drew a much earlier start than the charts that
+ * show a single market's outcomes. Precomputing per market cannot reproduce that, and should not
+ * try: a series' own candles are the only thing that should decide where its line begins.
+ */
+function buildTimeline(series: ChartWithMarketData[number]) {
+  const arr = series.poolHourDatas;
+  const window = getLiquidityWindow(series);
+  if (!arr.length || !window) return [];
 
-  all.forEach((o) => {
-    const window = getLiquidityWindow(o);
-    if (!window) return;
-
-    min = Math.min(min, window.start);
-    max = Math.max(max, window.end);
-  });
-
-  if (!isFinite(min) || !isFinite(max)) return [];
-
-  const start = Math.floor(min / INTERVAL) * INTERVAL;
-  const end = Math.ceil(max / INTERVAL) * INTERVAL;
+  const start = Math.floor(arr[0].periodStartUnix / INTERVAL) * INTERVAL;
+  const end = Math.ceil(window.end / INTERVAL) * INTERVAL;
 
   const timeline: number[] = [];
   for (let t = start; t <= end; t += INTERVAL) {
@@ -152,11 +152,9 @@ function getLastPrice(series: ChartWithMarketData[number]): number | null {
 }
 
 export function buildChartSeries(chartWithMarketData: ChartWithMarketData): ChartSeries[] {
-  const timeline = buildTimeline(chartWithMarketData);
-
   return chartWithMarketData.map((outcomeData) => {
-    const window = getLiquidityWindow(outcomeData);
-    const seriesEnd = window?.end ?? Infinity;
+    const timeline = buildTimeline(outcomeData);
+    const seriesEnd = getLiquidityWindow(outcomeData)?.end ?? Infinity;
 
     const timestamps = outcomeData.poolHourDatas.map((d) => d.periodStartUnix);
     const points: [number, number][] = [];
