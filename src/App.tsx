@@ -12,13 +12,17 @@ import { Tab } from "./components/Tab";
 import { OldTradeWallet } from "./components/trade/OldTradeWallet";
 import { TradeWalletMenu } from "./components/trade/TradeWalletMenu";
 import { Button, Card, EmptyState, TooltipProvider } from "./components/ui";
-import { BookIcon, ExternalIcon } from "./components/ui/icons";
+import { BookIcon } from "./components/ui/icons";
 import { WalletConnect } from "./components/WalletConnect";
-import { localStoragePersister, queryClient, shouldDehydrateQuery } from "./config/queryClient";
+import {
+  localStoragePersister,
+  PERSIST_BUSTER,
+  queryClient,
+  shouldDehydrateQuery,
+} from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
 import { cn } from "./utils/cn";
-import { SEER_MARKETS_URL } from "./utils/constants";
 
 const CONTAINER = "mx-auto w-full max-w-[86rem] px-4 sm:px-6 lg:px-8";
 
@@ -161,25 +165,10 @@ const AppContent: React.FC = () => {
           {mounted.has("markets") && (
             <div style={{ display: view === "markets" ? "block" : "none" }} className="space-y-6">
               <ReadinessRail />
+              {/* The Seer pointer used to live here, under every contest. It now renders inside
+                  each live contest panel (Tab.tsx), since it invites trading and a finished
+                  contest has none left to do. */}
               <Tab />
-
-              <div className="flex flex-col gap-3 rounded-lg bg-surface px-6 py-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-lede font-semibold text-ink">Trading one market at a time?</p>
-                  <p className="mt-1 text-body text-ink-3">
-                    Seer has the individual market view, liquidity provision and full analytics.
-                  </p>
-                </div>
-                <a
-                  href={SEER_MARKETS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-1.5 text-body font-semibold text-primary transition-colors hover:text-primary-hover"
-                >
-                  Browse on Seer
-                  <ExternalIcon width={13} height={13} />
-                </a>
-              </div>
             </div>
           )}
 
@@ -261,6 +250,7 @@ function App() {
         client={queryClient}
         persistOptions={{
           persister: localStoragePersister,
+          buster: PERSIST_BUSTER,
           dehydrateOptions: { shouldDehydrateQuery },
         }}
       >

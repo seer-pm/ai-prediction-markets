@@ -66,7 +66,7 @@ export const DEEP_CONTESTS = [
   },
   { id: "octant", label: "Octant", marketId: OCTANT_MARKET_ID, finished: true },
   { id: "round2-l2", label: "Round 2 · L2", marketId: L2_PARENT_MARKET_ID, finished: true },
-  { id: "round2-l1", label: "Round 2 · L1", marketId: L1_MARKET_ID, finished: false },
+  { id: "round2-l1", label: "Round 2 · L1", marketId: L1_MARKET_ID, finished: true },
   {
     id: "round2",
     label: "Round 2 · Originality",

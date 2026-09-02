@@ -81,3 +81,13 @@ const PERSISTED_QUERY_KEYS = new Set([
 
 export const shouldDehydrateQuery = (query: Parameters<typeof defaultShouldDehydrateQuery>[0]) =>
   defaultShouldDehydrateQuery(query) && PERSISTED_QUERY_KEYS.has(query.queryKey[0] as string);
+
+/**
+ * Bump on any shape change to a persisted query's data.
+ *
+ * A restored snapshot is typed as the *current* shape but was written by whatever build stored it,
+ * so a field added since then is missing at runtime and every unguarded read of it throws on first
+ * paint — which is exactly how the L1 panel died when `parentMarket`/`otherMarket` were added.
+ * A new buster makes the persister discard the old snapshot instead.
+ */
+export const PERSIST_BUSTER = "l1-levels-v1";

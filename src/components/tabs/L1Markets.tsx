@@ -77,14 +77,19 @@ export const L1Markets = () => {
   // Redeem needs each level's tokens in outcome order. `tableData` is sorted by price and mixes
   // both markets, so a row index no longer matches an on-chain outcome index.
   // React Query dedupes this read with useProcessL1Predictions.
+  //
+  // Optional all the way down, not just on `l1Data`: the query is persisted to localStorage, so a
+  // visitor whose cache was written before these two levels existed restores a `l1Data` that has
+  // neither, and the unguarded `.wrappedTokens` took the whole contest panel down on first paint —
+  // before the refetch that would have filled them in.
   const { data: l1Data } = useL1MarketsData();
   const parentTokens = useMemo(
-    () => l1Data?.parentMarket.wrappedTokens ?? [],
-    [l1Data?.parentMarket.wrappedTokens],
+    () => l1Data?.parentMarket?.wrappedTokens ?? [],
+    [l1Data?.parentMarket?.wrappedTokens],
   );
   const otherTokens = useMemo(
-    () => l1Data?.otherMarket.wrappedTokens ?? [],
-    [l1Data?.otherMarket.wrappedTokens],
+    () => l1Data?.otherMarket?.wrappedTokens ?? [],
+    [l1Data?.otherMarket?.wrappedTokens],
   );
 
   const { data: parentBalances, isLoading: isLoadingParentBalances } = useTokensBalances(
@@ -97,8 +102,8 @@ export const L1Markets = () => {
   );
 
   // Each level settles on its own Reality questions, so each is gated on its own status.
-  const parentClosed = l1Data?.parentMarket.marketStatus === MarketStatus.CLOSED;
-  const otherClosed = l1Data?.otherMarket.marketStatus === MarketStatus.CLOSED;
+  const parentClosed = l1Data?.parentMarket?.marketStatus === MarketStatus.CLOSED;
+  const otherClosed = l1Data?.otherMarket?.marketStatus === MarketStatus.CLOSED;
 
   const hasRedeemable = useMemo(
     () =>
@@ -208,7 +213,10 @@ export const L1Markets = () => {
     isResolved:
       !isLoading &&
       !isLoadingBalances &&
-      l1Data !== undefined &&
+      // Both levels, not just `l1Data`: a pre-redeem persisted snapshot restores without them, and
+      // the empty token lists would otherwise read as a confident "nothing to claim".
+      l1Data?.parentMarket !== undefined &&
+      l1Data?.otherMarket !== undefined &&
       balancesResolved(parentBalances, parentTokens) &&
       balancesResolved(otherBalances, otherTokens),
   });

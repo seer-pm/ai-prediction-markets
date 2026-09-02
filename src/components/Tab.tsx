@@ -13,6 +13,7 @@ import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
 import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
 import { ZcashMarkets } from "./tabs/ZcashMarkets";
+import { SeerPromo } from "./SeerPromo";
 
 /**
  * Which component renders each contest. The id / label / finished flag come from the shared
@@ -36,7 +37,9 @@ const TABS = DEEP_CONTESTS.filter((contest) => !(contest as Contest).hidden).map
 const LIVE_TABS = TABS.filter((tab) => !tab.finished);
 const ARCHIVED_TABS = TABS.filter((tab) => tab.finished);
 
-const DEFAULT_TAB: string = "round2-l1";
+// The live contest. Keep it in step with the `finished` flags in `@/utils/contests` — landing a
+// first-time visitor in the archive would be odd.
+const DEFAULT_TAB: string = "zcash";
 
 /**
  * Four of five contests have ended, so they sit in an archive menu rather than
@@ -155,6 +158,10 @@ export const Tab = () => {
                   <Component />
                 </ContestProvider>
               </ErrorBoundary>
+
+              {/* Outside the boundary, so a crashing contest still leaves the way out to Seer.
+                  A finished contest has no trading left to send anyone to. */}
+              {!finished && <SeerPromo />}
             </div>
           ) : null,
         )}
