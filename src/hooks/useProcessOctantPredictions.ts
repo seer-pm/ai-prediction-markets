@@ -113,7 +113,5 @@ export const useProcessOctantPredictions = (predictions: OctantRow[]) => {
     isFetching,
     isLoadingBalances,
     error,
-    charts: data.charts,
-    totalVolumeMapping: data.totalVolumeMapping,
   };
 };

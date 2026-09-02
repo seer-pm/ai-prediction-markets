@@ -6,6 +6,7 @@ import { ZcashTradingInterface } from "@/components/trade/ZcashTradingInterface"
 import { Button, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import { ZcashMarketTable } from "@/components/ZcashMarketTable";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useMarketCharts } from "@/hooks/useMarketCharts";
 import { useProcessZcashPredictions } from "@/hooks/useProcessZcashPredictions";
 import { useRedeemZcash } from "@/hooks/useRedeemZcash";
 import { useSellZcashToCollateral } from "@/hooks/useSellZcashToCollateral";
@@ -62,13 +63,15 @@ export const ZcashMarkets = () => {
   const {
     data: tableData,
     isLoading,
-    isFetching,
     isLoadingBalances,
     error,
-    charts,
     marketIdToProject,
-    totalVolumeMapping,
   } = useProcessZcashPredictions(predictions);
+
+  // 37 proposals share one chart, so they are fetched together rather than 37 times over.
+  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(
+    useMemo(() => Object.keys(marketIdToProject), [marketIdToProject]),
+  );
 
   // Raw market data for redeem scope (React Query dedupes with useProcessZcashPredictions).
   const { data: zcashMarketData } = useZcashMarketsData();
@@ -96,23 +99,16 @@ export const ZcashMarkets = () => {
   );
 
   const chartData = useMemo(() => {
-    if (!charts || !marketIdToProject) return undefined;
-    return Object.entries(charts).map(([marketId, chartWithMarketData]) => {
+    if (!charts) return undefined;
+    return Object.entries(marketIdToProject).flatMap(([marketId, project]) => {
       // Index 0 is YES — the number this pilot exists to publish.
-      const { poolHourDatas, collateral, outcomeId } = chartWithMarketData[YES_INDEX];
-      return {
-        poolHourDatas,
-        outcomeName: marketIdToProject[marketId],
-        collateral,
-        marketId,
-        outcomeId,
-      };
+      const series = charts[marketId.toLowerCase()]?.series[YES_INDEX];
+      return series ? [{ ...series, outcomeName: project }] : [];
     });
   }, [charts, marketIdToProject]);
 
   const volumeLabel = useMemo(() => {
-    if (!totalVolumeMapping) return undefined;
-    const entries = Object.values(totalVolumeMapping);
+    const entries = Object.values(charts ?? {}).map((chart) => chart.totalVolumeMarket);
     if (!entries.length) return undefined;
     const total = entries.reduce((acc, curr) => acc + Number(curr.split(" ")[0]), 0);
     return (
@@ -121,7 +117,7 @@ export const ZcashMarkets = () => {
         {entries.length} markets
       </>
     );
-  }, [totalVolumeMapping]);
+  }, [charts]);
 
   const hasSellTokens = useMemo(
     () => !!tableData?.filter((row) => row.yesBalance || row.noBalance)?.length,
@@ -215,7 +211,7 @@ export const ZcashMarkets = () => {
     <>
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
-        isLoading={isLoading || isFetching}
+        isLoading={isLoadingCharts}
         eyebrow="Zcash · Q3 2026"
         title="Approval odds over time"
         description="Each line is one proposal's YES price — the market's estimate of its chance of being approved."

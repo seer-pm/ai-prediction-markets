@@ -170,6 +170,7 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
       isFetching,
       isLoadingBalances,
       error,
+      marketIdToRepo,
     };
   }
 
@@ -179,8 +180,6 @@ export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) 
     isFetching,
     isLoadingBalances,
     error,
-    charts: data.charts,
     marketIdToRepo,
-    totalVolumeMapping: data.totalVolumeMapping,
   };
 };

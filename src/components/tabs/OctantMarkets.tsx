@@ -6,6 +6,7 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useMarketChart } from "@/hooks/useMarketCharts";
 import { useOctantMarketsData } from "@/hooks/useOctantMarketsData";
 import { useProcessOctantPredictions } from "@/hooks/useProcessOctantPredictions";
 import { useRedeemOctant } from "@/hooks/useRedeemOctant";
@@ -14,6 +15,7 @@ import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OctantRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
+import { OCTANT_MARKET_ID } from "@/utils/constants";
 import { parseOctantCSV } from "@/utils/csvParser";
 import { formatAmount, formatPercent } from "@/utils/format";
 import { sampleOctantPredictions } from "@/utils/sampleOctantPredictions";
@@ -59,12 +61,12 @@ export const OctantMarkets = () => {
   const {
     data: tableData,
     isLoading,
-    isFetching,
     isLoadingBalances,
     error,
-    charts,
-    totalVolumeMapping,
   } = useProcessOctantPredictions(predictions);
+
+  // Its own query, so the table need not wait on the price history — see `useMarketCharts`.
+  const { data: chart, isLoading: isLoadingChart } = useMarketChart(OCTANT_MARKET_ID);
 
   const sellAll = useSellOctantToCollateral();
   const redeem = useRedeemOctant();
@@ -100,22 +102,19 @@ export const OctantMarkets = () => {
   });
 
   const volumeLabel = useMemo(() => {
-    const volumeString = Object.values(totalVolumeMapping ?? {})[0];
-    if (!volumeString) return undefined;
-    const [volume] = volumeString.split(" ");
+    const [volume] = (chart?.totalVolumeMarket ?? "").split(" ");
+    if (!volume) return undefined;
     return (
       <>
         Volume <span className="font-mono text-ink">{formatAmount(Number(volume))} sUSDS</span>
       </>
     );
-  }, [totalVolumeMapping]);
+  }, [chart?.totalVolumeMarket]);
 
-  const chartData = useMemo(() => {
-    if (!charts) return undefined;
-    return Object.values(charts)[0].filter(
-      (x) => !x.outcomeName.toLowerCase().includes("invalid result"),
-    );
-  }, [charts]);
+  const chartData = useMemo(
+    () => chart?.series.filter((x) => !x.outcomeName.toLowerCase().includes("invalid result")),
+    [chart?.series],
+  );
 
   const tradableCount = useMemo(
     () => tableData?.filter((row) => row.difference).length ?? 0,
@@ -179,7 +178,7 @@ export const OctantMarkets = () => {
     <>
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
-        isLoading={isLoading || isFetching}
+        isLoading={isLoadingChart}
         eyebrow="Octant"
         title="Project funding share over time"
         volume={volumeLabel}

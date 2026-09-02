@@ -13,11 +13,10 @@ const SETTLE_MS = 1500;
  * slower; it runs in the gap afterwards instead.
  *
  * Three conditions, and the third is the one that is easy to miss: `PersistQueryClientProvider`
- * renders its children *while* it rehydrates the localStorage cache, and during that window no
+ * renders its children *while* it rehydrates the persisted cache, and during that window no
  * query has started yet — so `useIsFetching()` and `useIsMutating()` are both 0 and the page looks
- * idle at t=0, before it has done anything at all. The persisted blob here is deliberately large
- * (see the `charts`-stripping note in `@/config/queryClient`), so that window is not always short.
- * `useIsRestoring` closes it.
+ * idle at t=0, before it has done anything at all. Restoring reads a sizeable snapshot out of
+ * IndexedDB, so that window is not always short. `useIsRestoring` closes it.
  *
  * Latched: once true it stays true. Callers use it to *enable* a query, and a background refetch
  * flipping it back would disable that query mid-flight and throw away the answer.

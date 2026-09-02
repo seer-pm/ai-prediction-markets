@@ -17,41 +17,20 @@ export default async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   try {
     const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
-    // Market and chart data are independent — fetch concurrently.
-    const [
-      { data, error },
-      { data: chartData, error: chartError },
-    ] = await Promise.all([
-      supabase
-        .from("markets")
-        .select(
-          "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators,subgraph_data->payoutReported,subgraph_data->questions",
-        )
-        .eq("id", OCTANT_MARKET_ID)
-        .eq("chain_id", CHAIN_ID)
-        .single(),
-      supabase
-        .from("key_value")
-        .select("value")
-        .eq("key", `market_chart_hour_data_${OCTANT_MARKET_ID}_${CHAIN_ID}_deep_pm`)
-        .single(),
-    ]);
+    const { data, error } = await supabase
+      .from("markets")
+      .select(
+        "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutNumerators,subgraph_data->payoutReported,subgraph_data->questions",
+      )
+      .eq("id", OCTANT_MARKET_ID)
+      .eq("chain_id", CHAIN_ID)
+      .single();
     if (error) {
       throw error;
     }
     if (!data) {
       throw { message: "Market not found" };
     }
-    const charts = chartError
-      ? null
-      : {
-          [OCTANT_MARKET_ID]: chartData.value.chartData,
-        };
-    const totalVolumeMapping = chartError
-      ? null
-      : {
-          [OCTANT_MARKET_ID]: chartData.value.totalVolumeMarket,
-        };
     const wrappedTokens = data.wrappedTokens as Address[];
     const outcomesByMarket = (data.outcomes as string[]).map((outcome) => ({
       outcome,
@@ -136,12 +115,10 @@ export default async (req: Request) => {
     return new Response(
       JSON.stringify({
         marketsData: repoToPriceMapping,
-        charts,
         wrappedTokens,
         payoutNumerators: data.payoutNumerators,
         // Octant is a single flat market, so one status covers the whole contest.
         marketStatus: getMarketStatus(data as unknown as MarketStatusInput),
-        totalVolumeMapping,
       }),
       {
         status: 200,

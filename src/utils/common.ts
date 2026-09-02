@@ -19,8 +19,12 @@ export function getAppUrl() {
  * state on every chart rather than an error. Throwing instead lets React Query surface `error`, and
  * each contest tab already renders `ErrorPanel title="Market data could not be loaded"`.
  */
-export async function fetchAppJson<T>(functionName: string): Promise<T> {
-  const response = await fetch(`${getAppUrl()}/.netlify/functions/${functionName}`);
+export async function fetchAppJson<T>(
+  functionName: string,
+  searchParams?: Record<string, string>,
+): Promise<T> {
+  const search = searchParams ? `?${new URLSearchParams(searchParams)}` : "";
+  const response = await fetch(`${getAppUrl()}/.netlify/functions/${functionName}${search}`);
 
   if (!response.ok) {
     // Our own functions report `{ error }`; a crashed one gets Netlify's `{ errorMessage }`.

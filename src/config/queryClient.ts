@@ -1,6 +1,6 @@
 import { QueryClient, defaultShouldDehydrateQuery } from "@tanstack/react-query";
-import type { PersistedClient } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import { del, get, set } from "idb-keyval";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,32 +26,27 @@ const reviver = (_key: string, value: unknown) =>
     ? BigInt(value.slice(BIGINT_TAG.length))
     : value;
 
-// The market-data queries (L1/Originality/L2) embed huge `charts` history
-// (~5MB, ~5MB and ~86MB respectively) that blows past the ~5MB localStorage
-// quota — setItem throws QuotaExceededError and aborts the whole persist, so
-// nothing is restored on reload. Charts are display-only and refetched on
-// mount, so we drop them from the persisted snapshot while keeping them live in
-// memory. The query data restores without `charts` (undefined), then the
-// background refetch repopulates it. We shallow-clone the affected paths so the
-// in-memory cache is never mutated.
-const stripChartsForPersist = (client: PersistedClient): PersistedClient => ({
-  ...client,
-  clientState: {
-    ...client.clientState,
-    queries: client.clientState.queries.map((query) => {
-      const data = query.state?.data;
-      if (data && typeof data === "object" && "charts" in data) {
-        const { charts: _charts, ...rest } = data as Record<string, unknown>;
-        return { ...query, state: { ...query.state, data: rest } };
-      }
-      return query;
-    }),
-  },
-});
+/**
+ * IndexedDB, not localStorage.
+ *
+ * localStorage's ~5MB ceiling is a hard wall: one oversized entry makes `setItem` throw
+ * QuotaExceededError, which aborts the *whole* persist, so nothing at all is restored on reload.
+ * Chart history used to blow past it, and the workaround — stripping charts out of the snapshot —
+ * meant every market-data query had to refetch on mount to fill the hole back in.
+ *
+ * Charts are now precomputed and small, but the browsing pattern still accumulates: forty L2
+ * repositories and thirty-seven Zcash proposals each cache their own series. IndexedDB has room for
+ * that, and the async persister already speaks to a promise-based store, so this is a drop-in.
+ */
+const idbStorage = {
+  getItem: (key: string) => get<string>(key).then((value) => value ?? null),
+  setItem: (key: string, value: string) => set(key, value),
+  removeItem: (key: string) => del(key),
+};
 
-export const localStoragePersister = createAsyncStoragePersister({
-  storage: window.localStorage,
-  serialize: (client) => JSON.stringify(stripChartsForPersist(client), replacer),
+export const queryPersister = createAsyncStoragePersister({
+  storage: idbStorage,
+  serialize: (client) => JSON.stringify(client, replacer),
   deserialize: (cached) => JSON.parse(cached, reviver),
 });
 
@@ -63,6 +58,9 @@ const PERSISTED_QUERY_KEYS = new Set([
   "fetchOriginalityMarketsData", // Round 2 Originality
   "fetchL2MarketsData", // Round 2 L2 (default tab)
   "fetchZcashMarketsData", // Zcash Q3 2026
+  // Chart history, one entry per market. Small enough to keep now that the series arrive
+  // precomputed — see `useMarketCharts`.
+  "marketChart",
   "useTokensBalances", // L2 table balances
   "useTokenBalance", // sUSDS wallet balance
   // Persist the executor-check queries so predictedAddress is restored from
@@ -75,7 +73,7 @@ const PERSISTED_QUERY_KEYS = new Set([
   // `useLeaderboard` rank: a primary name is a cosmetic label, not a claimed fact.
   "useEnsName",
   // Wallet profiles, for the same reason. These store URLs, never image bytes, so they cost the
-  // localStorage budget almost nothing — see the `charts` note above for what does.
+  // storage budget almost nothing.
   "useProfiles",
 ]);
 
@@ -90,4 +88,4 @@ export const shouldDehydrateQuery = (query: Parameters<typeof defaultShouldDehyd
  * paint — which is exactly how the L1 panel died when `parentMarket`/`otherMarket` were added.
  * A new buster makes the persister discard the old snapshot instead.
  */
-export const PERSIST_BUSTER = "l1-levels-v1";
+export const PERSIST_BUSTER = "charts-split-v1";

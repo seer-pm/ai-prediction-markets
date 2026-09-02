@@ -6,6 +6,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useL1MarketsData } from "@/hooks/useL1MarketsData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useMarketChart } from "@/hooks/useMarketCharts";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
 import { useRedeemL1 } from "@/hooks/useRedeemL1";
 import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
@@ -13,7 +14,7 @@ import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { PredictionRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
-import { COLLATERAL_TOKENS, CHAIN_ID } from "@/utils/constants";
+import { COLLATERAL_TOKENS, CHAIN_ID, L1_MARKET_ID } from "@/utils/constants";
 import { parseCSV } from "@/utils/csvParser";
 import { formatAmount } from "@/utils/format";
 import {
@@ -71,12 +72,13 @@ export const L1Markets = () => {
   const {
     data: tableData,
     isLoading,
-    isFetching,
     isLoadingBalances,
     error,
-    charts,
-    totalVolumeMapping,
   } = useProcessL1Predictions(predictions);
+
+  // Chart history is its own query: it is far larger than the table data and changes on a different
+  // clock, so bundling the two only meant neither could be shown until both had arrived.
+  const { data: chart, isLoading: isLoadingChart } = useMarketChart(L1_MARKET_ID);
 
   const sellAll = useSellL1ToCollateral();
   const redeem = useRedeemL1();
@@ -156,28 +158,25 @@ export const L1Markets = () => {
   );
 
   const volumeLabel = useMemo(() => {
-    const volumeString = Object.values(totalVolumeMapping ?? {})[0];
-    if (!volumeString) return undefined;
-    const [volume] = volumeString.split(" ");
+    const [volume] = (chart?.totalVolumeMarket ?? "").split(" ");
+    if (!volume) return undefined;
     return (
       <>
         Volume <span className="font-mono text-ink">{formatAmount(Number(volume))} sUSDS</span>
       </>
     );
-  }, [totalVolumeMapping]);
+  }, [chart?.totalVolumeMarket]);
 
-  const chartData = useMemo(() => {
-    // `charts` can be a present-but-empty object, so the first entry is not guaranteed — indexing
-    // straight into `[0].filter` threw and took the whole contest panel down with it.
-    const first = charts && Object.values(charts)[0];
-    if (!first) return undefined;
-    return first.filter(
-      (x) =>
-        !["invalid result", "other repositories"].some((name) =>
-          x.outcomeName.toLowerCase().includes(name),
-        ),
-    );
-  }, [charts]);
+  const chartData = useMemo(
+    () =>
+      chart?.series.filter(
+        (x) =>
+          !["invalid result", "other repositories"].some((name) =>
+            x.outcomeName.toLowerCase().includes(name),
+          ),
+      ),
+    [chart?.series],
+  );
 
   const tradableCount = useMemo(
     () => tableData?.filter((row) => row.difference).length ?? 0,
@@ -268,7 +267,7 @@ export const L1Markets = () => {
     <>
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
-        isLoading={isLoading || isFetching}
+        isLoading={isLoadingChart}
         eyebrow="Round 2 · L1"
         title="Repository weight in the Ethereum ecosystem"
         volume={volumeLabel}

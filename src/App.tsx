@@ -15,7 +15,7 @@ import { Button, Card, EmptyState, TooltipProvider } from "./components/ui";
 import { BookIcon } from "./components/ui/icons";
 import { WalletConnect } from "./components/WalletConnect";
 import {
-  localStoragePersister,
+  queryPersister,
   PERSIST_BUSTER,
   queryClient,
   shouldDehydrateQuery,
@@ -251,7 +251,7 @@ function App() {
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{
-          persister: localStoragePersister,
+          persister: queryPersister,
           buster: PERSIST_BUSTER,
           dehydrateOptions: { shouldDehydrateQuery },
         }}

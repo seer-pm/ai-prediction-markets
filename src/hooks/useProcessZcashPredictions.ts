@@ -178,6 +178,7 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
       isFetching,
       isLoadingBalances,
       error,
+      marketIdToProject,
     };
   }
 
@@ -187,8 +188,6 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
     isFetching,
     isLoadingBalances,
     error,
-    charts: data.charts,
     marketIdToProject,
-    totalVolumeMapping: data.totalVolumeMapping,
   };
 };

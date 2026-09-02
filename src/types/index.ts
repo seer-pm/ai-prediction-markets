@@ -316,3 +316,20 @@ export type ChartWithMarketData = {
   outcomeId: Address;
   collateral: Address;
 }[];
+
+/**
+ * A chart series, already resampled and ready to hand to lightweight-charts.
+ *
+ * Built once by the background job (`netlify/functions/utils/buildChartSeries.ts`) rather than in the
+ * browser: a contest runs 40-100 outcomes at a time, and resampling raw `PoolHourData` per outcome —
+ * binary search per tick plus BigInt sqrtPrice math — is what made the charts slow to appear.
+ */
+export type ChartSeries = {
+  marketId: string;
+  outcomeName: string;
+  outcomeId: Address;
+  /** [unix seconds, price], on a 30-minute grid with flat runs collapsed to their endpoints. */
+  points: [number, number][];
+  /** Latest resolvable price. Drives the legend readout and its sort order. */
+  lastPrice: number | null;
+};

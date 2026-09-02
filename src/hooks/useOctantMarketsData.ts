@@ -1,4 +1,4 @@
-import { ChartWithMarketData, PoolInfo } from "@/types";
+import { PoolInfo } from "@/types";
 import { fetchAppJson } from "@/utils/common";
 import { MarketStatus } from "@seer-pm/sdk";
 import { useQuery } from "@tanstack/react-query";
@@ -16,12 +16,6 @@ interface GetMarketsDataApiResult {
   wrappedTokens: Address[];
   payoutNumerators: string[];
   marketStatus: MarketStatus;
-  charts: {
-    [key: string]: ChartWithMarketData;
-  } | null;
-  totalVolumeMapping: {
-    [key: string]: string;
-  } | null;
 }
 
 // Throwing rather than returning a stub also keeps the redeem flow honest: `data` is `undefined` on
@@ -33,12 +27,10 @@ export const useOctantMarketsData = () => {
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    // Show persisted/cached data instantly, then refetch in the background on mount.
-    // "always" (not `true`) because `charts` is stripped from the persisted cache
-    // to fit the localStorage quota — the restored data is intentionally
-    // incomplete, so we must refetch on every mount regardless of staleTime to
-    // refill charts (otherwise a reload within staleTime shows "No Chart Data").
-    refetchOnMount: "always",
+    // Persisted data paints immediately and refreshes only once `staleTime` has passed. This used
+    // to be `refetchOnMount: "always"` because chart history was stripped out of the persisted
+    // snapshot to fit the localStorage quota, making every restore incomplete; charts now live in
+    // their own query, so what is restored here is whole.
     refetchInterval: false,
     staleTime: 30 * 1000,
     gcTime: 24 * 60 * 60 * 1000,

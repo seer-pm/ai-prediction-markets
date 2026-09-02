@@ -1,51 +1,12 @@
 import { UniswapGraphQLClient } from "@/config/apollo";
 import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
-import { ChartWithMarketData, PoolInfo } from "@/types";
+import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
-import { CHAIN_ID } from "@/utils/constants";
 import { NO_INDEX, YES_INDEX, ZCASH_MARKETS } from "@/utils/zcashMarkets";
-import { createClient } from "@supabase/supabase-js";
-import pLimit from "p-limit";
 import { Address } from "viem";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
-
-const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
-
-/** Per-market chart blobs, read in small parallel chunks so 37 keys stay inside one round of PostgREST. */
-async function getCharts(keys: string[]) {
-  try {
-    const chunkSize = 4;
-    const concurrency = 5;
-
-    function chunkArray<T>(arr: T[], size: number) {
-      const res: T[][] = [];
-      for (let i = 0; i < arr.length; i += size) {
-        res.push(arr.slice(i, i + size));
-      }
-      return res;
-    }
-
-    const chunks = chunkArray(keys, chunkSize);
-    const limit = pLimit(concurrency);
-
-    const results = await Promise.all(
-      chunks.map((chunk) =>
-        limit(async () => {
-          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
-
-          if (error) throw error;
-          return data || [];
-        }),
-      ),
-    );
-
-    return { data: results.flat() };
-  } catch (e) {
-    return { data: null, error: e };
-  }
-}
 
 export default async (req: Request) => {
   const preflight = handleCorsPreflight(req);
@@ -54,35 +15,18 @@ export default async (req: Request) => {
   try {
     const markets = await fetchZcashMarketsOnChain();
 
-    // Charts and pool data both depend only on `markets` but not on each other — run concurrently.
-    const [{ data: chartData, error: chartError }, queryResult] = await Promise.all([
-      getCharts(markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`)),
-      UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
-        query: GetPoolsDocument,
-        variables: {
-          first: 1000,
-          where: {
-            // Invalid is never seeded with liquidity, so only YES and NO are priced.
-            or: markets.flatMap(({ wrappedTokens, collateralToken }) =>
-              wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)),
-            ),
-          },
+    const queryResult = await UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
+      query: GetPoolsDocument,
+      variables: {
+        first: 1000,
+        where: {
+          // Invalid is never seeded with liquidity, so only YES and NO are priced.
+          or: markets.flatMap(({ wrappedTokens, collateralToken }) =>
+            wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)),
+          ),
         },
-      }),
-    ]);
-
-    const charts = chartError
-      ? null
-      : (chartData?.reduce<Record<string, ChartWithMarketData>>((acc, row) => {
-          acc[row.value.marketId] = row.value.chartData;
-          return acc;
-        }, {}) ?? {});
-    const totalVolumeMapping = chartError
-      ? null
-      : (chartData?.reduce<Record<string, string>>((acc, row) => {
-          acc[row.value.marketId] = row.value.totalVolumeMarket;
-          return acc;
-        }, {}) ?? {});
+      },
+    });
 
     // A transport failure, not an empty result: no liquidity has been seeded yet, so `pools: []`
     // is the expected answer today and must fall through to null prices rather than throwing.
@@ -152,9 +96,6 @@ export default async (req: Request) => {
       JSON.stringify({
         marketsData: projectToPriceMapping,
         markets,
-        charts,
-        totalVolumeMapping,
-        chartError,
       }),
       {
         status: 200,

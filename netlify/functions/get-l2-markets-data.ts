@@ -45,46 +45,6 @@ export async function getPools() {
   return pages.flat().map((row) => row.data);
 }
 
-async function getCharts(keys: string[]) {
-  try {
-    const chunkSize = 4;
-    const concurrency = 5;
-
-    function chunkArray(arr: any[], size: number) {
-      const res = [];
-      for (let i = 0; i < arr.length; i += size) {
-        res.push(arr.slice(i, i + size));
-      }
-      return res;
-    }
-
-    const chunks = chunkArray(keys, chunkSize);
-    const limit = pLimit(concurrency);
-
-    const results = await Promise.all(
-      chunks.map((chunk) =>
-        limit(async () => {
-          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
-
-          if (error) throw error;
-          return data || [];
-        }),
-      ),
-    );
-
-    const allData = results.flat();
-
-    return {
-      data: allData,
-    };
-  } catch (e) {
-    return {
-      data: null,
-      error: e,
-    };
-  }
-}
-
 export default async (req: Request) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -129,25 +89,7 @@ export default async (req: Request) => {
       ...market,
       marketStatus: getMarketStatus(market),
     }));
-    // Charts (depends on market ids) and pools (independent) can run concurrently.
-    console.time("get chart + pools");
-    const [{ data: chartData, error: chartError }, pools] = await Promise.all([
-      getCharts(markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`)),
-      getPools(),
-    ]);
-    console.timeEnd("get chart + pools");
-    const charts = chartError
-      ? null
-      : (chartData?.reduce<Record<string, any>>((acc, row) => {
-          acc[row.value.marketId] = row.value.chartData;
-          return acc;
-        }, {}) ?? {});
-    const totalVolumeMapping = chartError
-      ? null
-      : (chartData?.reduce<Record<string, any>>((acc, row) => {
-          acc[row.value.marketId] = row.value.totalVolumeMarket;
-          return acc;
-        }, {}) ?? {});
+    const pools = await getPools();
     //we only use the pool with highest liquidity for each pair
     const tokenPairToPoolMapping = pools.reduce(
       (acc, pool) => {
@@ -211,9 +153,6 @@ export default async (req: Request) => {
       JSON.stringify({
         marketsData: repoToPriceMapping,
         markets,
-        charts,
-        chartError,
-        totalVolumeMapping,
       }),
       {
         status: 200,

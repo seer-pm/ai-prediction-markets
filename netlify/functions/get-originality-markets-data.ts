@@ -7,7 +7,6 @@ import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { getMarketStatus, MarketStatusInput } from "./utils/marketStatus";
 import { createClient } from "@supabase/supabase-js";
-import pLimit from "p-limit";
 import { Address } from "viem";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
@@ -19,46 +18,6 @@ interface Market extends MarketStatusInput {
   outcomes: string[];
   parentOutcome: number;
   conditionId: Address;
-}
-
-async function getCharts(keys: string[]) {
-  try {
-    const chunkSize = 4;
-    const concurrency = 5;
-
-    function chunkArray(arr: any[], size: number) {
-      const res = [];
-      for (let i = 0; i < arr.length; i += size) {
-        res.push(arr.slice(i, i + size));
-      }
-      return res;
-    }
-
-    const chunks = chunkArray(keys, chunkSize);
-    const limit = pLimit(concurrency);
-
-    const results = await Promise.all(
-      chunks.map((chunk) =>
-        limit(async () => {
-          const { data, error } = await supabase.from("key_value").select("value").in("key", chunk);
-
-          if (error) throw error;
-          return data || [];
-        }),
-      ),
-    );
-
-    const allData = results.flat();
-
-    return {
-      data: allData,
-    };
-  } catch (e) {
-    return {
-      data: null,
-      error: e,
-    };
-  }
 }
 
 export default async (req: Request) => {
@@ -101,37 +60,19 @@ export default async (req: Request) => {
       ...market,
       marketStatus: getMarketStatus(market),
     }));
-    // Charts and pool data both depend only on `markets` but not on each other — run concurrently.
-    console.time("get chart + pools");
-    const [{ data: chartData, error: chartError }, queryResult] = await Promise.all([
-      getCharts(markets.map((market) => `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`)),
-      UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
-        query: GetPoolsDocument,
-        variables: {
-          first: 1000,
-          where: {
-            or: markets.flatMap(
-              ({ wrappedTokens, collateralToken }) =>
-                wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)) ??
-                [],
-            ),
-          },
+    const queryResult = await UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
+      query: GetPoolsDocument,
+      variables: {
+        first: 1000,
+        where: {
+          or: markets.flatMap(
+            ({ wrappedTokens, collateralToken }) =>
+              wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)) ??
+              [],
+          ),
         },
-      }),
-    ]);
-    console.timeEnd("get chart + pools");
-    const charts = chartError
-      ? null
-      : (chartData?.reduce<Record<string, any>>((acc, row) => {
-          acc[row.value.marketId] = row.value.chartData;
-          return acc;
-        }, {}) ?? {});
-    const totalVolumeMapping = chartError
-      ? null
-      : (chartData?.reduce<Record<string, any>>((acc, row) => {
-          acc[row.value.marketId] = row.value.totalVolumeMarket;
-          return acc;
-        }, {}) ?? {});
+      },
+    });
     if (!queryResult.data) {
       throw { message: "No pool found" };
     }
@@ -208,9 +149,6 @@ export default async (req: Request) => {
         marketsData: repoToPriceMapping,
         markets,
         parentWrappedTokens: parentMarket.wrappedTokens,
-        charts,
-        totalVolumeMapping,
-        chartError,
       }),
       {
         status: 200,

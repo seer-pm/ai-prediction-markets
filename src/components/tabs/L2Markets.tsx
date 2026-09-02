@@ -12,7 +12,7 @@ import { useSellL2ToCollateral } from "@/hooks/useSellL2ToCollateral";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { L2Row } from "@/types";
-import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
+import { downloadCsv, minBigIntArray } from "@/utils/common";
 import { parseL2CSV } from "@/utils/csvParser";
 import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 import { sampleL2Predictions } from "@/utils/samepleL2Predictions";
@@ -66,8 +66,6 @@ export const L2Markets = () => {
     isFetching,
     isLoadingBalances,
     error,
-    charts,
-    totalVolumeMapping,
   } = useProcessL2Predictions(predictions);
 
   const sellAll = useSellL2ToCollateral();
@@ -197,12 +195,7 @@ export const L2Markets = () => {
 
   return (
     <>
-      <L2Charts
-        repoOptions={repoOptions}
-        charts={isUndefined(charts) ? undefined : charts}
-        totalVolumeMapping={totalVolumeMapping ?? undefined}
-        isLoading={isLoading || isFetching}
-      />
+      <L2Charts repoOptions={repoOptions} isLoading={isLoading || isFetching} />
 
       <ContestBar
         predictionCount={predictions.length}

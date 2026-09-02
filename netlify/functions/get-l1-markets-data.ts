@@ -17,11 +17,10 @@ export default async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   try {
     const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
-    // Parent market, child market and chart data are independent — fetch concurrently.
+    // Parent market and child market are independent — fetch concurrently.
     const [
       { data, error },
       { data: otherMarketData, error: otherMarketError },
-      { data: chartData, error: chartError },
       [onChainParent, onChainOther],
     ] = await Promise.all([
       supabase
@@ -39,11 +38,6 @@ export default async (req: Request) => {
         )
         .eq("subgraph_data->parentMarket->>id", L1_MARKET_ID)
         .eq("chain_id", CHAIN_ID)
-        .single(),
-      supabase
-        .from("key_value")
-        .select("value")
-        .eq("key", `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`)
         .single(),
       // Resolution state comes from the chain, not Supabase. Seer's indexer stalled on Optimism at
       // block 156,195,946 (2026-08-29) and never saw these markets resolve two days later, so the
@@ -64,16 +58,6 @@ export default async (req: Request) => {
     if (!otherMarketData) {
       throw { message: "Other market not found" };
     }
-    const charts = chartError
-      ? null
-      : {
-          [L1_MARKET_ID]: chartData.value.chartData,
-        };
-    const totalVolumeMapping = chartError
-      ? null
-      : {
-          [L1_MARKET_ID]: chartData.value.totalVolumeMarket,
-        };
     const wrappedTokens = (data.wrappedTokens as Address[]).concat(
       otherMarketData.wrappedTokens as Address[],
     );
@@ -164,7 +148,6 @@ export default async (req: Request) => {
     return new Response(
       JSON.stringify({
         marketsData: repoToPriceMapping,
-        charts,
         wrappedTokens,
         // On-chain, so this is real the moment the market resolves rather than whenever Seer's
         // indexer catches up.
@@ -189,7 +172,6 @@ export default async (req: Request) => {
           payoutNumerators: onChainOther.payoutNumerators,
           parentOutcome: onChainOther.parentOutcome,
         },
-        totalVolumeMapping,
       }),
       {
         status: 200,

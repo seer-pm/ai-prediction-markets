@@ -1,10 +1,10 @@
 import MarketChart from "@/components/MarketChart";
 import { Card, CardHeader, EmptyState, Skeleton } from "@/components/ui";
-import type { ChartWithMarketData } from "@/types";
+import type { ChartSeries } from "@/types";
 import type { ReactElement, ReactNode } from "react";
 
 interface ContestChartProps {
-  data: ChartWithMarketData | undefined;
+  data: ChartSeries[] | undefined;
   isLoading: boolean;
   eyebrow?: string;
   title: string;

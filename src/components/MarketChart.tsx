@@ -1,7 +1,6 @@
 import { ChartLegend, type LegendEntry } from "@/components/ChartLegend";
 import { Card, CardHeader, EmptyState } from "@/components/ui";
-import { ChartWithMarketData, PoolHourData } from "@/types";
-import { isTwoStringsEqual } from "@/utils/common";
+import { ChartSeries } from "@/types";
 import { withAlpha } from "@/utils/color";
 import { formatWeight } from "@/utils/format";
 import {
@@ -22,10 +21,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Address, formatUnits } from "viem";
 import ErrorBoundary from "./ErrorBoundary";
-
-const INTERVAL = 30 * 60;
 
 /**
  * Series colours: saturated enough to tell apart at 1px on white, held to a
@@ -53,7 +49,8 @@ const AXIS_COLOR = "#6B7280";
 const GRID_COLOR = "#E5E7EB";
 
 type Props = {
-  data: ChartWithMarketData;
+  /** Already resampled by the background job — see `ChartSeries`. Draw it, don't rebuild it. */
+  data: ChartSeries[];
   totalVolumeMarket?: string | ReactElement;
   title?: string;
   eyebrow?: string;
@@ -62,121 +59,6 @@ type Props = {
   /** How a series' latest price reads in the legend. Weights by default. */
   formatValue?: (value: number) => string;
 };
-
-function findClosestLessThanOrEqualToTimestamp(
-  sortedTimestamps: number[],
-  targetTimestamp: number,
-) {
-  let left = 0;
-  let right = sortedTimestamps.length - 1;
-  let result = -1;
-
-  while (left <= right) {
-    const mid = (left + right) >> 1;
-
-    if (sortedTimestamps[mid] <= targetTimestamp) {
-      result = mid;
-      left = mid + 1;
-    } else {
-      right = mid - 1;
-    }
-  }
-
-  return result;
-}
-
-function calculateTokenPricesFromSqrtPrice(sqrtPrice: string) {
-  const s = BigInt(sqrtPrice);
-
-  const token0Price = (2n ** 192n * 10n ** 18n) / (s * s);
-  const token1Price = (s * s * 10n ** 18n) / 2n ** 192n;
-
-  return { token0Price, token1Price };
-}
-
-function resolveOutcomePrice(d: PoolHourData, collateral: Address): number | null {
-  let token0Price = d.token0Price;
-  let token1Price = d.token1Price;
-
-  if (token0Price === "0" && token1Price === "0" && d.sqrtPrice && d.sqrtPrice !== "0") {
-    const prices = calculateTokenPricesFromSqrtPrice(d.sqrtPrice);
-
-    token0Price = formatUnits(prices.token0Price, 18);
-    token1Price = formatUnits(prices.token1Price, 18);
-  }
-
-  const token0IsCollateral = isTwoStringsEqual(d.pool.token0.id, collateral);
-
-  const price = token0IsCollateral ? Number(token0Price) : Number(token1Price);
-
-  if (!isFinite(price) || price <= 0) return null;
-  return price;
-}
-
-// The window during which a series was actually tradable: from the first hour
-// liquidity was present to the last hour it was still present. Falls back to
-// the series' full range if no point reports liquidity > 0.
-function getLiquidityWindow(series: ChartWithMarketData[number]) {
-  const arr = series.poolHourDatas;
-  if (!arr.length) return null;
-
-  let start: number | null = null;
-  let end: number | null = null;
-
-  arr.forEach((d) => {
-    if (Number(d.liquidity) > 0) {
-      if (start === null) start = d.periodStartUnix;
-      end = d.periodStartUnix;
-    }
-  });
-
-  if (start === null || end === null) {
-    start = arr[0].periodStartUnix;
-    end = arr[arr.length - 1].periodStartUnix;
-  }
-
-  return { start, end };
-}
-
-function buildTimeline(all: ChartWithMarketData) {
-  let min = Infinity;
-  let max = -Infinity;
-
-  all.forEach((o) => {
-    const window = getLiquidityWindow(o);
-    if (!window) return;
-
-    min = Math.min(min, window.start);
-    max = Math.max(max, window.end);
-  });
-
-  const start = Math.floor(min / INTERVAL) * INTERVAL;
-  const end = Math.ceil(max / INTERVAL) * INTERVAL;
-
-  const timeline: number[] = [];
-  for (let t = start; t <= end; t += INTERVAL) {
-    timeline.push(t);
-  }
-
-  return timeline;
-}
-
-/**
- * The most recent resolvable price for a series, walking back from the end of
- * its liquidity window. Drives both the legend readout and its sort order.
- */
-function getLastPrice(series: ChartWithMarketData[number]): number | null {
-  const window = getLiquidityWindow(series);
-  const end = window?.end ?? Infinity;
-
-  for (let i = series.poolHourDatas.length - 1; i >= 0; i--) {
-    const point = series.poolHourDatas[i];
-    if (point.periodStartUnix > end) continue;
-    const price = resolveOutcomePrice(point, series.collateral);
-    if (price != null) return price;
-  }
-  return null;
-}
 
 function truncateOutcomeName(name: string, maxLength = 14) {
   if (!name) return "";
@@ -225,7 +107,7 @@ const MarketChart = React.memo(function MarketChart({
         index,
         name: series.outcomeName,
         color: SERIES_COLORS[index % SERIES_COLORS.length],
-        value: getLastPrice(series),
+        value: series.lastPrice,
       })),
     [data],
   );
@@ -361,11 +243,7 @@ const MarketChart = React.memo(function MarketChart({
 
     chartRef.current = chart;
 
-    const timeline = buildTimeline(data);
-
     data.forEach((outcomeData, i) => {
-      const window = getLiquidityWindow(outcomeData);
-      const seriesEnd = window?.end ?? Infinity;
       const series = chart.addSeries(LineSeries, {
         color: SERIES_COLORS[i % SERIES_COLORS.length],
         lineWidth: 2,
@@ -385,47 +263,10 @@ const MarketChart = React.memo(function MarketChart({
       seriesRef.current.push(series);
       seriesTitles.current.push(truncateOutcomeName(outcomeData.outcomeName));
 
-      const timestamps = outcomeData.poolHourDatas.map((d) => d.periodStartUnix);
-
-      const lineData: LineData[] = [];
-
-      let lastPrice: number | null = null;
-      // A flat stretch only needs its two endpoints — the renderer draws a
-      // straight line between them. Carrying a point per 30-minute tick for
-      // every one of a hundred series is what made panning crawl.
-      let pendingFlat: LineData | null = null;
-
-      timeline.forEach((t) => {
-        if (t > seriesEnd) return; // stop past this series' liquidity removal
-
-        const idx = findClosestLessThanOrEqualToTimestamp(timestamps, t);
-
-        if (idx !== -1) {
-          const price = resolveOutcomePrice(outcomeData.poolHourDatas[idx], outcomeData.collateral);
-
-          if (price != null) {
-            lastPrice = price; //update latest known price
-          }
-        }
-
-        if (lastPrice == null) return;
-
-        const previous = lineData[lineData.length - 1];
-        if (previous && previous.value === lastPrice) {
-          // Same value as the point before: hold it back, and only commit it
-          // when the run ends so the flat segment keeps its true length.
-          pendingFlat = { time: t as UTCTimestamp, value: lastPrice };
-          return;
-        }
-
-        if (pendingFlat) {
-          lineData.push(pendingFlat);
-          pendingFlat = null;
-        }
-        lineData.push({ time: t as UTCTimestamp, value: lastPrice });
-      });
-
-      if (pendingFlat) lineData.push(pendingFlat);
+      const lineData: LineData[] = outcomeData.points.map(([time, value]) => ({
+        time: time as UTCTimestamp,
+        value,
+      }));
 
       series.setData(lineData);
     });

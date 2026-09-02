@@ -132,7 +132,5 @@ export const useProcessL2Predictions = (predictions: L2Row[]) => {
     isFetching,
     isLoadingBalances,
     error,
-    charts: data.charts,
-    totalVolumeMapping: data.totalVolumeMapping
   };
 };

@@ -1,4 +1,4 @@
-import { PoolHourData } from "@/types";
+import { ChartWithMarketData, PoolHourData } from "@/types";
 import { getToken0Token1, isTwoStringsEqual } from "@/utils/common";
 import {
   CHAIN_ID,
@@ -10,6 +10,7 @@ import {
 } from "@/utils/constants";
 import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
+import { buildChartSeries, getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getChartData, getPoolIds } from "./utils/getChartData";
 import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
 import { GetSwapsQuery } from "@seer-pm/sdk/subgraph/swapr";
@@ -19,6 +20,46 @@ function pairKey(token: Address, collateral: Address) {
   const { token0, token1 } = getToken0Token1(token, collateral);
   return `${token0.toLowerCase()}_${token1.toLowerCase()}`;
 }
+
+/**
+ * Persists one market's chart in both shapes.
+ *
+ * `market_chart_hour_data_*` is the raw hourly candles, kept as the source of truth (and for a future
+ * client-side period picker). `market_chart_series_*` is what the app actually reads: the same data
+ * already resampled into point lists, which is what turned a multi-megabyte download plus a
+ * hundred-series client rebuild into a small request the browser can draw straight away.
+ *
+ * A failure on either write is logged, not thrown — one contest losing its chart must not cost the
+ * other four theirs.
+ */
+const upsertMarketChart = async (
+  label: string,
+  marketId: string,
+  chartWithMarketData: ChartWithMarketData,
+  totalVolumeMarket: string,
+) => {
+  const timestamp = Date.now();
+  const rows = [
+    {
+      key: `market_chart_hour_data_${marketId}_${CHAIN_ID}_deep_pm`,
+      value: { chartData: chartWithMarketData, timestamp, marketId, totalVolumeMarket },
+    },
+    {
+      key: getMarketChartSeriesKey(marketId, CHAIN_ID),
+      value: {
+        series: buildChartSeries(chartWithMarketData),
+        timestamp,
+        marketId,
+        totalVolumeMarket,
+      },
+    },
+  ];
+
+  const { error } = await supabase.from("key_value").upsert(rows, { onConflict: "key" });
+  if (error) {
+    console.log(`insert ${label} error`, error.message);
+  }
+};
 
 const getL1Pairs = async (
   poolIndex: Map<string, PoolHourData[]>,
@@ -77,21 +118,12 @@ const getL1Pairs = async (
       marketId: L1_MARKET_ID,
     };
   });
-  const { error: upsertError } = await supabase.from("key_value").upsert(
-    {
-      key: `market_chart_hour_data_${L1_MARKET_ID}_${CHAIN_ID}_deep_pm`,
-      value: {
-        chartData: chartWithMarketData,
-        timestamp: Date.now(),
-        marketId: L1_MARKET_ID,
-        totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
-      },
-    },
-    { onConflict: "key" },
+  await upsertMarketChart(
+    "l1",
+    L1_MARKET_ID,
+    chartWithMarketData,
+    `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
   );
-  if (upsertError) {
-    console.log("insert l1 error", upsertError.message);
-  }
 };
 
 const getOctantPairs = async (
@@ -137,21 +169,12 @@ const getOctantPairs = async (
       marketId: OCTANT_MARKET_ID,
     };
   });
-  const { error: upsertError } = await supabase.from("key_value").upsert(
-    {
-      key: `market_chart_hour_data_${OCTANT_MARKET_ID}_${CHAIN_ID}_deep_pm`,
-      value: {
-        chartData: chartWithMarketData,
-        timestamp: Date.now(),
-        marketId: OCTANT_MARKET_ID,
-        totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
-      },
-    },
-    { onConflict: "key" },
+  await upsertMarketChart(
+    "octant",
+    OCTANT_MARKET_ID,
+    chartWithMarketData,
+    `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
   );
-  if (upsertError) {
-    console.log("insert octant error", upsertError.message);
-  }
 };
 
 /**
@@ -196,21 +219,12 @@ const getZcashPairs = async (
       collateral,
       marketId,
     }));
-    const { error: upsertError } = await supabase.from("key_value").upsert(
-      {
-        key: `market_chart_hour_data_${marketId}_${CHAIN_ID}_deep_pm`,
-        value: {
-          chartData: chartWithMarketData,
-          timestamp: Date.now(),
-          marketId,
-          totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
-        },
-      },
-      { onConflict: "key" },
+    await upsertMarketChart(
+      "zcash",
+      marketId,
+      chartWithMarketData,
+      `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
     );
-    if (upsertError) {
-      console.log("insert zcash error", upsertError.message);
-    }
   }
 };
 
@@ -264,21 +278,12 @@ const getOriginalityPairs = async (
         marketId: market.id,
       };
     });
-    const { error: upsertError } = await supabase.from("key_value").upsert(
-      {
-        key: `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`,
-        value: {
-          chartData: chartWithMarketData,
-          timestamp: Date.now(),
-          marketId: market.id,
-          totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
-        },
-      },
-      { onConflict: "key" },
+    await upsertMarketChart(
+      "originality",
+      market.id,
+      chartWithMarketData,
+      `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
     );
-    if (upsertError) {
-      console.log("insert originality error", upsertError.message);
-    }
   }
 };
 
@@ -336,21 +341,12 @@ const getL2Pairs = async (
         marketId: market.id,
       };
     });
-    const { error: upsertError } = await supabase.from("key_value").upsert(
-      {
-        key: `market_chart_hour_data_${market.id}_${CHAIN_ID}_deep_pm`,
-        value: {
-          chartData: chartWithMarketData,
-          timestamp: Date.now(),
-          marketId: market.id,
-          totalVolumeMarket: `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
-        },
-      },
-      { onConflict: "key" },
+    await upsertMarketChart(
+      "l2",
+      market.id,
+      chartWithMarketData,
+      `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
     );
-    if (upsertError) {
-      console.log("insert l2 error", upsertError.message);
-    }
   }
 };
 
