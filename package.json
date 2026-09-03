@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "codegen": "graphql-codegen --config codegen.ts",
     "export:l1-pnl": "esbuild scripts/exportL1Pnl.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=scripts/.exportL1Pnl.mjs --log-level=warning && node scripts/.exportL1Pnl.mjs",
+    "export:l2-pnl": "esbuild scripts/exportL2Pnl.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=scripts/.exportL2Pnl.mjs --log-level=warning && node --env-file=.env scripts/.exportL2Pnl.mjs",
     "rebuild:chart-series": "esbuild scripts/rebuildChartSeries.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=scripts/.rebuildChartSeries.mjs --log-level=warning && node --env-file=.env scripts/.rebuildChartSeries.mjs"
   },
   "dependencies": {
