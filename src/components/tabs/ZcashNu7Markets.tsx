@@ -188,12 +188,6 @@ export const ZcashNu7Markets = () => {
     <>
       <ZcashNu7Charts markets={tableData ?? []} isLoading={isLoading} />
 
-      <Panel tone="info" title="The NU7 coinholder poll">
-        Five ballot questions, each a single-select market on Optimism. A winning share settles at 1
-        sUSDS and everything else at 0. Upload a file naming the price you think each outcome should
-        trade at, then run it: every disagreement with the market is traded in one go.
-      </Panel>
-
       <ContestBar
         predictionCount={predictions.length}
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
