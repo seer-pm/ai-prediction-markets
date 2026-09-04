@@ -8,6 +8,7 @@ import {
   OTHER_MARKET_ID,
 } from "@/utils/constants";
 import { ZCASH_MARKET_IDS } from "@/utils/zcashMarkets";
+import { ZCASH_NU7_MARKET_IDS } from "@/utils/zcashNu7Markets";
 import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { erc20Abi, type Address } from "viem";
@@ -117,7 +118,12 @@ async function fetchClosedTokensByContest(): Promise<Record<string, ClosedTokens
       selectChildren(ORIGINALITY_PARENT_MARKET_ID),
       selectMarket(L2_PARENT_MARKET_ID),
       selectChildren(L2_PARENT_MARKET_ID, "%What will be the average weight of%"),
-      fetchMarketsOnChain([L1_MARKET_ID, OTHER_MARKET_ID, ...ZCASH_MARKET_IDS] as Address[]),
+      fetchMarketsOnChain([
+        L1_MARKET_ID,
+        OTHER_MARKET_ID,
+        ...ZCASH_MARKET_IDS,
+        ...ZCASH_NU7_MARKET_IDS,
+      ] as Address[]),
     ]);
 
   const closedOnChain = onChain.filter((market) => market.marketStatus === MarketStatus.CLOSED);
@@ -133,6 +139,7 @@ async function fetchClosedTokensByContest(): Promise<Record<string, ClosedTokens
     "round2-l2": [...l2Parent, ...l2Children],
     "round2-l1": tokensOf([L1_MARKET_ID, OTHER_MARKET_ID]),
     zcash: tokensOf(ZCASH_MARKET_IDS),
+    "zcash-nu7": tokensOf(ZCASH_NU7_MARKET_IDS),
   };
 }
 

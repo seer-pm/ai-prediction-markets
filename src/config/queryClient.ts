@@ -57,7 +57,8 @@ const PERSISTED_QUERY_KEYS = new Set([
   "useL1MarketsData", // Round 2 L1
   "fetchOriginalityMarketsData", // Round 2 Originality
   "fetchL2MarketsData", // Round 2 L2 (default tab)
-  "fetchZcashMarketsData", // Zcash Q3 2026
+  "fetchZcashMarketsData", // Zcash Q3 2026 grants
+  "fetchZcashNu7MarketsData", // Zcash NU7 poll (default tab)
   // Chart history, one entry per market. Small enough to keep now that the series arrive
   // precomputed — see `useMarketCharts`.
   "marketChart",

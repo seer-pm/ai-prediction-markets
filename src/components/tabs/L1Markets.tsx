@@ -341,6 +341,7 @@ export const L1Markets = () => {
           onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
           rows={tableData}
+          isLoadingBalances={isLoadingBalances}
         />
       )}
 

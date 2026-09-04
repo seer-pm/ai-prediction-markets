@@ -12,6 +12,7 @@ interface TradingInterfaceProps {
   onOpenChange: (open: boolean) => void;
   markets: OriginalityTableData[];
   tradeExecutor: Address;
+  isLoadingBalances: boolean;
 }
 
 export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -19,6 +20,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   onOpenChange,
   tradeExecutor,
   markets,
+  isLoadingBalances,
 }) => {
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -26,6 +28,12 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   });
 
   const executeTradeMutation = useExecuteOriginalityStrategy();
+
+  // Nothing held and nothing minted means the run has no input at all.
+  const hasPositions = useMemo(
+    () => markets.some((m) => (m.upBalance ?? 0n) > 0n || (m.downBalance ?? 0n) > 0n),
+    [markets],
+  );
 
   const { repoCount, buyCount, sellCount, largestDelta } = useMemo(() => {
     const deltas = markets.flatMap((market) => [market.upDifference, market.downDifference]);
@@ -51,6 +59,8 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
       ]}
       balance={balanceData}
       balanceLoading={isBalanceLoading}
+      balancesLoading={isLoadingBalances}
+      hasPositions={hasPositions}
       mutation={executeTradeMutation}
       blockedReason={
         repoCount === 0

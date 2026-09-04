@@ -294,6 +294,7 @@ export const ZcashMarkets = () => {
           onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
           markets={tableData}
+          isLoadingBalances={isLoadingBalances}
         />
       )}
 

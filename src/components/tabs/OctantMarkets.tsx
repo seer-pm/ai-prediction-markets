@@ -253,6 +253,7 @@ export const OctantMarkets = () => {
           onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
           rows={tableData}
+          isLoadingBalances={isLoadingBalances}
         />
       )}
 

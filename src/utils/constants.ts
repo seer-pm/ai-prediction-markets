@@ -19,6 +19,10 @@ export const OCTANT_MARKET_ID = "0xe85ada7cd6d33cb41ac596fb4749e3f94d836ece";
 // the predictions CSV joins against; re-exported here so `contests.ts` has one import site.
 export { ZCASH_MARKET_IDS } from "./zcashMarkets";
 
+// Zcash NU7 is the same shape again — 5 independent top-level markets, no parent — but categorical
+// rather than binary. Same re-export for the same reason.
+export { ZCASH_NU7_MARKET_IDS } from "./zcashNu7Markets";
+
 export const CHAIN_ID = 10 as SupportedChain;
 
 /**

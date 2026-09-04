@@ -43,6 +43,9 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const executeTradeMutation = useExecuteL2Strategy();
 
+  // Nothing held and nothing minted means the run has no input at all.
+  const hasPositions = useMemo(() => rows.some((row) => (row.balance ?? 0n) > 0n), [rows]);
+
   const { buyCount, sellCount, marketCount, largestDelta } = useMemo(() => {
     const tradable = rows.filter((row) => row.difference);
     return {
@@ -67,6 +70,7 @@ export const L2TradingInterface: React.FC<TradingInterfaceProps> = ({
       balance={balanceData}
       balanceLoading={isBalanceLoading}
       balancesLoading={isLoadingBalances}
+      hasPositions={hasPositions}
       quotesLoading={isLoadingQuotes}
       quotesProgress={{ step: quoteProgress ?? 0, of: marketCount }}
       quotesError={errorGettingQuotes}

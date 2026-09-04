@@ -33,6 +33,13 @@ export interface StrategyDialogProps {
   quotesProgress?: { step: number; of: number };
   quotesError?: unknown;
   balancesLoading?: boolean;
+  /**
+   * Whether the wallet already holds outcome tokens this run could trade with.
+   * `false` makes the mint amount mandatory: with nothing to sell and nothing
+   * to mint, the run has no input at all and dies on the first quote.
+   * Leave undefined when the contest cannot tell.
+   */
+  hasPositions?: boolean;
   mutation: {
     isPending: boolean;
     isError: boolean;
@@ -84,6 +91,7 @@ export function StrategyDialog({
   quotesProgress,
   quotesError,
   balancesLoading = false,
+  hasPositions,
   mutation,
   onSubmit,
   onAmountChange,
@@ -118,6 +126,9 @@ export function StrategyDialog({
   }, [open, reset]);
 
   const status = runStatus(mutation);
+  // Balances still loading means we do not yet know, so hold the requirement back.
+  const needsAmount = hasPositions === false && !balancesLoading;
+  const amountRequiredMessage = `You hold no outcome tokens here, so enter the ${collateral.symbol} to mint with.`;
   const maxValue = balance ? formatUnits(balance.value, balance.decimals) : undefined;
 
   const disabledReason = (() => {
@@ -126,6 +137,7 @@ export function StrategyDialog({
     if (quotesLoading) return "Still fetching quotes from the pools.";
     if (quotesError) return "Quotes could not be fetched — dismiss the error and reopen.";
     if (errors.amount) return errors.amount.message;
+    if (needsAmount && !amount?.trim()) return amountRequiredMessage;
     return blockedReason;
   })();
 
@@ -223,7 +235,7 @@ export function StrategyDialog({
         {status !== "succeeded" && (
         <form id={formId} onSubmit={handleSubmit(({ amount }) => onSubmit(amount))} noValidate>
           <AmountInput
-            label={`Mint new positions with (optional)`}
+            label={`Mint new positions with${needsAmount ? "" : " (optional)"}`}
             unit={collateral.symbol}
             placeholder="0.00"
             disabled={mutation.isPending || balancesLoading}
@@ -237,7 +249,9 @@ export function StrategyDialog({
             error={errors.amount?.message}
             hint={
               <>
-                Leave empty to trade only with outcome tokens you already hold.
+                {needsAmount
+                  ? "You hold no outcome tokens here, so the run has nothing to trade with until you fund it."
+                  : "Leave empty to trade only with outcome tokens you already hold."}
                 {account && tradeExecutor && (
                   <>
                     {" "}
@@ -254,9 +268,12 @@ export function StrategyDialog({
             }
             {...register("amount", {
               validate: (value) => {
-                if (!value) return true;
+                if (!value) return needsAmount ? amountRequiredMessage : true;
                 const parsed = safeParseUnits(value, balance?.decimals ?? 18);
-                if (parsed <= 0n) return "Enter a positive amount, or leave this empty.";
+                if (parsed <= 0n)
+                  return needsAmount
+                    ? "Enter a positive amount."
+                    : "Enter a positive amount, or leave this empty.";
                 if (parsed > (balance?.value ?? 0n)) {
                   const available = balance
                     ? formatAmount(Number(formatUnits(balance.value, balance.decimals)))

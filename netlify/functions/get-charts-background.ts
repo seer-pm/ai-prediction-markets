@@ -12,7 +12,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Address } from "viem";
 import { buildChartSeries, getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getChartData, getPoolIds } from "./utils/getChartData";
+import type { MarketOnChain } from "./utils/marketView";
 import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
+import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
 import { GetSwapsQuery } from "@seer-pm/sdk/subgraph/swapr";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
@@ -178,18 +180,22 @@ const getOctantPairs = async (
 };
 
 /**
- * Zcash is 37 separate top-level markets, so unlike the single-market contests above this writes 37
- * chart blobs — one per proposal — and reads the market set from chain rather than Supabase, which
- * has no rows for it.
+ * The two Zcash contests are sets of separate top-level markets, so unlike the single-market
+ * contests above this writes one chart blob *per market* and reads the market set from chain rather
+ * than Supabase, which has no rows for either.
  *
- * A market with no pool data in the index is skipped rather than upserted empty: until
- * `add-zcash-liquidity.js` runs there are no pools at all, and 37 empty blobs would only mask that.
+ * A market with no pool data in the index is skipped rather than upserted empty: before the
+ * liquidity script runs there are no pools at all, and a run of empty blobs would only mask that.
+ *
+ * Shared by the 37 binary grants markets and the 5 categorical NU7 markets — the only thing that
+ * differs is the market list and the blob label, and neither cares how many outcomes a market has.
  */
-const getZcashPairs = async (
+const getFlatMarketPairs = async (
+  label: string,
+  markets: MarketOnChain[],
   poolIndex: Map<string, PoolHourData[]>,
   volumeIndex: Map<string, PoolVolumeData>,
 ) => {
-  const markets = await fetchZcashMarketsOnChain();
   const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
 
   for (const market of markets) {
@@ -220,7 +226,7 @@ const getZcashPairs = async (
       marketId,
     }));
     await upsertMarketChart(
-      "zcash",
+      label,
       marketId,
       chartWithMarketData,
       `${totalVolumeMarket ?? 0} ${collateralSymbol}`,
@@ -451,24 +457,37 @@ export default async () => {
   }
 
   // `deep_pm_pool_ids` is maintained outside this repo, so a newly seeded market set is not in it.
-  // Rather than wait for that to be updated by hand, resolve the Zcash pools from their token pairs
-  // and union them in — otherwise the tab renders "No price history yet" indefinitely even though
-  // the pools exist. Deduped because a pool present in both lists would be fetched twice.
+  // Rather than wait for that to be updated by hand, resolve the pools of the on-chain-only
+  // contests from their token pairs and union them in — otherwise those tabs render "No price
+  // history yet" indefinitely even though the pools exist. Deduped because a pool present in more
+  // than one list would be fetched twice.
   let allPoolIds = poolIds;
-  try {
-    const zcashMarkets = await fetchZcashMarketsOnChain();
-    const zcashCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address as Address;
-    const zcashPoolIds = await getPoolIds(
-      zcashMarkets.flatMap(({ wrappedTokens }) =>
-        // Invalid is never seeded, so only YES and NO have pools.
-        wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, zcashCollateral)),
-      ),
-    );
-    allPoolIds = [...new Set([...poolIds, ...zcashPoolIds.map((id) => id.toLowerCase())])];
-    console.log(`zcash pools: ${zcashPoolIds.length}, total after union: ${allPoolIds.length}`);
-  } catch (e) {
-    // A failure here must not cost the other four contests their charts.
-    console.log("could not resolve zcash pool ids", e);
+  const onChainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address as Address;
+
+  // Resolved once and reused by the writers below — the market set is the same read either way, and
+  // these are 42 `getMarket` calls across two multicalls, not something to pay for twice.
+  const onChainContests: { label: string; markets: MarketOnChain[] }[] = [];
+  for (const [label, fetchMarkets] of [
+    ["zcash", fetchZcashMarketsOnChain],
+    ["zcash-nu7", fetchZcashNu7MarketsOnChain],
+  ] as const) {
+    try {
+      const contestMarkets = await fetchMarkets();
+      onChainContests.push({ label, markets: contestMarkets });
+      const contestPoolIds = await getPoolIds(
+        contestMarkets.flatMap(({ wrappedTokens }) =>
+          // Invalid is never seeded, and it is always the last outcome.
+          wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, onChainCollateral)),
+        ),
+      );
+      allPoolIds = [...new Set([...allPoolIds, ...contestPoolIds.map((id) => id.toLowerCase())])];
+      console.log(
+        `${label} pools: ${contestPoolIds.length}, total after union: ${allPoolIds.length}`,
+      );
+    } catch (e) {
+      // A failure here must not cost the other contests their charts.
+      console.log(`could not resolve ${label} pool ids`, e);
+    }
   }
 
   console.log(allPoolIds.length);
@@ -502,10 +521,14 @@ export default async () => {
   } catch (e) {
     console.log(e);
   }
-  try {
-    console.log("getting zcash chart");
-    await getZcashPairs(poolIndex, volumeIndex);
-  } catch (e) {
-    console.log(e);
+  // A contest whose market read failed above is simply absent here, which is the right outcome: it
+  // has no pools in the index either, so every one of its blobs would be skipped anyway.
+  for (const { label, markets } of onChainContests) {
+    try {
+      console.log(`getting ${label} chart`);
+      await getFlatMarketPairs(label, markets, poolIndex, volumeIndex);
+    } catch (e) {
+      console.log(e);
+    }
   }
 };

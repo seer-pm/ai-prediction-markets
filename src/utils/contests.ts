@@ -12,6 +12,7 @@ import {
   OCTANT_MARKET_ID,
   ORIGINALITY_PARENT_MARKET_ID,
   ZCASH_MARKET_IDS,
+  ZCASH_NU7_MARKET_IDS,
 } from "./constants";
 
 /**
@@ -58,8 +59,17 @@ export interface Contest {
 
 export const DEEP_CONTESTS = [
   {
+    id: "zcash-nu7",
+    label: "Zcash · NU7",
+    marketIds: ZCASH_NU7_MARKET_IDS,
+    finished: false,
+    leaderboard: false,
+  },
+  {
+    // Relabelled from plain "Zcash" when NU7 landed: two live Zcash contests in the bar, and the
+    // grants set is the one people already had open.
     id: "zcash",
-    label: "Zcash",
+    label: "Zcash · Grants",
     marketIds: ZCASH_MARKET_IDS,
     finished: false,
     leaderboard: false,

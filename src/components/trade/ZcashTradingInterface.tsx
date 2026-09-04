@@ -13,6 +13,7 @@ interface TradingInterfaceProps {
   onOpenChange: (open: boolean) => void;
   markets: ZcashTableData[];
   tradeExecutor: Address;
+  isLoadingBalances: boolean;
 }
 
 export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -20,6 +21,7 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
   onOpenChange,
   tradeExecutor,
   markets,
+  isLoadingBalances,
 }) => {
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -31,6 +33,13 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
   // Mirrored from the dialog so the "per market" stat updates as the user types. The dialog owns
   // the input; this is only ever read.
   const [amount, setAmount] = useState("");
+
+  // Nothing held and nothing minted means the run has no input at all: the
+  // budget allocates zero to every row and the pass dies on "No quote found".
+  const hasPositions = useMemo(
+    () => markets.some((m) => (m.yesBalance ?? 0n) > 0n || (m.noBalance ?? 0n) > 0n),
+    [markets],
+  );
 
   // Counted over fundable rows only. Unlike the old yes/no counts these do not have to sum to
   // `fundableCount`: a row whose YES price already sits on the user's number, but whose NO side is
@@ -62,6 +71,8 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
       ]}
       balance={balanceData}
       balanceLoading={isBalanceLoading}
+      balancesLoading={isLoadingBalances}
+      hasPositions={hasPositions}
       mutation={executeTradeMutation}
       onAmountChange={setAmount}
       blockedReason={

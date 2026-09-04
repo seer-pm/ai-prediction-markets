@@ -14,6 +14,7 @@ interface TradingInterfaceProps {
   onOpenChange: (open: boolean) => void;
   rows: TableData[];
   tradeExecutor: Address;
+  isLoadingBalances: boolean;
 }
 
 export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -21,6 +22,7 @@ export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
   onOpenChange,
   tradeExecutor,
   rows,
+  isLoadingBalances,
 }) => {
   const [amount, setAmount] = useState("");
   const debouncedAmount = useDebounce(amount, 300);
@@ -40,6 +42,9 @@ export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
   });
 
   const executeTradeMutation = useExecuteOctantTradeStrategy();
+
+  // Nothing held and nothing minted means the run has no input at all.
+  const hasPositions = useMemo(() => rows.some((row) => (row.balance ?? 0n) > 0n), [rows]);
 
   const { buyCount, sellCount, largestDelta } = useMemo(() => {
     const deltas = rows.map((row) => row.difference).filter((d): d is number => !!d);
@@ -63,6 +68,8 @@ export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
       ]}
       balance={balanceData}
       balanceLoading={isBalanceLoading}
+      balancesLoading={isLoadingBalances}
+      hasPositions={hasPositions}
       quotesLoading={isLoadingQuotes}
       quotesProgress={{ step: quoteProgress ?? 0, of: rows.filter((r) => r.difference).length }}
       quotesError={errorGettingQuotes}

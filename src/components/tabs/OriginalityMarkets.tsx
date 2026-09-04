@@ -311,6 +311,7 @@ export const OriginalityMarkets = () => {
           onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
           markets={tableData}
+          isLoadingBalances={isLoadingBalances}
         />
       )}
 
