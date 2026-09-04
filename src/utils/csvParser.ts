@@ -1,6 +1,7 @@
 import { L2Row, OctantRow, OriginalityRow, PredictionRow, ZcashNu7Row, ZcashRow } from "@/types";
 import { getZcashMarketByTitle } from "@/utils/zcashMarkets";
 import { ZCASH_NU7_MARKETS } from "@/utils/zcashNu7Markets";
+import { NU7_SUM_TOLERANCE } from "@/utils/zcashNu7Targets";
 
 export const parseCSV = (csvText: string): PredictionRow[] => {
   const lines = csvText.trim().split("\n");
@@ -392,23 +393,32 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
  * The only categorical contest here, so a row names both the ballot question (1-5, matching
  * `ZcashNu7Market.id`) and which outcome within it (1-based over the *substantive* outcomes, Invalid
  * excluded). The prediction is the absolute price that one outcome should trade at, in [0, 1] — not
- * a share of the question. Each NU7 outcome has its own pool, so nothing here is normalised and
- * targets within a question need not sum to 1.
+ * a share of the question.
  *
- * Rows may be left out at both levels: an omitted question and an omitted outcome both mean "no
- * view", and neither is ever traded. Same convention as `parseZcashCSV` above.
+ * Rows may be left out at both levels, but the two omissions no longer mean the same thing:
  *
- * Two deliberate departures from the parsers above:
+ * - An omitted **question** means "no view", exactly as in `parseZcashCSV` above. Nothing about it
+ *   is traded.
+ * - An omitted **outcome** of a question you did annotate means "no view *here*, keep the market's
+ *   relative view". `completeNu7Targets` fills it in from the probability your own rows leave over,
+ *   and it is traded like any other leg. The outcomes of one question are mutually exclusive, so a
+ *   set of targets that does not sum to 1 is not a partial instruction but an incoherent one — see
+ *   the header of `@/utils/zcashNu7Targets` for why leaving the gap open costs the user money.
+ *
+ * Three deliberate departures from the parsers above:
  *
  * 1. Columns are resolved by **header index**, not position. The others check `includes(...)` and
  *    then read `values[0]`, which silently mis-reads a file whose columns were reordered. With three
  *    purely numeric columns that failure is invisible, and it would trade the wrong outcome at the
  *    wrong price.
- * 2. There is **no upper bound on `outcome`** and **no sum check**. Outcome strings live on chain and
- *    arrive from MarketView at runtime — `@/utils/zcashNu7Markets` deliberately carries no outcome
- *    list, so this parser cannot know that Q4 has only three substantive outcomes. `4,5,0.3` parses
- *    cleanly here and `useProcessZcashNu7Predictions` reports it as an ignored row. A question whose
- *    targets sum above 1 is accepted outright; the card shows that sum beside the market's own.
+ * 2. There is **no upper bound on `outcome`**. Outcome strings live on chain and arrive from
+ *    MarketView at runtime — `@/utils/zcashNu7Markets` deliberately carries no outcome list, so this
+ *    parser cannot know that Q4 has only three substantive outcomes. `4,5,0.3` parses cleanly here
+ *    and `useProcessZcashNu7Predictions` reports it as an ignored row.
+ * 3. It is the only parser here that checks a **sum**, and it checks only one side of it: a question
+ *    summing above 1 is rejected outright, because nothing that could be assigned to the outcomes
+ *    left out would bring it back. A question summing *below* 1 is not decidable without the outcome
+ *    count, so it is left to the completion step.
  */
 export const parseZcashNu7CSV = (csvText: string): ZcashNu7Row[] => {
   const lines = csvText.trim().split("\n");
@@ -495,6 +505,24 @@ export const parseZcashNu7CSV = (csvText: string): ZcashNu7Row[] => {
 
   if (results.length === 0) {
     throw new Error("CSV contains no valid data rows");
+  }
+
+  // The one sum check this parser can make. A question whose rows already exceed 1 is impossible
+  // whatever its on-chain outcome count turns out to be — no assignment to the outcomes left out
+  // could bring the total back — so it is caught here rather than after the join, and the upload
+  // dialog keeps the user in place to fix the file. The opposite case, a question summing below 1,
+  // is NOT decidable here: a short file may be a complete small question or a partial large one,
+  // and only the on-chain outcome count says which. `completeNu7Targets` handles it.
+  const sumByQuestion = new Map<number, number>();
+  for (const row of results) {
+    sumByQuestion.set(row.question, (sumByQuestion.get(row.question) ?? 0) + row.prediction);
+  }
+  for (const [question, sum] of sumByQuestion) {
+    if (sum > 1 + NU7_SUM_TOLERANCE) {
+      throw new Error(
+        `Q${question}: your predictions sum to ${sum.toFixed(2)}. The outcomes of one question are mutually exclusive, so they cannot sum above 1.`,
+      );
+    }
   }
 
   return results;

@@ -1,7 +1,7 @@
 import { getVolumeUntilPrice } from "@/lib/trade/getVolumeUntilPrice";
 import { ZcashNu7OutcomeRow, ZcashNu7Row, ZcashNu7TableData } from "@/types";
-import { MIN_PRICE } from "@/utils/constants";
 import { getZcashNu7Market, substantiveIndexes } from "@/utils/zcashNu7Markets";
+import { completeNu7Targets, type Nu7TargetLeg } from "@/utils/zcashNu7Targets";
 import { useMemo } from "react";
 import { Address } from "viem";
 import { useTokensBalances } from "./useTokensBalances";
@@ -15,7 +15,11 @@ import { useZcashNu7MarketsData } from "./useZcashNu7MarketsData";
  */
 export type Nu7PredictionIssue =
   | { kind: "no-such-outcome"; question: number; outcome: number; substantiveCount: number }
-  | { kind: "no-pool"; question: number; outcome: number; label: string };
+  | { kind: "no-pool"; question: number; outcome: number; label: string }
+  /** The file named every pooled outcome of this question, but not to 1. Scaled onto 1. */
+  | { kind: "sum-renormalised"; question: number; sum: number }
+  /** The file's own rows claimed the whole question, so what it left out is being priced at ~0. */
+  | { kind: "residual-exhausted"; question: number; unnamedCount: number };
 
 /**
  * Turns a NU7 predictions CSV into one row per ballot question, each carrying one leg per
@@ -24,8 +28,10 @@ export type Nu7PredictionIssue =
  * Two levels because the two halves of a run live at different levels: the legs are per-outcome
  * (each has its own pool), but the mint is per-market (a complete set belongs to one question).
  *
- * Unlike `useProcessZcashPredictions` there is no complement to derive — a prediction is an absolute
- * target for one pool, so an outcome the file left out simply has no target and is never traded.
+ * The same complement `useProcessZcashPredictions` derives is derived here too, just over three or
+ * four outcomes instead of two: the file states part of a distribution and `completeNu7Targets`
+ * finishes it, so a question the user annotated always carries a full set of targets summing to 1.
+ * An outcome left out is therefore *filled in*, not skipped. Only an omitted question is untraded.
  */
 export const useProcessZcashNu7Predictions = (predictions: ZcashNu7Row[]) => {
   const { tradeExecutor } = useTradeWalletStatus();
@@ -87,45 +93,95 @@ export const useProcessZcashNu7Predictions = (predictions: ZcashNu7Row[]) => {
         }
       }
 
-      const outcomes: ZcashNu7OutcomeRow[] = indexes.map((outcomeIndex, position) => {
+      // Pass one: what the file said, and which outcomes could carry a target at all. A prediction
+      // on an outcome with no pool cannot be traded — `quoteLeg` would throw on it — so it is
+      // reported and then treated exactly as if the file had not mentioned that outcome.
+      const legs = indexes.map((outcomeIndex, position) => {
         const outcomeNumber = position + 1;
         const token = market.wrappedTokens[outcomeIndex] as Address;
         const price = market.prices[outcomeIndex] ?? null;
         const pool = market.pools[outcomeIndex];
+        const outcome = market.outcomes[outcomeIndex] ?? "";
         const raw = predictionByCell[`${question}-${outcomeNumber}`];
 
-        const base = {
+        if (raw !== undefined && (price === null || !pool)) {
+          collected.push({ kind: "no-pool", question, outcome: outcomeNumber, label: outcome });
+        }
+
+        return {
           outcomeIndex,
           outcomeNumber,
-          outcome: market.outcomes[outcomeIndex] ?? "",
+          outcome,
           token,
           price,
+          pool,
           balance: balanceByToken[token.toLowerCase()],
+          raw,
+        };
+      });
+
+      // Pass two: finish the question into a distribution, then diff each pool against it. Null
+      // means the file never named this question, and nothing about it is traded.
+      const completion = completeNu7Targets(
+        legs.map(
+          (leg): Nu7TargetLeg => ({
+            outcomeNumber: leg.outcomeNumber,
+            price: leg.pool ? leg.price : null,
+            raw: leg.raw,
+          }),
+        ),
+      );
+
+      if (completion?.note === "renormalised") {
+        collected.push({ kind: "sum-renormalised", question, sum: completion.namedSum });
+      }
+      if (completion?.note === "residual-exhausted") {
+        collected.push({
+          kind: "residual-exhausted",
+          question,
+          unnamedCount: completion.derivedCount,
+        });
+      }
+
+      const outcomes: ZcashNu7OutcomeRow[] = legs.map((leg) => {
+        const base = {
+          outcomeIndex: leg.outcomeIndex,
+          outcomeNumber: leg.outcomeNumber,
+          outcome: leg.outcome,
+          token: leg.token,
+          price: leg.price,
+          balance: leg.balance,
         };
 
-        if (raw === undefined) {
-          return { ...base, target: null, difference: null, volumeUntilPrice: 0, hasPrediction: false };
+        const target = completion?.targets.get(leg.outcomeNumber) ?? null;
+        if (target === null || leg.price === null || !leg.pool) {
+          return {
+            ...base,
+            target: null,
+            difference: null,
+            volumeUntilPrice: 0,
+            source: null,
+            hasTarget: false,
+          };
         }
 
-        // A prediction on an outcome with no pool cannot be traded, and `quoteLeg` would throw on it.
-        if (price === null || !pool) {
-          collected.push({ kind: "no-pool", question, outcome: outcomeNumber, label: base.outcome });
-          return { ...base, target: null, difference: null, volumeUntilPrice: 0, hasPrediction: false };
-        }
-
-        // `MIN_PRICE` keeps the bound off the extremes — a pool cannot be sold to 0, and
-        // `getVolumeUntilPrice` divides by the target. Same guard the other contests apply.
-        const target = Math.min(Math.max(raw, MIN_PRICE), 1 - MIN_PRICE);
-        const difference = target - price;
+        const difference = target - leg.price;
 
         // `!== 0` rather than a truthiness check: a difference of exactly 0 is a real answer
         // ("this pool is already where the number would put it") and must not be read as "no price".
         const volumeUntilPrice =
           difference !== 0
-            ? getVolumeUntilPrice(pool, target, token, difference > 0 ? "buy" : "sell")
+            ? getVolumeUntilPrice(leg.pool, target, leg.token, difference > 0 ? "buy" : "sell")
             : 0;
 
-        return { ...base, target, difference, volumeUntilPrice, hasPrediction: true };
+        return {
+          ...base,
+          target,
+          difference,
+          volumeUntilPrice,
+          source: completion?.source.get(leg.outcomeNumber) ?? null,
+          hasTarget: true,
+        };
       });
 
       return {

@@ -353,9 +353,10 @@ export interface ZcashNu7Row {
   outcome: number;
   /**
    * The absolute pool price this one outcome should trade at, in [0, 1]. Not a share of the
-   * question and not normalised — every NU7 outcome has its own pool, so a target on outcome 2 is
-   * executable whatever was said (or left unsaid) about outcome 3. Targets within a question
-   * therefore need not sum to 1.
+   * question — but the outcomes of one question are mutually exclusive, so the full set of targets
+   * does have to sum to 1. A file need not spell all of it out: `completeNu7Targets` derives
+   * whatever is left out from the market's own prices, the same way the binary contest derives NO
+   * from YES. A question summing above 1 is rejected by `parseZcashNu7CSV`.
    */
   prediction: number;
 }
@@ -374,14 +375,28 @@ export interface ZcashNu7OutcomeRow {
   token: Address;
   /** Null when this outcome has no pool. */
   price: number | null;
-  /** The user's target, clamped to [MIN_PRICE, 1 - MIN_PRICE]. Null means no view. */
+  /**
+   * The target for this pool, clamped to [MIN_PRICE, 1 - MIN_PRICE]. Null means the question was
+   * not annotated at all, or this outcome has no pool. Within an annotated question the targets sum
+   * to 1 across the pooled outcomes — see `completeNu7Targets`.
+   */
   target: number | null;
   /** `target - price`. Null when either is null. */
   difference: number | null;
   /** Swap input to move this pool to `target`: collateral for a buy, outcome tokens for a sell. */
   volumeUntilPrice: number;
   balance?: bigint;
-  hasPrediction: boolean;
+  /**
+   * Where the target came from. `"file"` is a row the user wrote; `"derived"` is one the completion
+   * filled in from the probability their rows left over. Null when there is no target. Presentation
+   * only — the planner treats the two identically, which is the point of completing them.
+   */
+  source: "file" | "derived" | null;
+  /**
+   * Whether this leg has a usable target, and so may be traded. NOT "the user typed this one" —
+   * that is `source === "file"`. A derived leg is as tradable as a written one.
+   */
+  hasTarget: boolean;
 }
 
 export interface ZcashNu7TableData {

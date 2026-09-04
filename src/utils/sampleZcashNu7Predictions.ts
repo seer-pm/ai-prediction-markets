@@ -8,9 +8,11 @@ import type { ZcashNu7Row } from "@/types";
  * header of `./zcashNu7Markets`). So it teaches the *shape* instead — how the two index columns
  * work, and that a file may be partial.
  *
- * The numbers are placeholders, not an opinion. Two questions are annotated and three are left out
- * entirely; Q1 is given every outcome and Q4 only two of its three, because both are valid — an
- * outcome with no row simply has no target and is never traded.
+ * The numbers are placeholders, not an opinion, but the two shapes are chosen. Three questions are
+ * left out entirely, which means no view and no trades. Q1 names all four of its outcomes and they
+ * sum to 1, the fully-specified case. Q4 names two of its three, summing to 0.85, which is the case
+ * worth showing: `completeNu7Targets` hands the remaining 0.15 to the outcome the file skipped, so
+ * the question still adds up to 1 and that third outcome is traded like the other two.
  *
  * For a file that already carries the real numbering *and* the market's own current prices, use
  * **Export market view** on the tab: it writes exactly these three columns, so it round-trips.

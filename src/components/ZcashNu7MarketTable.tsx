@@ -39,6 +39,26 @@ interface ZcashNu7MarketTableProps {
 const COLUMN_COUNT = 6;
 
 /**
+ * Per-question totals for the band row.
+ *
+ * The market's own sum is here as the yardstick: these are single-select questions, so it sits at
+ * ~1 whenever the pools are behaving, and printing the user's beside it is what makes "your numbers
+ * are a distribution, not four independent guesses" visible rather than merely documented. The
+ * predicted sum is 1 by construction once `completeNu7Targets` has run, so a value that is NOT 1 is
+ * a real signal — an unannotated question shows a dash instead.
+ */
+const questionSums = (market: ZcashNu7TableData) => {
+  const pooled = market.outcomes.filter((leg) => leg.price !== null);
+  const predicted = market.outcomes.filter((leg) => leg.target !== null);
+  return {
+    market: pooled.length ? pooled.reduce((sum, leg) => sum + (leg.price ?? 0), 0) : null,
+    predicted: predicted.length
+      ? predicted.reduce((sum, leg) => sum + (leg.target ?? 0), 0)
+      : null,
+  };
+};
+
+/**
  * The NU7 ballot as one table: a band per question, then a row per substantive outcome.
  *
  * Every other contest lists one row per *market*, because each of their markets is a single number.
@@ -70,7 +90,7 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
       <CardHeader
         eyebrow="Zcash · NU7"
         title="Predicted outcome prices"
-        description="One row per outcome, grouped by ballot question. Your number sits beside the market's, and the difference is what a run would trade."
+        description="One row per outcome, grouped by ballot question. Your number sits beside the market's, and the difference is what a run would trade. Greyed predictions were derived from the outcomes you did name, so each question's targets add up to 1."
         actions={
           onExport && (
             <ExportWeightsButton
@@ -133,6 +153,20 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
                         Settled
                       </Badge>
                     )}
+                    {(() => {
+                      const sums = questionSums(market);
+                      if (sums.market === null && sums.predicted === null) return null;
+                      return (
+                        <span className="mt-1 block text-label text-ink-4">
+                          Predicted{" "}
+                          <span className="font-mono text-ink-3">
+                            {formatWeight(sums.predicted)}
+                          </span>{" "}
+                          · Market{" "}
+                          <span className="font-mono text-ink-3">{formatWeight(sums.market)}</span>
+                        </span>
+                      );
+                    })()}
                   </td>
                 </tr>
 
@@ -150,7 +184,17 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
                     <Td numeric title={preciseValue(leg.price)}>
                       {formatWeight(leg.price)}
                     </Td>
-                    <Td numeric className="text-ink" title={preciseValue(leg.target)}>
+                    {/* Derived targets are muted so the user can tell their own numbers from the
+                        ones the completion filled in — without hiding that both are traded. */}
+                    <Td
+                      numeric
+                      className={leg.source === "derived" ? "text-ink-4" : "text-ink"}
+                      title={
+                        leg.source === "derived"
+                          ? `${preciseValue(leg.target)} — derived from the probability your other rows for this question left over`
+                          : preciseValue(leg.target)
+                      }
+                    >
                       {formatWeight(leg.target)}
                     </Td>
                     <Td className="text-right">

@@ -101,7 +101,7 @@ export const ZcashNu7TradingInterface: React.FC<TradingInterfaceProps> = ({
           tradeExecutor,
         })
       }
-      // Four plain sentences, not the algorithm. The mint mechanics — one complete set per question
+      // Five plain sentences, not the algorithm. The mint mechanics — one complete set per question
       // funding all of its sells, sized against the hungriest — are ours to get right, not the
       // user's to audit; they live in `planZcashNu7Legs`. The last line stays because it is the one
       // thing that shows up in the wallet afterwards and would otherwise look like a bug.
@@ -111,6 +111,11 @@ export const ZcashNu7TradingInterface: React.FC<TradingInterfaceProps> = ({
           <li>
             Each outcome is traded toward your number: sold where the market prices it higher, bought
             where it prices it lower.
+          </li>
+          <li>
+            Outcomes you left out of a question you did predict get whatever probability your own
+            numbers leave over, split the way the market splits it, and are traded too — the
+            outcomes of one question have to add up to 1.
           </li>
           <li>
             If a question cannot afford every buy, all of them move part of the way rather than one

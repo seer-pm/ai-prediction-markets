@@ -9,10 +9,11 @@ import { formatUnits, parseUnits } from "viem";
  * quote, and splitting them keeps the arithmetic readable and checkable on its own.
  *
  * **The binary contest's three-branch taxonomy does not carry over.** `planPaired` / `planDualBuy` /
- * `planDualSell` exist only because two pools price the *same* question, so YES+NO has to be held
- * near 1 and those branches are really a statement about where that sum sits. Here every outcome has
- * its own pool and the targets are absolute and independent by construction, so there is one shape:
- * a set of sell legs and a set of buy legs. This planner is simpler than the binary one, not harder.
+ * `planDualSell` exist only because two pools price the *same* question, so where YES+NO sits
+ * relative to 1 decides the shape of the move. A NU7 question's targets sum to 1 before this module
+ * ever sees them — `completeNu7Targets` guarantees it — so the sum is not a variable here and there
+ * is nothing for a branch to be a statement about. One shape: a set of sell legs and a set of buy
+ * legs. This planner is simpler than the binary one, not harder.
  */
 
 /**
@@ -25,9 +26,9 @@ import { formatUnits, parseUnits } from "viem";
  */
 export const ZCASH_NU7_MIN_EDGE = 0.005;
 
-/** Whether this leg's prediction disagrees with its pool by enough to be worth acting on. */
+/** Whether this leg's target disagrees with its pool by enough to be worth acting on. */
 export const hasNu7Edge = (leg: ZcashNu7OutcomeRow) =>
-  leg.hasPrediction && Math.abs(leg.difference ?? 0) >= ZCASH_NU7_MIN_EDGE;
+  leg.hasTarget && Math.abs(leg.difference ?? 0) >= ZCASH_NU7_MIN_EDGE;
 
 /** Edge, a pool to trade against, and enough depth to make a transaction worth its gas. */
 export const isNu7LegActionable = (leg: ZcashNu7OutcomeRow) =>
@@ -106,8 +107,12 @@ export interface ZcashNu7Plan {
  *     S = { i : d_i <= -EDGE, v_i >= VOLUME_MIN }    sell legs
  *     B = { i : d_i >= +EDGE, v_i >= VOLUME_MIN }    buy legs
  *
- * An outcome with no target is in neither set and is never traded. That is the point of the format:
- * each outcome has its own pool, so a view on outcome 2 is executable on its own.
+ * Every pooled outcome of an annotated question has a target by the time it reaches here, whether
+ * the user wrote it or `completeNu7Targets` derived it, and this module cannot tell the two apart —
+ * deliberately, since a derived target is as much a claim about the world as a written one. An
+ * outcome falls out of both sets only by sitting inside EDGE of its pool, which is what usually
+ * happens to a derived leg: weighting the residual by market price leaves it near where it started.
+ * A question with no rows at all has no targets and is never reached.
  *
  * 1. THE MINT. Selling outcome i beyond b_i needs tokens only a complete set can produce, and one
  *    set yields one of EVERY outcome. So m sets serve every sell leg at once, and the binding leg is
@@ -163,26 +168,35 @@ export interface ZcashNu7Plan {
  * `pairedZcashQuotes`.
  *
  * WORKED EXAMPLE, which the implementation is checked against. Q1, four substantive outcomes priced
- * [0.50, 0.25, 0.15, 0.10]. The user predicts outcome 1 -> 0.35 and outcome 2 -> 0.40, with no view
- * on 3 or 4 (their targets sum to 0.75, which is fine — nothing here is normalised). Balances are
- * zero, v_1 = 60 tokens, v_2 = 45 sUSDS, share = 40.
+ * [0.50, 0.25, 0.15, 0.10]. The user writes one row: outcome 1 -> 0.35. `completeNu7Targets` splits
+ * the remaining 0.65 across the other three by their own prices (0.25 : 0.15 : 0.10), giving targets
+ * [0.35, 0.325, 0.195, 0.130], which sum to 1. Balances are zero, share = 40, and the volumes come
+ * back as v_1 = 60 tokens, v_2 = 22, v_3 = 13, v_4 = 9 sUSDS.
  *
- *     S = {1}, B = {2}
+ *     d = [-0.150, +0.075, +0.045, +0.030]     S = {1}, B = {2, 3, 4}
  *     need_1 = 60                      m = min(40, 60) = 40
  *     sell_1 = min(60, 0 + 40) = 40 tokens
- *     ceiling_2 = 45
+ *     ceilings      = 22, 13, 9        buyTotal = 44
  *     cashAfterMint = max(0, 40 - 40) = 0
  *     estProceeds   = 40 * 0.50 = 20
- *     buyScale      = min(1, (0 + 20) / 45) = 0.444
- *     buy_2         = 20 sUSDS
+ *     buyScale      = min(1, (0 + 20) / 44) = 0.455
+ *     buys          = 10.00, 5.91, 4.09 sUSDS
  *
- * 40 sUSDS out to mint, ~20 back from selling outcome 1, 20 spent buying outcome 2 — and the wallet
- * keeps 40 tokens each of outcomes 2, 3, 4 and Invalid, worth about 40 * (1 - 0.50) = 20 sUSDS,
- * exactly the mint cost minus the sell proceeds. The arithmetic closes.
+ * 40 sUSDS out to mint, ~20 back from selling outcome 1, 20 spent buying the other three — and the
+ * wallet keeps the 40 tokens each of outcomes 2, 3, 4 that the mint delivered, worth about
+ * 40 * (1 - 0.50) = 20 sUSDS, exactly the mint cost minus the sell proceeds. The arithmetic closes.
  *
- * That leftover inventory is inherent to shorting through complete sets, not a defect, and it has
- * precedent — `getZcashQuote` documents the same for the Invalid token it mints and never sells:
- * "It is left in the wallet deliberately." **Sell all positions** clears it in one click.
+ * Note what the completion costs and what it buys. Three legs the user never typed are now real
+ * trades spending real budget, and that is the point: the mass taken off outcome 1 has to go
+ * somewhere, and saying where is what keeps the question's basket at 1. Move outcome 1 alone and the
+ * basket lands at 0.85, where anyone can buy all four legs for 0.85 and redeem them for 1 —
+ * profiting off the user's own price move. The wider the named view, the more the derived legs
+ * matter; a view that barely moves its pool derives legs inside EDGE that never trade at all.
+ *
+ * The minted tokens of outcomes 2, 3 and 4 are no longer idle inventory either — the completion says
+ * the user thinks they are worth more than the pool does, so holding them IS the position. Only the
+ * Invalid token is left over now, with the precedent `getZcashQuote` sets for the same token: "It is
+ * left in the wallet deliberately." **Sell all positions** clears it in one click.
  *
  * Returns null when nothing is actionable.
  */

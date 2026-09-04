@@ -52,8 +52,13 @@ const ZCASH_NU7_SAMPLE_CONFIG: SampleCsvConfig = {
  * Like the other contests this takes a CSV of your numbers, diffs it against the market and executes
  * the whole disagreement in one batched run. What is different is the shape of the file: NU7 is the
  * only categorical set here, so a row names a question *and* an outcome within it, and the number is
- * that one outcome's target price rather than a share of the question. Every outcome has its own
- * pool, so rows can be left out freely at both levels and nothing is normalised.
+ * that one outcome's target price rather than a share of the question.
+ *
+ * Questions can be left out freely — an omitted question is simply not traded. Outcomes *within* an
+ * annotated question cannot, because they are mutually exclusive and their targets have to sum to 1
+ * to mean anything; what the file leaves out is derived from the market's own prices by
+ * `completeNu7Targets` and traded alongside the rest. See its header for why the alternative costs
+ * the user money.
  *
  * There is one way in: the file. The cards are a read-only market view showing your number beside
  * the market's, and every position is opened by the single batched run behind "Start trading".
@@ -145,6 +150,21 @@ export const ZcashNu7Markets = () => {
     [tableData],
   );
 
+  const rejectedRows = useMemo(
+    () =>
+      issues.filter(
+        (issue) => issue.kind === "no-such-outcome" || issue.kind === "no-pool",
+      ),
+    [issues],
+  );
+  const completionNotes = useMemo(
+    () =>
+      issues.filter(
+        (issue) => issue.kind === "sum-renormalised" || issue.kind === "residual-exhausted",
+      ),
+    [issues],
+  );
+
   const exportMarketView = useCallback(() => {
     if (!tableData) return;
     downloadCsv(
@@ -158,15 +178,23 @@ export const ZcashNu7Markets = () => {
       // rather than a convenience — outcome labels live on chain and appear in no static file, so an
       // export is how the numbering is learned. Outcomes with no pool are left out: a prediction on
       // one cannot be traded anyway, and including it would seed a row the diff hook then warns about.
-      tableData.flatMap((row) =>
-        row.outcomes
-          .filter((leg) => leg.price !== null)
-          .map((leg) => ({
-            question: row.question,
-            outcome: leg.outcomeNumber,
-            prediction: Number((leg.price ?? 0).toFixed(4)),
-          })),
-      ),
+      //
+      // Each question's prices are scaled onto 1 before they are written. The pools only sit at 1 by
+      // arbitrage, so on a busy day they drift — and a raw export summing past `NU7_SUM_TOLERANCE`
+      // would be rejected by our own parser on the way back in, which is the one thing this file
+      // must never do. Scaling also makes an unedited round trip mean what it looks like it means:
+      // a coherent "I agree with the market", rather than a distribution the completion step would
+      // quietly rescale underneath the user.
+      tableData.flatMap((row) => {
+        const pooled = row.outcomes.filter((leg) => leg.price !== null);
+        const sum = pooled.reduce((total, leg) => total + (leg.price ?? 0), 0);
+        const scale = sum > 0 ? 1 / sum : 0;
+        return pooled.map((leg) => ({
+          question: row.question,
+          outcome: leg.outcomeNumber,
+          prediction: Number(((leg.price ?? 0) * scale).toFixed(4)),
+        }));
+      }),
       "zcash-nu7-market-view",
     );
   }, [tableData]);
@@ -242,13 +270,17 @@ export const ZcashNu7Markets = () => {
         </Panel>
       )}
 
-      {issues.length > 0 && (
+      {/* Two panels, because the two kinds of issue are not the same kind of news. A row that names
+          something the ballot does not have is a mistake in the file; a question that had to be
+          completed or rescaled is the system working as designed, and dressing it in an alert would
+          teach the user to ignore the alert. */}
+      {rejectedRows.length > 0 && (
         <Panel
           tone="error"
-          title={`${issues.length} ${issues.length === 1 ? "row" : "rows"} in your file did not match the ballot`}
+          title={`${rejectedRows.length} ${rejectedRows.length === 1 ? "row" : "rows"} in your file did not match the ballot`}
         >
           <ul className="list-inside list-disc space-y-1">
-            {issues.map((issue) => (
+            {rejectedRows.map((issue) => (
               <li key={`${issue.kind}-${issue.question}-${issue.outcome}`}>
                 {issue.kind === "no-such-outcome"
                   ? `Q${issue.question} has no outcome ${issue.outcome} — it has ${issue.substantiveCount}.`
@@ -257,6 +289,20 @@ export const ZcashNu7Markets = () => {
             ))}
           </ul>
           <p className="mt-2">These rows are ignored; everything else was loaded.</p>
+        </Panel>
+      )}
+
+      {completionNotes.length > 0 && (
+        <Panel tone="info" title="How your predictions were completed">
+          <ul className="list-inside list-disc space-y-1">
+            {completionNotes.map((issue) => (
+              <li key={`${issue.kind}-${issue.question}`}>
+                {issue.kind === "sum-renormalised"
+                  ? `Q${issue.question}: you gave every outcome a number and they sum to ${issue.sum.toFixed(2)}, not 1. They have been scaled to fit — check the question if that was not intended.`
+                  : `Q${issue.question}: your own numbers account for the whole question, so the ${issue.unnamedCount === 1 ? "outcome" : `${issue.unnamedCount} outcomes`} you left out ${issue.unnamedCount === 1 ? "is" : "are"} being treated as worth ~0 and will be sold down.`}
+              </li>
+            ))}
+          </ul>
         </Panel>
       )}
 
