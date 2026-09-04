@@ -2,6 +2,7 @@ import { AmountInput, Button, Dialog, ErrorPanel, Panel } from "@/components/ui"
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { DepositInterface } from "./DepositInterface";
 import type { TxProgressState } from "@/hooks/useTxProgress";
+import type { TxPhase } from "@/types";
 import { cn } from "@/utils/cn";
 import { collateral } from "@/utils/constants";
 import { formatAmount, safeParseUnits } from "@/utils/format";
@@ -58,6 +59,14 @@ export interface StrategyDialogProps {
   onAmountChange?: (amount: string) => void;
   /** Extra reason the run can't start, beyond the built-in ones. */
   blockedReason?: string;
+  /**
+   * The stages this contest's run actually walks through. Defaults to `STRATEGY_PHASES`.
+   *
+   * Overridden by a contest whose run skips stages the shared list assumes — an owner-signed
+   * single-pass run never authorises a session key and never merges, and `RunLedger` would
+   * otherwise tick those rows as done on success, reporting work that never happened.
+   */
+  phases?: TxPhase[];
 }
 
 interface FormValues {
@@ -96,6 +105,7 @@ export function StrategyDialog({
   onSubmit,
   onAmountChange,
   blockedReason,
+  phases = STRATEGY_PHASES,
 }: StrategyDialogProps) {
   const {
     register,
@@ -189,7 +199,7 @@ export function StrategyDialog({
 
         {status !== "idle" && (
           <RunLedger
-            phases={STRATEGY_PHASES}
+            phases={phases}
             current={mutation.progress.current}
             completed={mutation.progress.completed}
             skipped={mutation.progress.skipped}

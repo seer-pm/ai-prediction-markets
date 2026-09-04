@@ -1,4 +1,5 @@
 import { SupportedChain } from "@/utils/constants";
+import { MarketStatus } from "@seer-pm/sdk";
 import { GetPoolHourDatasQuery } from "@seer-pm/sdk/subgraph/swapr";
 import { Address, TransactionReceipt } from "viem";
 
@@ -333,3 +334,86 @@ export type ChartSeries = {
   /** Latest resolvable price. Drives the legend readout and its sort order. */
   lastPrice: number | null;
 };
+
+/**
+ * One row of a Zcash NU7 predictions CSV: `question,outcome,prediction`.
+ *
+ * The only contest whose markets are categorical, so a row has to name both the ballot question and
+ * which outcome within it. Both identifiers already exist and are stable — see
+ * `@/utils/zcashNu7Markets` for the question numbering and `parseZcashNu7CSV` for the outcome one.
+ */
+export interface ZcashNu7Row {
+  /** 1-based ballot number — matches `ZcashNu7Market.id`. */
+  question: number;
+  /**
+   * 1-based over this market's *substantive* outcomes. Invalid is never numbered: it is always the
+   * last on-chain outcome (`invalidIndexOf`), has no pool, and its price is always null, so it can
+   * be neither predicted nor traded.
+   */
+  outcome: number;
+  /**
+   * The absolute pool price this one outcome should trade at, in [0, 1]. Not a share of the
+   * question and not normalised — every NU7 outcome has its own pool, so a target on outcome 2 is
+   * executable whatever was said (or left unsaid) about outcome 3. Targets within a question
+   * therefore need not sum to 1.
+   */
+  prediction: number;
+}
+
+/** One substantive outcome of one NU7 market, diffed against the user's number. */
+export interface ZcashNu7OutcomeRow {
+  /**
+   * Index into `outcomes` / `wrappedTokens` / `prices` / `pools`. The only index the router and the
+   * pool lookups may ever be given — see `substantiveIndexes` in `useProcessZcashNu7Predictions`.
+   */
+  outcomeIndex: number;
+  /** The 1-based number the CSV uses, and the badge printed on the card. */
+  outcomeNumber: number;
+  /** Outcome label, verbatim from chain. */
+  outcome: string;
+  token: Address;
+  /** Null when this outcome has no pool. */
+  price: number | null;
+  /** The user's target, clamped to [MIN_PRICE, 1 - MIN_PRICE]. Null means no view. */
+  target: number | null;
+  /** `target - price`. Null when either is null. */
+  difference: number | null;
+  /** Swap input to move this pool to `target`: collateral for a buy, outcome tokens for a sell. */
+  volumeUntilPrice: number;
+  balance?: bigint;
+  hasPrediction: boolean;
+}
+
+export interface ZcashNu7TableData {
+  marketId: Address;
+  /** 1-based ballot number. */
+  question: number;
+  shortName: string;
+  marketName: string;
+  collateralToken: Address;
+  /** EVERY outcome token in on-chain order, Invalid included — `splitPosition` needs the whole set. */
+  wrappedTokens: Address[];
+  /** Substantive outcomes only, in on-chain order. */
+  outcomes: ZcashNu7OutcomeRow[];
+  marketStatus: MarketStatus;
+  /** sUSDS this market may spend — its slice of the mint budget. Set by the allocator. */
+  amount?: string;
+}
+
+/** Informative only, for debugging a run — nothing branches on it. */
+export type ZcashNu7QuoteType = "sell" | "buy" | "mixed";
+
+export interface ZcashNu7QuoteResult {
+  quoteType: ZcashNu7QuoteType;
+  /** Sells first, then buys. The order is load-bearing — see `getZcashNu7Quote`. */
+  quotes: UniswapQuoteTradeResult[];
+  row: ZcashNu7TableData;
+  /** Complete sets to mint for this market before its sell legs can settle. */
+  mintAmount?: string;
+}
+
+export interface ZcashNu7TradeProps {
+  tradeExecutor: Address;
+  amount: string;
+  tableData: ZcashNu7TableData[];
+}

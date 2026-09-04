@@ -35,6 +35,20 @@ export interface ZcashNu7Market {
  */
 export const invalidIndexOf = (outcomes: readonly unknown[]) => outcomes.length - 1;
 
+/**
+ * The CSV numbers substantive outcomes from 1, skipping Invalid. Invalid is always the LAST on-chain
+ * outcome (see `invalidIndexOf`), so the substantive outcomes occupy indices 0..K-1 contiguously and
+ * the mapping today is exactly `outcomeIndex = outcomeNumber - 1`.
+ *
+ * It is written as a filter over `invalidIndexOf` rather than as `n - 1` on purpose. If Invalid ever
+ * stopped being last, `n - 1` would silently point every prediction at the wrong pool and the run
+ * would trade the wrong outcomes at prices that still looked plausible. This follows the data.
+ */
+export const substantiveIndexes = (outcomes: readonly unknown[]): number[] => {
+  const invalid = invalidIndexOf(outcomes);
+  return outcomes.map((_, index) => index).filter((index) => index !== invalid);
+};
+
 export const ZCASH_NU7_MARKETS: readonly ZcashNu7Market[] = [
   {
     id: 1,

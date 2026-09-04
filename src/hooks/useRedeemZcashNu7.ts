@@ -15,7 +15,7 @@ interface RedeemZcashNu7Props {
  * Same flat-market redeem as the grants set — these are top-level markets on sUSDS too — with this
  * contest's own caches to refresh.
  *
- * Session key rather than the owner-signed path `useTradeOutcome` uses: a redeem can span all five
+ * Session key rather than the owner-signed path `useSellAllZcashNu7` uses: a redeem can span all five
  * markets at once and shares the `RedeemL2Interface` progress ledger, which is built around it.
  */
 export const useRedeemZcashNu7 = (onSuccess?: () => unknown) => {

@@ -1,81 +1,88 @@
+import { ContestBar } from "@/components/contest/ContestBar";
 import { useContest } from "@/components/contest/contestState";
-import { OutcomeTradeDialog } from "@/components/trade/OutcomeTradeDialog";
 import { RedeemL2Interface } from "@/components/trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "@/components/trade/SellAllTokensInterface";
-import { Button, Card, ErrorPanel, Panel, Skeleton } from "@/components/ui";
-import {
-  ZcashNu7MarketCard,
-  type OutcomeTradeRequest,
-} from "@/components/ZcashNu7MarketCard";
+import { ZcashNu7TradingInterface } from "@/components/trade/ZcashNu7TradingInterface";
+import { Button, ErrorPanel, Panel } from "@/components/ui";
+import { ZcashNu7MarketTable } from "@/components/ZcashNu7MarketTable";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useProcessZcashNu7Predictions } from "@/hooks/useProcessZcashNu7Predictions";
 import { useRedeemZcashNu7 } from "@/hooks/useRedeemZcashNu7";
 import { useSellAllZcashNu7, type SellAllNu7Position } from "@/hooks/useSellAllZcashNu7";
-import { useTokenBalance } from "@/hooks/useTokenBalance";
-import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
-import { useZcashNu7MarketsData } from "@/hooks/useZcashNu7MarketsData";
-import { collateral } from "@/utils/constants";
+import { ZcashNu7Row } from "@/types";
+import { downloadCsv } from "@/utils/common";
+import { tradeDisabledReason } from "@/utils/contest";
+import { parseZcashNu7CSV } from "@/utils/csvParser";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
+import { sampleZcashNu7Predictions } from "@/utils/sampleZcashNu7Predictions";
+import { isZcashNu7RowFundable } from "@/utils/zcashNu7Budget";
 import { invalidIndexOf } from "@/utils/zcashNu7Markets";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
-import { Address } from "viem";
+import ZcashNu7Charts from "./ZcashNu7Charts";
+import { GenericCSVUpload } from "../GenericCSVUpload";
+import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
+
+const ZCASH_NU7_CSV_FORMAT: CSVFormatInfo = {
+  headers: "question,outcome,prediction",
+  exampleRows: ["1,2,0.45", "3,1,0.7"],
+  description:
+    "One row per outcome: the question number, the outcome number, and your prediction.",
+};
+
+const ZCASH_NU7_SAMPLE_CONFIG: SampleCsvConfig = {
+  columns: [
+    { key: "question", title: "question" },
+    { key: "outcome", title: "outcome" },
+    { key: "prediction", title: "prediction" },
+  ],
+  dataMapper: (row) => ({
+    question: row.question,
+    outcome: row.outcome,
+    prediction: row.prediction,
+  }),
+  sampleData: sampleZcashNu7Predictions,
+  filename: "zcash-nu7-predictions",
+};
 
 /**
  * The Zcash NU7 coinholder poll — five categorical ballot questions.
  *
- * The one tab in this app that is not a prediction contest. The others take a CSV of your numbers,
- * diff it against the market and execute the whole disagreement in a single batched run; there is
- * no CSV here, no target price and no strategy. You pick an outcome, name an amount and trade it.
+ * Like the other contests this takes a CSV of your numbers, diffs it against the market and executes
+ * the whole disagreement in one batched run. What is different is the shape of the file: NU7 is the
+ * only categorical set here, so a row names a question *and* an outcome within it, and the number is
+ * that one outcome's target price rather than a share of the question. Every outcome has its own
+ * pool, so rows can be left out freely at both levels and nothing is normalised.
  *
- * That is a deliberate fit to the shape of the thing: 19 tradable outcomes across five questions is
- * a set someone forms a view on one at a time, and the trade wallet is already funded and approved,
- * so a direct trade costs one signature (see `useTradeOutcome`).
+ * There is one way in: the file. The cards are a read-only market view showing your number beside
+ * the market's, and every position is opened by the single batched run behind "Start trading".
+ * Selling out and redeeming stay available, since those are exits rather than ways to take a view.
  */
 export const ZcashNu7Markets = () => {
+  const [predictions, setPredictions] = useLocalStorage<ZcashNu7Row[]>(
+    "zcash-nu7-predictions",
+    [],
+  );
   const { finished } = useContest();
   const { account, tradeExecutor, canTrade } = useTradeWalletStatus();
 
-  const [trade, setTrade] = useState<OutcomeTradeRequest | null>(null);
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
   const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
+  const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
+  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
 
-  const { data, isLoading, error } = useZcashNu7MarketsData();
-  const markets = useMemo(() => data?.markets ?? [], [data?.markets]);
-
-  // Every outcome token of every market, flat and in market-then-outcome order. The card slices its
-  // own window back out by offset, so this order is load-bearing.
-  const allTokens = useMemo(
-    () => markets.flatMap((market) => market.wrappedTokens),
-    [markets],
-  );
-  const { data: balances, isLoading: isLoadingBalances } = useTokensBalances(
-    tradeExecutor as Address,
+  const {
+    data: tableData,
+    markets,
+    balanceByToken,
+    balances,
     allTokens,
-  );
-
-  const { data: collateralBalance, isLoading: isLoadingCollateral } = useTokenBalance({
-    address: tradeExecutor,
-    token: collateral.address,
-  });
-
-  // Where each market's outcomes start in the flat balance array.
-  const offsets = useMemo(() => {
-    let cursor = 0;
-    return markets.map((market) => {
-      const start = cursor;
-      cursor += market.wrappedTokens.length;
-      return start;
-    });
-  }, [markets]);
-
-  const balanceByToken = useMemo(() => {
-    const mapping: Record<string, bigint> = {};
-    allTokens.forEach((token, index) => {
-      const balance = balances?.[index];
-      if (balance !== undefined) mapping[token.toLowerCase()] = balance;
-    });
-    return mapping;
-  }, [allTokens, balances]);
+    issues,
+    isLoading,
+    isLoadingBalances,
+    error,
+  } = useProcessZcashNu7Predictions(predictions);
 
   const sellAll = useSellAllZcashNu7();
   const redeem = useRedeemZcashNu7();
@@ -123,105 +130,166 @@ export const ZcashNu7Markets = () => {
   const redeemState = redeemAvailability({
     hasRedeemable,
     isResolved:
-      !isLoading && !isLoadingBalances && !!data && balancesResolved(balances, allTokens),
+      !isLoading && !isLoadingBalances && !!markets.length && balancesResolved(balances, allTokens),
   });
 
-  // No pool on any outcome of any market. Distinct from "still loading": a table of "No pool"
-  // badges otherwise reads as a failure rather than a state.
+  // No pool on any outcome of any market. Distinct from "still loading": a wall of "No pool" badges
+  // otherwise reads as a failure rather than a state.
   const hasNoLiquidity = useMemo(
     () => markets.length > 0 && markets.every((market) => market.prices.every((p) => p === null)),
     [markets],
   );
 
-  const handleTrade = useCallback((request: OutcomeTradeRequest) => {
-    startTransition(() => setTrade(request));
-  }, []);
+  const fundableCount = useMemo(
+    () => tableData?.filter(isZcashNu7RowFundable).length ?? 0,
+    [tableData],
+  );
+
+  const exportMarketView = useCallback(() => {
+    if (!tableData) return;
+    downloadCsv(
+      [
+        { key: "question", title: "question" },
+        { key: "outcome", title: "outcome" },
+        { key: "prediction", title: "prediction" },
+      ],
+      // The market's own numbers, in exactly the format the upload expects: download it, edit the
+      // rows you disagree with, upload it back. On this contest that round trip is load-bearing
+      // rather than a convenience — outcome labels live on chain and appear in no static file, so an
+      // export is how the numbering is learned. Outcomes with no pool are left out: a prediction on
+      // one cannot be traded anyway, and including it would seed a row the diff hook then warns about.
+      tableData.flatMap((row) =>
+        row.outcomes
+          .filter((leg) => leg.price !== null)
+          .map((leg) => ({
+            question: row.question,
+            outcome: leg.outcomeNumber,
+            prediction: Number((leg.price ?? 0).toFixed(4)),
+          })),
+      ),
+      "zcash-nu7-market-view",
+    );
+  }, [tableData]);
 
   if (error) {
     return <ErrorPanel title="Market data could not be loaded" error={error} />;
   }
 
-  const tradeToken = trade?.market.wrappedTokens[trade.outcomeIndex];
+  const disabledReason =
+    hasNoLiquidity && !isLoading
+      ? "No liquidity has been seeded yet, so there is nothing to trade against."
+      : tradeDisabledReason({
+          hasPredictions: predictions.length > 0,
+          hasDifferences: fundableCount > 0,
+          isLoading,
+        });
 
   return (
     <>
+      <ZcashNu7Charts markets={tableData ?? []} isLoading={isLoading} />
+
       <Panel tone="info" title="The NU7 coinholder poll">
-        Five ballot questions, each a single-select market on Optimism. Buy the outcome you think
-        coinholders will pick; a winning share settles at 1 sUSDS and everything else at 0. Prices
-        here are what the market currently pays, not a forecast from us.
+        Five ballot questions, each a single-select market on Optimism. A winning share settles at 1
+        sUSDS and everything else at 0. Upload a file naming the price you think each outcome should
+        trade at, then run it: every disagreement with the market is traded in one go.
       </Panel>
 
-      {/* No prediction file to upload, so this is a plain action row rather than `ContestBar`,
-          which is built around a prediction count. */}
-      {canTrade && (
-        <Card className="flex flex-wrap items-center justify-end gap-3 !px-6 !py-4">
-          {!finished && (
-            <Button
-              size="sm"
-              onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
-              disabled={!hasSellTokens}
-              disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
-            >
-              Sell all positions
-            </Button>
-          )}
-          {/* Trading stops with the contest; claiming what you already hold does not. */}
-          {redeemState === "some" && (
-            <Button
-              size="sm"
-              variant="success"
-              onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
-              disabled={!account}
-            >
-              Redeem to sUSDS
-            </Button>
-          )}
-        </Card>
-      )}
+      <ContestBar
+        predictionCount={predictions.length}
+        onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
+        onClear={() => startTransition(() => setPredictions([]))}
+        actions={
+          <>
+            {canTrade && (
+              <>
+                {/* Trading stops with the contest; claiming what you already hold does not. */}
+                {!finished && (
+                  <Button
+                    size="sm"
+                    onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
+                    disabled={!hasSellTokens}
+                    disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
+                  >
+                    Sell all positions
+                  </Button>
+                )}
+                {redeemState === "some" && (
+                  <Button
+                    size="sm"
+                    variant="success"
+                    onClick={() => startTransition(() => setIsRedeemDialogOpen(true))}
+                    disabled={!account}
+                  >
+                    Redeem to sUSDS
+                  </Button>
+                )}
+                {!finished && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => startTransition(() => setIsTradeDialogOpen(true))}
+                    disabled={!!disabledReason || !account}
+                    disabledReason={disabledReason}
+                  >
+                    Start trading
+                  </Button>
+                )}
+              </>
+            )}
+          </>
+        }
+      />
 
       {hasNoLiquidity && (
         <Panel tone="info" title="Not tradable yet">
           All five markets are live on Optimism, but no liquidity has been seeded, so there are no
-          pools to price them. Prices and trading turn on once the pools exist.
+          pools to price them. Predictions can be uploaded now. Prices and trading turn on once the
+          pools exist.
         </Panel>
       )}
 
-      {isLoading && !markets.length
-        ? Array.from({ length: 5 }, (_, index) => (
-            <Card key={index}>
-              <Skeleton width="45%" height={14} />
-              <Skeleton className="mt-3" width="80%" height={18} />
-              <Skeleton className="mt-5" height={100} />
-            </Card>
-          ))
-        : markets.map((market, marketIndex) => (
-            <ZcashNu7MarketCard
-              key={market.id}
-              market={market}
-              balances={market.wrappedTokens.map(
-                (_, outcomeIndex) => balances?.[offsets[marketIndex] + outcomeIndex],
-              )}
-              balancesLoading={isLoadingBalances}
-              canTrade={canTrade}
-              tradingOpen={!finished}
-              onTrade={handleTrade}
-            />
-          ))}
+      {issues.length > 0 && (
+        <Panel
+          tone="error"
+          title={`${issues.length} ${issues.length === 1 ? "row" : "rows"} in your file did not match the ballot`}
+        >
+          <ul className="list-inside list-disc space-y-1">
+            {issues.map((issue) => (
+              <li key={`${issue.kind}-${issue.question}-${issue.outcome}`}>
+                {issue.kind === "no-such-outcome"
+                  ? `Q${issue.question} has no outcome ${issue.outcome} — it has ${issue.substantiveCount}.`
+                  : `Q${issue.question} outcome ${issue.outcome} (${issue.label}) has no pool yet, so it cannot be traded.`}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2">These rows are ignored; everything else was loaded.</p>
+        </Panel>
+      )}
 
-      {trade && tradeToken && tradeExecutor && (
-        <OutcomeTradeDialog
-          open
-          onOpenChange={(open) => !open && setTrade(null)}
-          side={trade.side}
+      <ZcashNu7MarketTable
+        markets={tableData ?? []}
+        isLoading={isLoading && !tableData?.length}
+        isLoadingBalances={isLoadingBalances}
+        onExport={exportMarketView}
+        exportDisabled={!tableData || hasNoLiquidity}
+      />
+
+      <GenericCSVUpload<ZcashNu7Row>
+        open={isCsvDialogOpen}
+        onOpenChange={setIsCsvDialogOpen}
+        onDataParsed={setPredictions}
+        parseFn={parseZcashNu7CSV}
+        formatInfo={ZCASH_NU7_CSV_FORMAT}
+        sampleConfig={ZCASH_NU7_SAMPLE_CONFIG}
+      />
+
+      {tradeExecutor && tableData && (
+        <ZcashNu7TradingInterface
+          open={isTradeDialogOpen}
+          onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
-          outcomeLabel={trade.market.outcomes[trade.outcomeIndex]}
-          outcomeToken={tradeToken}
-          outcomeSymbol={trade.market.outcomes[trade.outcomeIndex]}
-          collateralToken={trade.market.collateralToken}
-          outcomeBalance={balanceByToken[tradeToken.toLowerCase()] ?? 0n}
-          collateralBalance={collateralBalance?.value ?? 0n}
-          balanceLoading={isLoadingBalances || isLoadingCollateral}
-          price={trade.market.prices[trade.outcomeIndex] ?? null}
+          markets={tableData}
+          isLoadingBalances={isLoadingBalances}
         />
       )}
 

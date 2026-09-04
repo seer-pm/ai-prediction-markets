@@ -26,8 +26,8 @@ interface SellAllProps {
  * Liquidate every tradable outcome token on the NU7 tab.
  *
  * At most 19 sells across 5 markets, so unlike the grants set's 74 this fits comfortably in one
- * batch and needs no chunking. Owner-signed for the same reason as `useTradeOutcome`: one wallet
- * prompt beats the session key's authorise/fund/execute/refund round trip.
+ * batch and needs no chunking. Owner-signed because one wallet prompt beats the session key's
+ * authorise/fund/execute/refund round trip, which only pays for itself over many batches.
  *
  * Invalid is skipped — it has no pool, so a quote for it would only throw. It is reachable through
  * redeem once the market settles.
