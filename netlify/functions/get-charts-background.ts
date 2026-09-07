@@ -15,13 +15,9 @@ import { getChartData, getPoolIds } from "./utils/getChartData";
 import type { MarketOnChain } from "./utils/marketView";
 import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
-import { GetSwapsQuery } from "@seer-pm/sdk/subgraph/swapr";
+import { getPoolVolumes, poolPairKey, type PoolVolumeData } from "./utils/poolVolumes";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
-function pairKey(token: Address, collateral: Address) {
-  const { token0, token1 } = getToken0Token1(token, collateral);
-  return `${token0.toLowerCase()}_${token1.toLowerCase()}`;
-}
 
 /**
  * Persists one market's chart in both shapes.
@@ -99,15 +95,15 @@ const getL1Pairs = async (
   );
   const outcomes = (data.outcomes as string[]).concat(otherMarketData.outcomes as string[]);
   const chartDataMarket = wrappedTokens.map((token) => {
-    return poolIndex.get(pairKey(token, collateral)) ?? [];
+    return poolIndex.get(poolPairKey(token, collateral)) ?? [];
   });
   const totalVolumeMarket = wrappedTokens.reduce((acc, token) => {
-    const volumeByPair = volumeIndex.get(pairKey(token, collateral));
+    const volumeByPair = volumeIndex.get(poolPairKey(token, collateral));
     if (!volumeByPair) return acc;
     const { totalVolume0, totalVolume1, token0 } = volumeByPair;
     return (acc += isTwoStringsEqual(collateral, token0) ? totalVolume0 : totalVolume1);
   }, 0);
-  const poolData = volumeIndex.get(pairKey(wrappedTokens[0], collateral));
+  const poolData = volumeIndex.get(poolPairKey(wrappedTokens[0], collateral));
   const collateralSymbol = poolData ? isTwoStringsEqual(collateral, poolData.token0)
     ? poolData.token0Name
     : poolData.token1Name: "";
@@ -148,15 +144,15 @@ const getOctantPairs = async (
   const wrappedTokens = data.wrappedTokens as Address[];
   const outcomes = data.outcomes as string[];
   const chartDataMarket = wrappedTokens.map((token) => {
-    return poolIndex.get(pairKey(token, collateral)) ?? [];
+    return poolIndex.get(poolPairKey(token, collateral)) ?? [];
   });
   const totalVolumeMarket = wrappedTokens.reduce((acc, token) => {
-    const volumeByPair = volumeIndex.get(pairKey(token, collateral));
+    const volumeByPair = volumeIndex.get(poolPairKey(token, collateral));
     if (!volumeByPair) return acc;
     const { totalVolume0, totalVolume1, token0 } = volumeByPair;
     return (acc += isTwoStringsEqual(collateral, token0) ? totalVolume0 : totalVolume1);
   }, 0);
-  const poolData = volumeIndex.get(pairKey(wrappedTokens[0], collateral));
+  const poolData = volumeIndex.get(poolPairKey(wrappedTokens[0], collateral));
   const collateralSymbol = poolData
     ? isTwoStringsEqual(collateral, poolData.token0)
       ? poolData.token0Name
@@ -201,18 +197,18 @@ const getFlatMarketPairs = async (
   for (const market of markets) {
     const { id: marketId, wrappedTokens, outcomes } = market;
     const chartDataMarket = wrappedTokens.map(
-      (token) => poolIndex.get(pairKey(token, collateral)) ?? [],
+      (token) => poolIndex.get(poolPairKey(token, collateral)) ?? [],
     );
     if (chartDataMarket.every((series) => series.length === 0)) {
       continue;
     }
     const totalVolumeMarket = wrappedTokens.reduce((acc, token) => {
-      const volumeByPair = volumeIndex.get(pairKey(token, collateral));
+      const volumeByPair = volumeIndex.get(poolPairKey(token, collateral));
       if (!volumeByPair) return acc;
       const { totalVolume0, totalVolume1, token0 } = volumeByPair;
       return (acc += isTwoStringsEqual(collateral, token0) ? totalVolume0 : totalVolume1);
     }, 0);
-    const poolData = volumeIndex.get(pairKey(wrappedTokens[0], collateral));
+    const poolData = volumeIndex.get(poolPairKey(wrappedTokens[0], collateral));
     const collateralSymbol = poolData
       ? isTwoStringsEqual(collateral, poolData.token0)
         ? poolData.token0Name
@@ -261,19 +257,19 @@ const getOriginalityPairs = async (
   }[];
   for (const market of markets) {
     const totalVolumeMarket = market.wrappedTokens.reduce((acc, token) => {
-      const volumeByPair = volumeIndex.get(pairKey(token, market.collateralToken));
+      const volumeByPair = volumeIndex.get(poolPairKey(token, market.collateralToken));
       if (!volumeByPair) return acc;
       const { totalVolume0, totalVolume1, token0 } = volumeByPair;
       return (acc += isTwoStringsEqual(market.collateralToken, token0)
         ? totalVolume0
         : totalVolume1);
     }, 0);
-    const poolData = volumeIndex.get(pairKey(market.wrappedTokens[0], market.collateralToken));
+    const poolData = volumeIndex.get(poolPairKey(market.wrappedTokens[0], market.collateralToken));
     const collateralSymbol = poolData ? isTwoStringsEqual(market.collateralToken, poolData.token0)
       ? poolData.token0Name
       : poolData.token1Name : "";
     const chartDataMarket = market.wrappedTokens.map((token) => {
-      return poolIndex.get(pairKey(token, market.collateralToken)) ?? [];
+      return poolIndex.get(poolPairKey(token, market.collateralToken)) ?? [];
     });
     const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
       return {
@@ -322,21 +318,21 @@ const getL2Pairs = async (
   }[];
   for (const market of markets) {
     const totalVolumeMarket = market.wrappedTokens.reduce((acc, token) => {
-      const volumeByPair = volumeIndex.get(pairKey(token, market.collateralToken));
+      const volumeByPair = volumeIndex.get(poolPairKey(token, market.collateralToken));
       if (!volumeByPair) return acc;
       const { totalVolume0, totalVolume1, token0 } = volumeByPair;
       return (acc += isTwoStringsEqual(market.collateralToken, token0)
         ? totalVolume0
         : totalVolume1);
     }, 0);
-    const poolData = volumeIndex.get(pairKey(market.wrappedTokens[0], market.collateralToken));
+    const poolData = volumeIndex.get(poolPairKey(market.wrappedTokens[0], market.collateralToken));
     const collateralSymbol = poolData
       ? isTwoStringsEqual(market.collateralToken, poolData.token0)
         ? poolData.token0Name
         : poolData.token1Name
       : "";
     const chartDataMarket = market.wrappedTokens.map((token) => {
-      return poolIndex.get(pairKey(token, market.collateralToken)) ?? [];
+      return poolIndex.get(poolPairKey(token, market.collateralToken)) ?? [];
     });
     const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
       return {
@@ -370,76 +366,6 @@ function buildPoolIndex(chartData: PoolHourData[]) {
     }
 
     map.get(key)!.push(data);
-  }
-
-  return map;
-}
-
-type PoolVolumeData = {
-  poolId: string;
-
-  token0: Address;
-  token1: Address;
-
-  token0Name: string;
-  token1Name: string;
-
-  totalVolume0: number;
-  totalVolume1: number;
-
-  swapCount: number;
-
-  firstTimestamp: number;
-  lastTimestamp: number;
-};
-
-function buildVolumeIndex(swaps: GetSwapsQuery["swaps"]) {
-  const map = new Map<string, PoolVolumeData>();
-
-  for (const swap of swaps) {
-    const poolId = swap.pool.id.toLowerCase();
-
-    const token0 = swap.pool.token0.id.toLowerCase() as Address;
-    const token1 = swap.pool.token1.id.toLowerCase() as Address;
-
-    const amount0 = Math.abs(Number(swap.amount0));
-    const amount1 = Math.abs(Number(swap.amount1));
-
-    const timestamp = Number(swap.timestamp);
-    const key = `${token0}_${token1}`;
-    if (!map.has(key)) {
-      map.set(key, {
-        poolId,
-
-        token0,
-        token1,
-
-        totalVolume0: 0,
-        totalVolume1: 0,
-
-        swapCount: 0,
-
-        firstTimestamp: timestamp,
-        lastTimestamp: timestamp,
-        token0Name: swap.pool.token0.name,
-        token1Name: swap.pool.token1.name,
-      });
-    }
-
-    const current = map.get(key)!;
-
-    current.totalVolume0 += amount0;
-    current.totalVolume1 += amount1;
-
-    current.swapCount += 1;
-
-    if (timestamp < current.firstTimestamp) {
-      current.firstTimestamp = timestamp;
-    }
-
-    if (timestamp > current.lastTimestamp) {
-      current.lastTimestamp = timestamp;
-    }
   }
 
   return map;
@@ -492,11 +418,11 @@ export default async () => {
 
   console.log(allPoolIds.length);
   console.time("get chart");
-  const { chartData, swapsData } = await getChartData(allPoolIds);
+  const { chartData } = await getChartData(allPoolIds);
   console.timeEnd("get chart");
   console.log(chartData.length);
   const poolIndex = buildPoolIndex(chartData);
-  const volumeIndex = buildVolumeIndex(swapsData);
+  const volumeIndex = await getPoolVolumes(allPoolIds);
   try {
     console.log("getting l1 chart");
     await getL1Pairs(poolIndex, volumeIndex);

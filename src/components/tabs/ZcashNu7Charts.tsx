@@ -78,6 +78,7 @@ export default function ZcashNu7Charts({
       // The question itself, which the table's band row states only once per group.
       description={market?.marketName}
       volume={volumeLabel}
+      refreshMarketIds={selected ? [selected] : []}
       actions={
         segments.length > 0 && (
           <SegmentedControl

@@ -34,7 +34,8 @@ const ZCASH_CSV_FORMAT: CSVFormatInfo = {
   headers: "project,probability",
   exampleRows: ["Zcash Grants Hub,0.82", "ZODL Q1 2026 Core Protocol Development,0.15"],
   description:
-    "One row per proposal, and how likely you think coinholders are to fund it — a number between 0 and 1, so 0.82 means 82%. Leave a proposal out of the file if you have no view on it and it will not be traded.",
+    "One row per proposal, and how likely you think coinholders are to fund it — a number between 0 and 1, so 0.82 means 82%.",
+  valueColumn: "probability",
 };
 
 const ZCASH_SAMPLE_CONFIG: SampleCsvConfig = {
@@ -69,9 +70,8 @@ export const ZcashMarkets = () => {
   } = useProcessZcashPredictions(predictions);
 
   // 37 proposals share one chart, so they are fetched together rather than 37 times over.
-  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(
-    useMemo(() => Object.keys(marketIdToProject), [marketIdToProject]),
-  );
+  const chartMarketIds = useMemo(() => Object.keys(marketIdToProject), [marketIdToProject]);
+  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(chartMarketIds);
 
   // Raw market data for redeem scope (React Query dedupes with useProcessZcashPredictions).
   const { data: zcashMarketData } = useZcashMarketsData();
@@ -216,6 +216,7 @@ export const ZcashMarkets = () => {
         title="Approval odds over time"
         description="Each line is one proposal's YES price — the market's estimate of its chance of being approved."
         volume={volumeLabel}
+        refreshMarketIds={chartMarketIds}
       />
 
       {hasNoLiquidity && (

@@ -29,10 +29,14 @@ import { OctantTradingInterface } from "../trade/OctantTradingInterface";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 
+/** What the volume figure covers, for the refresh control. Module-level to keep it referentially stable. */
+const OCTANT_VOLUME_MARKETS = [OCTANT_MARKET_ID];
+
 const OCTANT_CSV_FORMAT: CSVFormatInfo = {
   headers: "project,percent",
   exampleRows: ["Protocol Guild,13.27", "Solidity,12.58"],
   description: "One row per project: its name, and the share of the round you predict (0–100).",
+  valueColumn: "percent",
 };
 
 const OCTANT_SAMPLE_CONFIG: SampleCsvConfig = {
@@ -182,6 +186,7 @@ export const OctantMarkets = () => {
         eyebrow="Octant"
         title="Project funding share over time"
         volume={volumeLabel}
+        refreshMarketIds={OCTANT_VOLUME_MARKETS}
         formatValue={formatOctantShare}
       />
 

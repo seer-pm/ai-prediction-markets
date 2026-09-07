@@ -1,3 +1,4 @@
+import { RefreshVolumeButton } from "@/components/contest/RefreshVolumeButton";
 import MarketChart from "@/components/MarketChart";
 import { Card, CardHeader, EmptyState, Skeleton } from "@/components/ui";
 import type { ChartSeries } from "@/types";
@@ -10,6 +11,12 @@ interface ContestChartProps {
   title: string;
   description?: string;
   volume?: string | ReactElement;
+  /**
+   * The markets `volume` was summed over. Given them, the figure gets a refresh control — the only
+   * thing on the card that is written by a cron rather than read live, so the only one worth a way
+   * of asking again. See `RefreshVolumeButton`.
+   */
+  refreshMarketIds?: string[];
   actions?: ReactNode;
   /** How the legend reads each series' latest price. Weights by default. */
   formatValue?: (value: number) => string;
@@ -23,14 +30,25 @@ export function ContestChart({
   title,
   description,
   volume,
+  refreshMarketIds,
   actions,
   formatValue,
 }: ContestChartProps) {
+  const volumeWithRefresh =
+    volume && refreshMarketIds?.length ? (
+      <span className="inline-flex items-center gap-1.5">
+        {volume}
+        <RefreshVolumeButton marketIds={refreshMarketIds} />
+      </span>
+    ) : (
+      volume
+    );
+
   if (data && data.length > 0) {
     return (
       <MarketChart
         data={data}
-        totalVolumeMarket={volume}
+        totalVolumeMarket={volumeWithRefresh}
         eyebrow={eyebrow}
         title={title}
         description={description}

@@ -2,6 +2,28 @@ import { L2Row, OctantRow, OriginalityRow, PredictionRow, ZcashNu7Row, ZcashRow 
 import { getZcashMarketByTitle } from "@/utils/zcashMarkets";
 import { ZCASH_NU7_MARKETS } from "@/utils/zcashNu7Markets";
 
+/**
+ * The cells of one data row, padded to the header's width.
+ *
+ * A predictions file may be partial: a row left out of the file means "no view" on that entry, and
+ * so does a row that is present with its value cell cleared. The second spelling is the one a
+ * spreadsheet produces — take **Export market view**, delete the numbers you have no opinion on, and
+ * you get `3,1,` back. Deleting the last value by hand takes its comma with it too, so a row shorter
+ * than the header is padded rather than called a shape error. A row *wider* than the header is still
+ * a real mistake and still throws.
+ */
+const rowCells = (line: string, columnCount: number, rowNumber: number): string[] => {
+  const values = line.split(",").map((v) => v.trim());
+
+  if (values.length > columnCount) {
+    throw new Error(`Row ${rowNumber}: Expected ${columnCount} columns, found ${values.length}`);
+  }
+
+  while (values.length < columnCount) values.push("");
+
+  return values;
+};
+
 export const parseCSV = (csvText: string): PredictionRow[] => {
   const lines = csvText.trim().split("\n");
 
@@ -27,19 +49,19 @@ export const parseCSV = (csvText: string): PredictionRow[] => {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
-    const values = line.split(",").map((v) => v.trim());
-
-    if (values.length !== 3) {
-      throw new Error(`Row ${i + 1}: Expected 3 columns, found ${values.length}`);
-    }
+    const values = rowCells(line, 3, i + 1);
 
     const repo = values[0];
     const parent = values[1];
     const weightStr = values[2];
 
-    // Check for empty values
-    if (!repo || !parent || !weightStr) {
-      throw new Error(`Row ${i + 1}: All columns must have values`);
+    // A cleared weight is how you say "no view on this repo" without deleting the row.
+    if (!weightStr) continue;
+
+    if (!repo || !parent) {
+      throw new Error(
+        `Row ${i + 1}: Missing repo or parent. Leave the weight blank to skip a row — a row that has a weight needs both.`,
+      );
     }
 
     // Check for duplicate repo
@@ -66,7 +88,7 @@ export const parseCSV = (csvText: string): PredictionRow[] => {
   }
 
   if (results.length === 0) {
-    throw new Error("CSV contains no valid data rows");
+    throw new Error("CSV contains no predictions — every row was blank or left out.");
   }
 
   return results;
@@ -97,18 +119,16 @@ export const parseOriginalityCSV = (csvText: string): OriginalityRow[] => {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
-    const values = line.split(",").map((v) => v.trim());
-
-    if (values.length !== 2) {
-      throw new Error(`Row ${i + 1}: Expected 2 columns, found ${values.length}`);
-    }
+    const values = rowCells(line, 2, i + 1);
 
     const repo = values[0];
     const originalityStr = values[1];
 
-    // Check for empty values
-    if (!repo || !originalityStr) {
-      throw new Error(`Row ${i + 1}: All columns must have values`);
+    // A cleared originality is how you say "no view on this repo" without deleting the row.
+    if (!originalityStr) continue;
+
+    if (!repo) {
+      throw new Error(`Row ${i + 1}: Missing repo. Leave the originality blank to skip a row.`);
     }
 
     // Check for duplicate repo
@@ -134,7 +154,7 @@ export const parseOriginalityCSV = (csvText: string): OriginalityRow[] => {
   }
 
   if (results.length === 0) {
-    throw new Error("CSV contains no valid data rows");
+    throw new Error("CSV contains no predictions — every row was blank or left out.");
   }
 
   return results;
@@ -165,18 +185,16 @@ export const parseOctantCSV = (csvText: string): OctantRow[] => {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
-    const values = line.split(",").map((v) => v.trim());
-
-    if (values.length !== 2) {
-      throw new Error(`Row ${i + 1}: Expected 2 columns, found ${values.length}`);
-    }
+    const values = rowCells(line, 2, i + 1);
 
     const project = values[0];
     const percentStr = values[1];
 
-    // Check for empty values
-    if (!project || !percentStr) {
-      throw new Error(`Row ${i + 1}: All columns must have values`);
+    // A cleared percent is how you say "no view on this project" without deleting the row.
+    if (!percentStr) continue;
+
+    if (!project) {
+      throw new Error(`Row ${i + 1}: Missing project. Leave the percent blank to skip a row.`);
     }
 
     // Check for duplicate project
@@ -202,7 +220,7 @@ export const parseOctantCSV = (csvText: string): OctantRow[] => {
   }
 
   if (results.length === 0) {
-    throw new Error("CSV contains no valid data rows");
+    throw new Error("CSV contains no predictions — every row was blank or left out.");
   }
 
   return results;
@@ -233,16 +251,15 @@ export const parseL2CSV = (csvText: string): L2Row[] => {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
-    const values = line.split(",").map((v) => v.trim());
+    const [dependency, repo, weightStr] = rowCells(line, 3, i + 1);
 
-    if (values.length !== 3) {
-      throw new Error(`Row ${i + 1}: Expected 3 columns, found ${values.length}`);
-    }
-    const [dependency, repo, weightStr] = values;
+    // A cleared weight is how you say "no view on this pair" without deleting the row.
+    if (!weightStr) continue;
 
-    // Check for empty values
-    if (!dependency || !repo || !weightStr) {
-      throw new Error(`Row ${i + 1}: All columns must have values`);
+    if (!dependency || !repo) {
+      throw new Error(
+        `Row ${i + 1}: Missing dependency or repo. Leave the weight blank to skip a row — a row that has a weight needs both.`,
+      );
     }
 
     // Check for duplicate dependency + repo
@@ -270,7 +287,7 @@ export const parseL2CSV = (csvText: string): L2Row[] => {
   }
 
   if (results.length === 0) {
-    throw new Error("CSV contains no valid data rows");
+    throw new Error("CSV contains no predictions — every row was blank or left out.");
   }
 
   return results;
@@ -297,11 +314,13 @@ const LEGACY_YES_NO_VALUES = new Set([
  * Zcash predictions: one row per proposal, and how likely you think coinholders are to approve it.
  *
  * A probability in [0, 1] rather than a yes/no call — the number *is* the price each pool is aimed
- * at, so 0.82 says "82% likely" and lands the YES pool there. Rows may be left out entirely: a
- * proposal with no row gets no prediction and is never traded, which is how you say "no view"
- * without inventing a number. The project name is validated against the ballot (`ZCASH_MARKETS`)
- * rather than being matched loosely later — a typo here would otherwise surface as a silently
- * untraded row.
+ * at, so 0.82 says "82% likely" and lands the YES pool there. Rows may be left out entirely, or
+ * left in with the probability cleared — either way that proposal gets no prediction and is never
+ * traded, which is how you say "no view" without inventing a number. A cleared cell is checked
+ * before the title is, so skipping a proposal never requires spelling it right.
+ *
+ * The project name is validated against the ballot (`ZCASH_MARKETS`) rather than being matched
+ * loosely later — a typo here would otherwise surface as a silently untraded row.
  */
 export const parseZcashCSV = (csvText: string): ZcashRow[] => {
   const lines = csvText.trim().split("\n");
@@ -327,17 +346,17 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
-    const values = line.split(",").map((v) => v.trim());
-
-    if (values.length !== 2) {
-      throw new Error(`Row ${i + 1}: Expected 2 columns, found ${values.length}`);
-    }
+    const values = rowCells(line, 2, i + 1);
 
     const project = values[0];
     const probabilityStr = values[1];
 
-    if (!project || !probabilityStr) {
-      throw new Error(`Row ${i + 1}: All columns must have values`);
+    // A cleared probability is how you say "no view on this proposal" without deleting the row.
+    // Checked before the ballot lookup below, so a skipped row is not held to the exact title.
+    if (!probabilityStr) continue;
+
+    if (!project) {
+      throw new Error(`Row ${i + 1}: Missing project. Leave the probability blank to skip a row.`);
     }
 
     const market = getZcashMarketByTitle(project);
@@ -380,7 +399,7 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
   }
 
   if (results.length === 0) {
-    throw new Error("CSV contains no valid data rows");
+    throw new Error("CSV contains no predictions — every row was blank or left out.");
   }
 
   return results;
@@ -396,7 +415,9 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
  * targets within a question need not sum to 1.
  *
  * Rows may be left out at both levels: an omitted question and an omitted outcome both mean "no
- * view", and neither is ever traded. Same convention as `parseZcashCSV` above.
+ * view", and neither is ever traded. A row present with its `prediction` cleared says the same
+ * thing — that is what you get from **Export market view** once you delete the numbers you have no
+ * opinion on, so it must not be an error. Same convention as `parseZcashCSV` above.
  *
  * Two deliberate departures from the parsers above:
  *
@@ -439,18 +460,21 @@ export const parseZcashNu7CSV = (csvText: string): ZcashNu7Row[] => {
     const line = lines[i].trim();
     if (!line) continue; // Skip empty lines
 
-    const values = line.split(",").map((v) => v.trim());
-
-    if (values.length !== 3) {
-      throw new Error(`Row ${i + 1}: Expected 3 columns, found ${values.length}`);
-    }
+    const values = rowCells(line, 3, i + 1);
 
     const questionStr = values[questionIndex];
     const outcomeStr = values[outcomeIndex];
     const predictionStr = values[predictionIndex];
 
-    if (!questionStr || !outcomeStr || !predictionStr) {
-      throw new Error(`Row ${i + 1}: All columns must have values`);
+    // A cleared prediction is how you say "no view on this outcome" without deleting the row —
+    // exactly what **Export market view** plus a spreadsheet gives you. Checked before the ballot
+    // lookups below, so a skipped row is never held to a question or outcome number.
+    if (!predictionStr) continue;
+
+    if (!questionStr || !outcomeStr) {
+      throw new Error(
+        `Row ${i + 1}: Missing question or outcome. Leave the prediction blank to skip a row — a row that has a prediction needs both.`,
+      );
     }
 
     // "Q1" is what the card header prints, so a user typing what they see is not punished.
@@ -494,7 +518,7 @@ export const parseZcashNu7CSV = (csvText: string): ZcashNu7Row[] => {
   }
 
   if (results.length === 0) {
-    throw new Error("CSV contains no valid data rows");
+    throw new Error("CSV contains no predictions — every row was blank or left out.");
   }
 
   return results;

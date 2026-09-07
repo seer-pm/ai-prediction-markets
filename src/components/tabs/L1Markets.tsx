@@ -35,6 +35,13 @@ import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 import { TradingInterface } from "../trade/TradingInterface";
 
+/**
+ * What the volume figure covers, for the refresh control. Module-level so the array identity is
+ * stable across renders. One id, not two: the chart job sums the parent and its "Other
+ * repositories" child into the parent's blob, and the refresh endpoint follows it there.
+ */
+const L1_VOLUME_MARKETS = [L1_MARKET_ID];
+
 const L1_CSV_FORMAT: CSVFormatInfo = {
   headers: "repo,parent,weight",
   exampleRows: [
@@ -42,6 +49,7 @@ const L1_CSV_FORMAT: CSVFormatInfo = {
     "https://github.com/ethereum/go-ethereum,ethereum,0.02100000",
   ],
   description: "One row per repository: its URL, its parent ecosystem, and the weight you predict.",
+  valueColumn: "weight",
 };
 
 const L1_SAMPLE_CONFIG: SampleCsvConfig = {
@@ -271,6 +279,7 @@ export const L1Markets = () => {
         eyebrow="Round 2 · L1"
         title="Repository weight in the Ethereum ecosystem"
         volume={volumeLabel}
+        refreshMarketIds={L1_VOLUME_MARKETS}
       />
 
       <ContestBar

@@ -59,9 +59,15 @@ const PERSISTED_QUERY_KEYS = new Set([
   "fetchL2MarketsData", // Round 2 L2 (default tab)
   "fetchZcashMarketsData", // Zcash Q3 2026 grants
   "fetchZcashNu7MarketsData", // Zcash NU7 poll (default tab)
-  // Chart history, one entry per market. Small enough to keep now that the series arrive
-  // precomputed — see `useMarketCharts`.
-  "marketChart",
+  // Chart history. Small enough to keep now that the series arrive precomputed — see
+  // `useMarketCharts`, which caches them indefinitely and refreshes in the background.
+  "marketChart", // one entry per market
+  // The batched entry the Zcash and Originality tabs read. It duplicates the per-market entries
+  // its fetch fans out into, and that duplication is the point: `PersistQueryClientProvider`
+  // rehydrates *while* rendering, so a query cannot seed itself off sibling entries at mount —
+  // without its own persisted copy this one has nothing to paint and falls back to the spinner,
+  // which is exactly the reload it is supposed to have stopped doing.
+  "marketCharts",
   "useTokensBalances", // L2 table balances
   "useTokenBalance", // sUSDS wallet balance
   // Persist the executor-check queries so predictedAddress is restored from

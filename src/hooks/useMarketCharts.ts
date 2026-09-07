@@ -1,7 +1,7 @@
 import { ChartSeries } from "@/types";
 import { fetchAppJson } from "@/utils/common";
 import { CHAIN_ID } from "@/utils/constants";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 /**
@@ -21,6 +21,42 @@ export type MarketChart = {
 type MarketChartsResponse = Record<string, MarketChart>;
 
 const EMPTY_CHART: MarketChart = { series: [], totalVolumeMarket: "" };
+
+/**
+ * Charts are kept forever and refreshed underneath.
+ *
+ * Price history is append-only, and the background job that precomputes it runs on a 15-minute
+ * cron — so a restored copy is never *wrong*, only behind. That makes it safe to treat the cache as
+ * the thing that paints: a market looked at once never shows an empty panel again, on a tab switch
+ * or on a cold reload out of IndexedDB, and the fresh series swaps in when it lands.
+ *
+ * The consumers read `isLoading` (pending *and* no data), not `isFetching`, so a background refresh
+ * never puts the spinner back over a chart that is already drawn.
+ */
+const CHART_QUERY_OPTIONS = {
+  retry: 1,
+  gcTime: Infinity,
+  /**
+   * Zero, against the 5-minute global default. The cached copy is what the user sees either way, so
+   * there is nothing to protect by suppressing the request behind it.
+   */
+  staleTime: 0,
+  /**
+   * `true` — the default — only refetches a *stale* entry, which is a distinction `staleTime: 0`
+   * has already erased; "always" says it outright and keeps the intent from quietly reversing if
+   * that staleTime is ever raised again.
+   */
+  refetchOnMount: "always",
+  /** Matches the cron that produces the series; anything faster re-downloads an identical payload. */
+  refetchInterval: 15 * 60 * 1000,
+  /** ...and only while the tab is actually being looked at. */
+  refetchIntervalInBackground: false,
+  /**
+   * Off, on top of the above. Originality draws 98 markets, which is three chunked requests, and
+   * refetching them every time the window regains focus buys nothing the interval doesn't.
+   */
+  refetchOnWindowFocus: false,
+} as const;
 
 /**
  * Ids per request. The endpoint caps a batch, and the ids ride in the query string, so a contest
@@ -50,7 +86,7 @@ async function fetchMarketCharts(marketIds: string[]): Promise<MarketChartsRespo
 /** One market's chart: the L1 and Octant tabs, and whichever repository L2 has selected. */
 export function useMarketChart(marketId: string | undefined) {
   return useQuery({
-    retry: 1,
+    ...CHART_QUERY_OPTIONS,
     enabled: !!marketId,
     queryKey: getMarketChartKey(marketId ?? ""),
     queryFn: async () => {
@@ -77,7 +113,7 @@ export function useMarketCharts(marketIds: string[] | undefined) {
   );
 
   return useQuery({
-    retry: 1,
+    ...CHART_QUERY_OPTIONS,
     enabled: ids.length > 0,
     queryKey: ["marketCharts", CHAIN_ID, ids.join(",")],
     queryFn: async () => {
@@ -88,6 +124,60 @@ export function useMarketCharts(marketIds: string[] | undefined) {
       }
 
       return charts;
+    },
+  });
+}
+
+/**
+ * Recompute the volume figure for these markets right now.
+ *
+ * The series behind a chart are only ever as current as the 15-minute cron that precomputes them,
+ * and that is fine — price history is append-only and the line moves visibly on its own. The volume
+ * *number* is what people watch after their own trade lands, so it gets its own endpoint
+ * (`refresh-market-volume`) that reads the pools' running totals directly, and this writes the
+ * answer over `totalVolumeMarket` in every cached entry that carries it — the per-market ones and
+ * the batched entry the Zcash and Originality tabs read — leaving `series` alone. No invalidation:
+ * refetching the whole chart to move one string would put the tab back through its loading state.
+ */
+export function useRefreshMarketVolume() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (marketIds: string[]) => {
+      // Chunked on the same boundary as `fetchMarketCharts`, and for the same reason: Originality
+      // asks about 98 markets at once, well past what one query string may carry.
+      const ids = [...new Set(marketIds.map((id) => id.toLowerCase()))];
+      const chunks: string[][] = [];
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        chunks.push(ids.slice(i, i + CHUNK_SIZE));
+      }
+
+      const results = await Promise.all(
+        chunks.map((chunk) =>
+          fetchAppJson<{ volumes: Record<string, string> }>("refresh-market-volume", {
+            ids: chunk.join(","),
+          }),
+        ),
+      );
+
+      return Object.assign({}, ...results.map(({ volumes }) => volumes)) as Record<string, string>;
+    },
+    onSuccess: (volumes) => {
+      const applyTo = (chart: MarketChart | undefined, id: string) =>
+        chart && volumes[id] !== undefined ? { ...chart, totalVolumeMarket: volumes[id] } : chart;
+
+      for (const id of Object.keys(volumes)) {
+        queryClient.setQueryData<MarketChart>(getMarketChartKey(id), (chart) => applyTo(chart, id));
+      }
+
+      queryClient.setQueriesData<MarketChartsResponse>(
+        { queryKey: ["marketCharts", CHAIN_ID] },
+        (charts) =>
+          charts &&
+          Object.fromEntries(
+            Object.entries(charts).map(([id, chart]) => [id, applyTo(chart, id) ?? chart]),
+          ),
+      );
     },
   });
 }

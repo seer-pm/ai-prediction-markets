@@ -37,6 +37,7 @@ const ORIGINALITY_CSV_FORMAT: CSVFormatInfo = {
   ],
   description:
     "One row per repository, and the share of it you predict is original work — 0.6 means 60% original, 40% carried by dependencies.",
+  valueColumn: "originality",
 };
 
 const ORIGINALITY_SAMPLE_CONFIG: SampleCsvConfig = {
@@ -73,9 +74,8 @@ export const OriginalityMarkets = () => {
 
   // One chart, one line per repository — so every child market is needed at once, and the batch
   // endpoint fetches them in a single request rather than one per repository.
-  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(
-    useMemo(() => Object.keys(marketIdToRepo), [marketIdToRepo]),
-  );
+  const chartMarketIds = useMemo(() => Object.keys(marketIdToRepo), [marketIdToRepo]);
+  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(chartMarketIds);
 
   // Raw market data for withdraw (React Query will deduplicate with useProcessOriginalityPredictions)
   const { data: originalityMarketData } = useOriginalityMarketsData();
@@ -240,6 +240,7 @@ export const OriginalityMarkets = () => {
         title="Share of original work over time"
         description="Each line is a repository's UP price — the market's estimate of how much of it is original."
         volume={volumeLabel}
+        refreshMarketIds={chartMarketIds}
       />
 
       <ContestBar

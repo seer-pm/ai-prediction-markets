@@ -35,6 +35,7 @@ const L2_CSV_FORMAT: CSVFormatInfo = {
   ],
   description:
     "One row per dependency: the dependency, the repository that depends on it, and the weight you predict.",
+  valueColumn: "weight",
 };
 
 const L2_SAMPLE_CONFIG: SampleCsvConfig = {

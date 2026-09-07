@@ -10,6 +10,12 @@ export interface CSVFormatInfo {
   exampleRows: string[];
   /** Description below the format box */
   description: string;
+  /**
+   * The column a reader clears — or leaves out a row of — to skip an entry: "weight",
+   * "prediction", and so on. Named in the note below the format box, since every contest treats an
+   * entry with no number as "no view" and trades nothing for it.
+   */
+  valueColumn: string;
 }
 
 export interface SampleCsvConfig {
@@ -69,6 +75,11 @@ export function GenericCSVUpload<T>({
             {formatInfo.exampleRows.map((row) => `\n${row}`)}
             <span className="text-ink-4">{"\n…"}</span>
           </pre>
+          <p className="mt-3 text-micro leading-relaxed text-ink-3">
+            You don't need to predict every outcome. Leave a row out of the file, or leave its{" "}
+            <span className="font-mono text-ink-2">{formatInfo.valueColumn}</span> blank, and that
+            entry is skipped — it gets no target and is never traded.
+          </p>
         </div>
 
         <PredictionDropzone

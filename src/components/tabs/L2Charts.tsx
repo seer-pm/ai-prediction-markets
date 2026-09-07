@@ -49,6 +49,7 @@ export default function L2Charts({
       title="Dependency prices over time"
       description="One repository at a time — each has its own set of dependency markets."
       volume={volumeLabel}
+      refreshMarketIds={repoSelected ? [repoSelected] : []}
       actions={
         repoOptions.length > 0 && (
           <Select

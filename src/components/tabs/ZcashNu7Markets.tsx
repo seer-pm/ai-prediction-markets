@@ -29,6 +29,7 @@ const ZCASH_NU7_CSV_FORMAT: CSVFormatInfo = {
   exampleRows: ["1,2,0.45", "3,1,0.7"],
   description:
     "One row per outcome: the question number, the outcome number, and your prediction.",
+  valueColumn: "prediction",
 };
 
 const ZCASH_NU7_SAMPLE_CONFIG: SampleCsvConfig = {
