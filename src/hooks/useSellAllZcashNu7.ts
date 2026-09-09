@@ -1,4 +1,4 @@
-import { queryClient } from "@/config/queryClient";
+import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { toastifyBatchTxOwner } from "@/lib/toastify";
 import { getUniswapQuote } from "@/lib/trade/getQuote";
 import { CallBatchesInput, TxStateChange, UniswapQuoteTradeResult } from "@/types";
@@ -87,6 +87,7 @@ async function sellAllZcashNu7({
 export const useSellAllZcashNu7 = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
+    mutationKey: TRADE_RUN_MUTATION_KEY,
     mutationFn: (props: SellAllProps) =>
       sellAllZcashNu7({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {

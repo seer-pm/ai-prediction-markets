@@ -1,4 +1,4 @@
-import { queryClient } from "@/config/queryClient";
+import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllL2Quotes } from "@/lib/trade/getQuote";
@@ -88,6 +88,7 @@ async function sellL2ToCollateral({
 export const useSellL2ToCollateral = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
+    mutationKey: TRADE_RUN_MUTATION_KEY,
     mutationFn: (props: SellAllProps) =>
       sellL2ToCollateral({ ...props, onStateChange: progress.onStateChange }),
     onSuccess() {

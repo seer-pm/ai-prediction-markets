@@ -1,6 +1,6 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
-import { queryClient } from "@/config/queryClient";
+import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { CallBatchesInput, L2TradeProps, TxStateChange } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
@@ -432,6 +432,7 @@ const executeL2StrategyContract = async ({
 export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
+    mutationKey: TRADE_RUN_MUTATION_KEY,
     mutationFn: (tradeProps: L2TradeProps) =>
       executeL2StrategyContract({
         ...tradeProps,

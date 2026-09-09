@@ -1,4 +1,4 @@
-import { queryClient } from "@/config/queryClient";
+import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getOctantBuyQuotes } from "@/lib/trade/getQuote";
@@ -213,6 +213,7 @@ const executeTradeStrategyContract = async ({
 export const useExecuteOctantTradeStrategy = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
+    mutationKey: TRADE_RUN_MUTATION_KEY,
     mutationFn: (tradeProps: OctantTradeProps) =>
       executeTradeStrategyContract({
         ...tradeProps,

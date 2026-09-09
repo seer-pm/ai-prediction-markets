@@ -3,12 +3,13 @@ import { config as wagmiConfig, OPTIMISM_TRANSPORT } from "@/config/wagmi";
 import { Execution } from "@/hooks/useCheck7702Support";
 import { BatchTxResult, CallBatchesInput, TxProgress, TxStateChange } from "@/types";
 import { CHAIN_ID, OPTIMISM_MAX_TX_GAS } from "@/utils/constants";
-import { getErrorHeadline } from "@/utils/errors";
+import { getErrorHeadline, TradeError } from "@/utils/errors";
 import {
   Config,
   ConnectorNotConnectedError,
   SendCallsReturnType,
   estimateFeesPerGas,
+  getCallsStatus,
   getTransactionReceipt,
   sendCalls,
   simulateContract,
@@ -198,54 +199,83 @@ export const toastify: ToastifyFn<any> = async (execute, config) => {
   }
 };
 
+/**
+ * A mined transaction is not a successful one.
+ *
+ * `waitForTransactionReceipt` resolves for a *reverted* transaction exactly as it does for a
+ * successful one — the outcome lives in `receipt.status`, and nothing here used to read it. Every
+ * batch is simulated before it is sent, so a revert is rare; the window it comes through is the gap
+ * between simulation and inclusion, where a price moves and a swap reverts. Such a run reported
+ * "Strategy executed" and left the user looking for trades that never happened.
+ *
+ * A `batchExecute` is one transaction, so a revert undoes the whole batch: nothing was applied.
+ */
+const settleReceipt = (receipt: TransactionReceipt): ToastifyTxReturn =>
+  receipt.status === "success"
+    ? { status: true, receipt }
+    : {
+        status: false,
+        error: new TradeError(
+          "The transaction reverted on chain.",
+          "Nothing in the run was applied. Reopen the dialog so fresh quotes are fetched, then execute again.",
+        ),
+        hash: receipt.transactionHash,
+      };
+
 export const handleTx: ToastifyTxFn = async (contractWrite) => {
   let hash: `0x${string}` | undefined = undefined;
+  // Set as soon as the wallet accepts an EIP-5792 batch, and the reason the recovery below can work
+  // without a hash: once there is an id the calls are on their way, whatever the wait then threw.
+  let callsId: string | undefined = undefined;
   const TIMEOUT = 30000;
   try {
     const result = await contractWrite();
 
-    let receipt: TransactionReceipt;
     if (typeof result === "string") {
       hash = result;
-
-      receipt = await waitForTransactionReceipt(wagmiConfig, {
-        hash,
-        confirmations: 0,
-        timeout: TIMEOUT, //x seconds timeout, then we poll manually
-      });
     } else {
+      callsId = result.id;
       const { receipts = [] } = await waitForCallsStatus(wagmiConfig, {
         id: result.id,
-        timeout: TIMEOUT,
-      });
-
-      if (!receipts.length || !receipts[0].transactionHash) {
-        throw new Error("No transaction hash found in call results");
-      }
-
-      hash = receipts[0].transactionHash;
-
-      receipt = await waitForTransactionReceipt(wagmiConfig, {
-        hash,
-        confirmations: 0,
         timeout: TIMEOUT, //x seconds timeout, then we poll manually
       });
+
+      hash = receipts[0]?.transactionHash;
+      if (!hash) {
+        throw new Error("No transaction hash found in call results");
+      }
     }
 
-    return { status: true, receipt: receipt };
+    const receipt = await waitForTransactionReceipt(wagmiConfig, {
+      hash,
+      confirmations: 0,
+      timeout: TIMEOUT, //x seconds timeout, then we poll manually
+    });
+
+    return settleReceipt(receipt);
     // biome-ignore lint/suspicious/noExplicitAny:
   } catch (error: any) {
+    // The batch reached the wallet but no answer came back at the bundle level — a slow
+    // `wallet_getCallsStatus`, or a wallet that acknowledges the bundle before it has receipts for
+    // it. The calls are in flight either way, so ask again for the hash instead of calling this a
+    // failure: a failure reported here is what makes a user re-run a strategy that already executed.
+    if (!hash && callsId) {
+      hash = await pollForCallsHash(callsId);
+    }
+
     // timeout so we poll manually
     if (
       hash &&
       (error instanceof WaitForTransactionReceiptTimeoutError ||
         error instanceof TransactionNotFoundError ||
         error instanceof TransactionReceiptNotFoundError ||
-        error?.message?.toLowerCase()?.includes("timed out"))
+        error?.message?.toLowerCase()?.includes("timed out") ||
+        // Reached via the recovery above, where the error is whatever the bundle wait threw.
+        !!callsId)
     ) {
       const newReceipt = await pollForTransactionReceipt(hash);
       if (newReceipt) {
-        return { status: true, receipt: newReceipt };
+        return settleReceipt(newReceipt);
       }
     }
 
@@ -701,6 +731,37 @@ export const toastifyBatchTxOwner = async (
   return { status: true, receipt: lastReceipt, executedCalls, prunedCalls, skippedBatches };
 };
 
+/** Shared by both pollers: ~64s of backoff, jittered to prevent synchronized retries. */
+const backoff = (attempt: number, initialInterval: number) =>
+  new Promise((resolve) =>
+    setTimeout(resolve, initialInterval * 2 ** attempt + Math.round(Math.random() * 1000)),
+  );
+
+/**
+ * The transaction hash behind an EIP-5792 batch, asked for until the wallet has one.
+ *
+ * `waitForCallsStatus` gives up at its timeout, and a batch only just broadcast has no receipts to
+ * report yet — MetaMask routes these through `redeemDelegations`, an ordinary transaction that
+ * takes ordinary inclusion time. Without this the run is reported as failed while its trades land
+ * anyway, and the natural response to that — run it again — executes the whole strategy twice.
+ */
+async function pollForCallsHash(id: string, maxAttempts = 7, initialInterval = 500) {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const { receipts } = await getCallsStatus(wagmiConfig, { id });
+      const hash = receipts?.[0]?.transactionHash;
+      if (hash) {
+        return hash;
+      }
+    } catch (e) {
+      console.warn(`Failed to get calls status for ${id}, attempt ${i + 1}:`, e);
+    }
+    await backoff(i, initialInterval);
+  }
+
+  return undefined;
+}
+
 async function pollForTransactionReceipt(
   hash: `0x${string}`,
   maxAttempts = 7,
@@ -715,9 +776,7 @@ async function pollForTransactionReceipt(
     } catch (e) {
       console.warn(`Failed to get transaction receipt for ${hash}, attempt ${i + 1}:`, e);
     }
-    const backoffTime = initialInterval * 2 ** i;
-    const jitter = Math.round(Math.random() * 1000); // Add some randomness to prevent synchronized retries
-    await new Promise((resolve) => setTimeout(resolve, backoffTime + jitter));
+    await backoff(i, initialInterval);
   }
 
   return null;

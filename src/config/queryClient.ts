@@ -2,6 +2,16 @@ import { QueryClient, defaultShouldDehydrateQuery } from "@tanstack/react-query"
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { del, get, set } from "idb-keyval";
 
+/**
+ * Marks the mutations that move a pool: every strategy run and every "sell all".
+ *
+ * Volume is the one figure on a contest card that is written by a cron rather than read live, so it
+ * is also the one the app has to be told about. Keying these lets `RefreshVolumeButton` recompute
+ * the volume of whatever chart is on screen as soon as a run settles, without each hook having to
+ * know which markets that chart happens to be summing.
+ */
+export const TRADE_RUN_MUTATION_KEY = ["tradeRun"] as const;
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
