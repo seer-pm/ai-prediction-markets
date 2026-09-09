@@ -64,7 +64,6 @@ export const DEEP_CONTESTS = [
     marketIds: ZCASH_NU7_MARKET_IDS,
     finished: false,
     leaderboard: false,
-    hidden: true,
   },
   {
     // Relabelled from plain "Zcash" when NU7 landed: two live Zcash contests in the bar, and the

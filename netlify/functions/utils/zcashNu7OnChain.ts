@@ -5,7 +5,7 @@ import { fetchMarketsOnChain, type MarketOnChain } from "./marketView";
  * Reading the Zcash NU7 poll market set straight off chain.
  *
  * Same reason as `./zcashOnChain`: Seer's `markets` table has no rows for these — they were created
- * on 2026-09-03, long after its newest indexed Optimism row — so nothing would find them by query.
+ * on 2026-09-09, long after its newest indexed Optimism row — so nothing would find them by query.
  * See `./marketView` for the MarketView plumbing this shares.
  *
  * Shared by `get-zcash-nu7-markets-data` and the chart job so the two cannot disagree about what the

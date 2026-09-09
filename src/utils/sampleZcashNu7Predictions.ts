@@ -9,17 +9,15 @@ import type { ZcashNu7Row } from "@/types";
  * work, and that a file may be partial.
  *
  * The numbers are placeholders, not an opinion. Two questions are annotated and three are left out
- * entirely; Q1 is given every outcome and Q4 only two of its three, because both are valid — an
+ * entirely; Q1 is given every outcome and Q4 only one of its two, because both are valid — an
  * outcome with no row simply has no target and is never traded.
  *
  * For a file that already carries the real numbering *and* the market's own current prices, use
  * **Export market view** on the tab: it writes exactly these three columns, so it round-trips.
  */
 export const sampleZcashNu7Predictions: ZcashNu7Row[] = [
-  { question: 1, outcome: 1, prediction: 0.45 },
-  { question: 1, outcome: 2, prediction: 0.3 },
-  { question: 1, outcome: 3, prediction: 0.15 },
-  { question: 1, outcome: 4, prediction: 0.1 },
-  { question: 4, outcome: 1, prediction: 0.6 },
-  { question: 4, outcome: 2, prediction: 0.25 },
+  { question: 1, outcome: 1, prediction: 0.2 },
+  { question: 1, outcome: 2, prediction: 0.7 },
+  { question: 1, outcome: 3, prediction: 0.1 },
+  { question: 4, outcome: 1, prediction: 0.85 },
 ];

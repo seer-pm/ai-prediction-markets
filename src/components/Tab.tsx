@@ -43,7 +43,7 @@ const ARCHIVED_TABS = TABS.filter((tab) => tab.finished);
 // The live contest. Keep it in step with the `finished` flags in `@/utils/contests` — landing a
 // first-time visitor in the archive would be odd. It also has to be a tab that survives the
 // `hidden` filter, or the fallback lands on nothing.
-const DEFAULT_TAB: string = "zcash";
+const DEFAULT_TAB: string = "zcash-nu7";
 
 /**
  * Four of five contests have ended, so they sit in an archive menu rather than
