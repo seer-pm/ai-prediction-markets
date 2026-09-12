@@ -13,9 +13,15 @@ import type { ReactNode } from "react";
  *
  * Cash is what the tabs print, because it is the figure that compares across markets trading at
  * different prices; the token count sits in the tooltip rather than in a second line of the header,
- * which is already carrying the refresh control. The tooltip states the two numbers and nothing
- * else — a hover is not the place to explain what a swap leg is — and simply omits the token line
- * on a chart blob written before the count was stored.
+ * which is already carrying the refresh control. The tooltip states the two amounts against each
+ * other — a hover is not the place to explain what a swap leg is, and the collateral line needs no
+ * label of its own once the token line names what it is being contrasted with.
+ *
+ * A chart blob written before the token count was stored has nothing to contrast, so there is no
+ * tooltip at all and no dotted underline promising one — a hover that only restates the number
+ * already on screen is worse than no hover. The exception is a market whose `note` has something to
+ * say regardless, which is the whole reason the note exists: on a conditional market it is what
+ * discloses that the figure is not denominated in sUSDS.
  */
 interface VolumeLabelProps {
   /** "Volume", "Total volume", "Average volume per repository" — the tabs differ. */
@@ -33,20 +39,28 @@ interface VolumeLabelProps {
 }
 
 export function VolumeLabel({ label, cash, tokens, symbol, suffix, note }: VolumeLabelProps) {
+  const amount = `${formatAmount(cash)} ${symbol}`;
+
+  if (tokens === undefined && !note) {
+    return (
+      <span>
+        {label} <span className="font-mono text-ink">{amount}</span>
+        {suffix}
+      </span>
+    );
+  }
+
   return (
     <Tooltip
       content={
         <div className="space-y-1.5">
-          <div>
-            <span className="font-mono">
-              {formatAmount(cash)} {symbol}
-            </span>{" "}
-            cash
-          </div>
           {tokens !== undefined && (
-            <div>
-              <span className="font-mono">{formatAmount(tokens)}</span> outcome tokens
-            </div>
+            <>
+              <div className="font-mono">{amount}</div>
+              <div>
+                <span className="font-mono">{formatAmount(tokens)}</span> outcome tokens
+              </div>
+            </>
           )}
           {note && <div className="text-ink-4">{note}</div>}
         </div>
@@ -55,7 +69,7 @@ export function VolumeLabel({ label, cash, tokens, symbol, suffix, note }: Volum
       <span className="cursor-help">
         {label}{" "}
         <span className="font-mono text-ink underline decoration-dotted decoration-ink-4 underline-offset-4">
-          {formatAmount(cash)} {symbol}
+          {amount}
         </span>
         {suffix}
       </span>

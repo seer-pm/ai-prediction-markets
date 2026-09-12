@@ -42,34 +42,64 @@ const upsertMarketChart = async (
   chartWithMarketData: ChartWithMarketData,
   volume: MarketVolume,
 ) => {
-  const timestamp = Date.now();
+  const rawKey = `market_chart_hour_data_${marketId}_${CHAIN_ID}_deep_pm`;
+  const seriesKey = getMarketChartSeriesKey(marketId, CHAIN_ID);
+
+  // The two halves of a blob fail independently, so each is written only when it has something to
+  // say. Candles are absent whenever the walk above was killed or the market simply has no pools;
+  // `matched` is false when none of this market's pools were in the volume index. Writing either
+  // one blindly is how a good figure gets replaced by an empty series or by `"0 "`.
+  const hasCandles = chartWithMarketData.some(({ poolHourDatas }) => poolHourDatas.length > 0);
+  if (!hasCandles && !volume.matched) return;
+
   // `totalVolumeMarket` keeps its `<amount> <collateral name>` shape — every reader splits it
   // on the space — and the notional count rides alongside as a bare number, since its unit is
   // always "outcome tokens".
-  const totalVolumeMarket = `${volume.collateral} ${volume.collateralName}`;
-  const totalVolumeTokens = `${volume.tokens}`;
+  const volumeFields = volume.matched
+    ? {
+        totalVolumeMarket: `${volume.collateral} ${volume.collateralName}`,
+        totalVolumeTokens: `${volume.tokens}`,
+      }
+    : undefined;
+
+  // Read-modify-write, but only when something is being left out: a run with both halves overwrites
+  // wholesale as it always did, and pays no extra round trip for the privilege.
+  let existing = new Map<string, Record<string, unknown>>();
+  if (!hasCandles || !volumeFields) {
+    const { data, error } = await supabase
+      .from("key_value")
+      .select("key,value")
+      .in("key", [rawKey, seriesKey]);
+    if (error) {
+      console.log(`read ${label} error`, error.message);
+      return;
+    }
+    existing = new Map((data ?? []).map((row) => [row.key, row.value as Record<string, unknown>]));
+  }
+
+  const timestamp = Date.now();
+  // Stamped only alongside fresh candles, so it keeps meaning "when this chart last moved" — a
+  // volume-only update must not make a stale chart look current.
+  const mergeRow = (key: string, fresh: Record<string, unknown>) => {
+    const prior = existing.get(key);
+    // No candles and no row to annotate: there is no chart here to attach a volume to.
+    if (!hasCandles && !prior) return undefined;
+    return {
+      key,
+      value: {
+        ...(prior ?? {}),
+        ...(hasCandles ? { ...fresh, timestamp } : {}),
+        marketId,
+        ...(volumeFields ?? {}),
+      },
+    };
+  };
+
   const rows = [
-    {
-      key: `market_chart_hour_data_${marketId}_${CHAIN_ID}_deep_pm`,
-      value: {
-        chartData: chartWithMarketData,
-        timestamp,
-        marketId,
-        totalVolumeMarket,
-        totalVolumeTokens,
-      },
-    },
-    {
-      key: getMarketChartSeriesKey(marketId, CHAIN_ID),
-      value: {
-        series: buildChartSeries(chartWithMarketData),
-        timestamp,
-        marketId,
-        totalVolumeMarket,
-        totalVolumeTokens,
-      },
-    },
-  ];
+    mergeRow(rawKey, { chartData: chartWithMarketData }),
+    mergeRow(seriesKey, { series: buildChartSeries(chartWithMarketData) }),
+  ].filter((row): row is NonNullable<typeof row> => row !== undefined);
+  if (!rows.length) return;
 
   const { error } = await supabase.from("key_value").upsert(rows, { onConflict: "key" });
   if (error) {
@@ -178,8 +208,10 @@ const getOctantPairs = async (
  * contests above this writes one chart blob *per market* and reads the market set from chain rather
  * than Supabase, which has no rows for either.
  *
- * A market with no pool data in the index is skipped rather than upserted empty: before the
- * liquidity script runs there are no pools at all, and a run of empty blobs would only mask that.
+ * A market with no pool data in the index is never upserted empty — before the liquidity script runs
+ * there are no pools at all, and a run of empty blobs would only mask that. That call belongs to
+ * `upsertMarketChart`, which knows whether a blob already exists to annotate; skipping the market
+ * here instead would also drop the volume update, which needs no candles to be correct.
  *
  * Shared by the 37 binary grants markets and the 5 categorical NU7 markets — the only thing that
  * differs is the market list and the blob label, and neither cares how many outcomes a market has.
@@ -197,9 +229,6 @@ const getFlatMarketPairs = async (
     const chartDataMarket = wrappedTokens.map(
       (token) => poolIndex.get(poolPairKey(token, collateral)) ?? [],
     );
-    if (chartDataMarket.every((series) => series.length === 0)) {
-      continue;
-    }
     const volume = sumMarketVolume(volumeIndex, wrappedTokens, collateral);
     const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => ({
       poolHourDatas,
@@ -380,12 +409,28 @@ export default async () => {
   }
 
   console.log(allPoolIds.length);
-  console.time("get chart");
-  const { chartData } = await getChartData(allPoolIds);
-  console.timeEnd("get chart");
-  console.log(chartData.length);
-  const poolIndex = buildPoolIndex(chartData);
+
+  // Volumes first, and deliberately so. This is one query per 100 pools reading running totals — a
+  // couple of seconds — while the candle walk below is ~3.8k pools paged 1000 rows at a time and is
+  // the part that can burn a quarter of an hour and be killed mid-flight. Computed after it, the
+  // volume figures the tabs actually print were hostage to it finishing.
   const volumeIndex = await getPoolVolumes(allPoolIds);
+
+  // The walk used to sit outside any `try`. A throw here — or a retry budget exhausted against the
+  // subgraph — rejected the whole handler before a single write, so every contest lost its chart at
+  // once while the per-contest guards below gave the impression of covering exactly that. An empty
+  // index now degrades each writer to a volume-only update instead: `upsertMarketChart` keeps
+  // whatever series it finds rather than replacing it with an empty one.
+  let poolIndex = new Map<string, PoolHourData[]>();
+  try {
+    console.time("get chart");
+    const { chartData } = await getChartData(allPoolIds);
+    console.timeEnd("get chart");
+    console.log(chartData.length);
+    poolIndex = buildPoolIndex(chartData);
+  } catch (e) {
+    console.log("chart data fetch failed, writing volumes only", e);
+  }
   try {
     console.log("getting l1 chart");
     await getL1Pairs(poolIndex, volumeIndex);
