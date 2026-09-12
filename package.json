@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "npm run codegen && tsc -b && vite build",
     "lint": "eslint .",
+    "typecheck:functions": "tsc --noEmit -p tsconfig.netlifycheck.json",
     "preview": "vite preview",
     "codegen": "graphql-codegen --config codegen.ts",
     "export:l1-pnl": "esbuild scripts/exportL1Pnl.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=scripts/.exportL1Pnl.mjs --log-level=warning && node scripts/.exportL1Pnl.mjs",

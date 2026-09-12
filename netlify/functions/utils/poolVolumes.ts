@@ -38,6 +38,7 @@ const GetPoolVolumesDocument = gql(`
   query GetPoolVolumes($first: Int!, $where: Pool_filter) {
     pools(first: $first, where: $where) {
       id
+      liquidity
       volumeToken0
       volumeToken1
       token0 { id name }
@@ -48,6 +49,7 @@ const GetPoolVolumesDocument = gql(`
 
 type PoolVolumeRow = {
   id: string;
+  liquidity: string;
   volumeToken0: string;
   volumeToken1: string;
   token0: { id: string; name: string };
@@ -57,21 +59,84 @@ type PoolVolumeRow = {
 /** Pool ids per query. Matches the chart job's batch size for the same subgraph. */
 const BATCH_SIZE = 100;
 
-export async function getPoolVolumes(poolIds: string[]): Promise<Map<string, PoolVolumeData>> {
+/**
+ * Reads per batch before the answer is accepted.
+ *
+ * The gateway fans this deployment out across indexers and they do not agree. The same query for the
+ * same 100 ids in the same process returns 100 pools, then 10, then 100 — and the short answers come
+ * back with a plausible `_meta.block.number` a few blocks behind and `hasIndexingErrors: false`, so
+ * nothing marks them partial and `data?.pools ?? []` accepts them whole. A single read is a coin
+ * flip on how much of the market set you see, which silently undercounts volume and would badly
+ * mislead anything using this to decide which pools still exist.
+ *
+ * Reading a batch more than once and unioning by pool id converges on the fullest answer: a lagging
+ * indexer omits rows, it does not invent them. Two reads is the floor for noticing a disagreement at
+ * all; the third is only paid when the second one still moved.
+ */
+const BATCH_ATTEMPTS = 3;
+
+/**
+ * One batch, read until two consecutive reads stop adding pools.
+ *
+ * Deduped by pool id *before* anything is summed: unioning raw rows would count a pool's volume once
+ * per read that returned it.
+ */
+async function readPoolBatch(batch: string[]): Promise<PoolVolumeRow[]> {
+  const pools = new Map<string, PoolVolumeRow>();
+
+  for (let attempt = 0; attempt < BATCH_ATTEMPTS; attempt++) {
+    const before = pools.size;
+    try {
+      const { data } = await UniswapGraphQLClient.query<{ pools: PoolVolumeRow[] }>({
+        query: GetPoolVolumesDocument,
+        variables: { first: 1000, where: { id_in: batch } },
+        // The point of this module is to answer "now"; Apollo's default cache would hand a warm
+        // lambda the same totals it returned on the previous invocation.
+        fetchPolicy: "no-cache",
+      });
+      for (const pool of data?.pools ?? []) pools.set(pool.id.toLowerCase(), pool);
+    } catch (e) {
+      // A thrown read is just another short one; keep whatever the other attempts found.
+      console.log("pool volume batch read failed", (e as Error)?.message);
+    }
+    // Settled: this read agreed with every read before it. One read can never establish that.
+    if (attempt > 0 && pools.size === before) break;
+  }
+
+  return [...pools.values()];
+}
+
+/**
+ * What one sweep of the pool entities learned.
+ *
+ * `byPair` is the volume index the writers sum from. The id lists are a by-product: the sweep visits
+ * every pool anyway, so reporting which exist and which have been emptied costs nothing — and
+ * because it is unioned over repeated reads, it is the only reading of that in this job which is
+ * safe to act on.
+ */
+export type PoolVolumeSweep = {
+  byPair: Map<string, PoolVolumeData>;
+  /**
+   * Ids that resolved to a real pool — not every id asked for. `deep_pm_pool_ids` is maintained
+   * outside this repo and carries ids that never became pools.
+   */
+  realPoolIds: string[];
+  /** A subset of `realPoolIds`: pools at zero liquidity, whose candle history can no longer change. */
+  drainedPoolIds: string[];
+};
+
+export async function getPoolVolumes(poolIds: string[]): Promise<PoolVolumeSweep> {
   const index = new Map<string, PoolVolumeData>();
+  const realPoolIds: string[] = [];
+  const drainedPoolIds: string[] = [];
   const ids = [...new Set(poolIds.map((id) => id.toLowerCase()))];
 
   for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
     const batch = ids.slice(offset, offset + BATCH_SIZE);
-    const { data } = await UniswapGraphQLClient.query<{ pools: PoolVolumeRow[] }>({
-      query: GetPoolVolumesDocument,
-      variables: { first: 1000, where: { id_in: batch } },
-      // The point of this module is to answer "now"; Apollo's default cache would hand a warm
-      // lambda the same totals it returned on the previous invocation.
-      fetchPolicy: "no-cache",
-    });
 
-    for (const pool of data?.pools ?? []) {
+    for (const pool of await readPoolBatch(batch)) {
+      realPoolIds.push(pool.id.toLowerCase());
+      if (BigInt(pool.liquidity || "0") === 0n) drainedPoolIds.push(pool.id.toLowerCase());
       const token0 = pool.token0.id.toLowerCase() as Address;
       const token1 = pool.token1.id.toLowerCase() as Address;
       const key = `${token0}_${token1}`;
@@ -90,7 +155,7 @@ export async function getPoolVolumes(poolIds: string[]): Promise<Map<string, Poo
     }
   }
 
-  return index;
+  return { byPair: index, realPoolIds, drainedPoolIds };
 }
 
 /**

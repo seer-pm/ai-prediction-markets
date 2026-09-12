@@ -80,11 +80,19 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return res;
 }
 
-export async function getChartData(poolIds: string[]) {
-  return await getPoolHourDatas(CHAIN_ID, poolIds);
+/**
+ * @param since Unix seconds. Only candles (and swaps) strictly after this are fetched; 0 walks
+ * everything. See `get-charts-background`, which derives it from how far behind the blobs are.
+ */
+export async function getChartData(poolIds: string[], since = 0) {
+  return await getPoolHourDatas(CHAIN_ID, poolIds, since);
 }
 
-async function getPoolHourDatasByPoolIds(chainId: SupportedChain, poolIds: string[]) {
+async function getPoolHourDatasByPoolIds(
+  chainId: SupportedChain,
+  poolIds: string[],
+  since: number,
+) {
   let allData: GetPoolHourDatasQuery["poolHourDatas"] = [];
   let currentId = undefined;
   const maxRetries = 3;
@@ -98,11 +106,13 @@ async function getPoolHourDatasByPoolIds(chainId: SupportedChain, poolIds: strin
       count++;
       try {
         const query: string = `{
-                    poolHourDatas(first: 1000, orderBy: id, orderDirection: asc${
-                      currentId
-                        ? `, where: {id_gt: "${currentId}", pool_in: [${poolIds.map((id) => `"${id}"`).join(",")}]}`
-                        : `, where: {pool_in: [${poolIds.map((id) => `"${id}"`).join(",")}]}`
-                    }) {
+                    poolHourDatas(first: 1000, orderBy: id, orderDirection: asc, where: {${[
+                      currentId ? `id_gt: "${currentId}"` : "",
+                      since > 0 ? `periodStartUnix_gt: ${since}` : "",
+                      `pool_in: [${poolIds.map((id) => `"${id}"`).join(",")}]`,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}}) {
                     id
                     token0Price
                     token1Price
@@ -177,7 +187,7 @@ async function getPoolHourDatasByPoolIds(chainId: SupportedChain, poolIds: strin
   }
   return allData;
 }
-async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[]) {
+async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[], since: number) {
   let allData: GetSwapsQuery["swaps"] = [];
   let currentId = undefined;
   const maxRetries = 3;
@@ -192,11 +202,13 @@ async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[]) {
       count++;
       try {
         const query: string = `{
-                    swaps(first: 1000, orderBy: timestamp, orderDirection: asc${
-                      currentId
-                        ? `, where: {id_gt: "${currentId}", pool_in: [${poolIds.map((id) => `"${id}"`).join(",")}]}`
-                        : `, where: {pool_in: [${poolIds.map((id) => `"${id}"`).join(",")}]}`
-                    }) {
+                    swaps(first: 1000, orderBy: timestamp, orderDirection: asc, where: {${[
+                      currentId ? `id_gt: "${currentId}"` : "",
+                      since > 0 ? `timestamp_gt: ${since}` : "",
+                      `pool_in: [${poolIds.map((id) => `"${id}"`).join(",")}]`,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}}) {
                     id
                     tick
                     amount0
@@ -270,9 +282,13 @@ async function getSwapsByPoolIds(chainId: SupportedChain, poolIds: string[]) {
   return allData;
 }
 
-async function getSwapsByTokenPairsAsPoolHourDatas(chainId: SupportedChain, poolIds: string[]) {
+async function getSwapsByTokenPairsAsPoolHourDatas(
+  chainId: SupportedChain,
+  poolIds: string[],
+  since: number,
+) {
   try {
-    const swaps = await getSwapsByPoolIds(chainId, poolIds);
+    const swaps = await getSwapsByPoolIds(chainId, poolIds, since);
     const swapsAsPoolHourDatas = swaps.map((swap) => {
       const [token1Price, token0Price] = tickToPrice(Number(swap.tick));
       return {
@@ -292,7 +308,27 @@ async function getSwapsByTokenPairsAsPoolHourDatas(chainId: SupportedChain, pool
   }
 }
 
-export async function getPoolHourDatas(chainId: SupportedChain, poolIds: string[]) {
+/**
+ * Batches walked at once.
+ *
+ * This was 3, and at the size the contests have grown to that no longer fit: 3,838 pools across 39
+ * batches is ~268 paged subgraph requests averaging ~16s each, which at a concurrency of 3 is 23.7
+ * minutes of wall clock — measured, against the 15-minute ceiling Netlify gives a background
+ * function. The job was being killed mid-walk on every single run, and since the walk precedes every
+ * write, each run left nothing behind at all.
+ *
+ * The work is entirely latency-bound — waiting on the subgraph, not computing — so the fix is to
+ * wait on more of it at once rather than to fetch less. Kept well short of what the endpoint will
+ * refuse: each batch still issues two walks in parallel internally, so this is half the requests
+ * actually in flight.
+ */
+const BATCH_CONCURRENCY = 8;
+
+export async function getPoolHourDatas(
+  chainId: SupportedChain,
+  poolIds: string[],
+  since = 0,
+) {
   if (poolIds.length === 0) {
     return { chartData: [], swapsData: [] };
   }
@@ -306,14 +342,14 @@ export async function getPoolHourDatas(chainId: SupportedChain, poolIds: string[
   const BATCH_SIZE = 100;
   const batches = chunk(poolIds, BATCH_SIZE);
 
-  const limit = pLimit(3);
+  const limit = pLimit(BATCH_CONCURRENCY);
   const totalSwaps: GetSwapsQuery["swaps"] = [];
   const batchResults = await Promise.all(
     batches.map((batch) =>
       limit(async () => {
         const [poolHourDatas, { swaps, swapsAsPoolHourDatas }] = await Promise.all([
-          getPoolHourDatasByPoolIds(chainId, batch),
-          getSwapsByTokenPairsAsPoolHourDatas(chainId, batch),
+          getPoolHourDatasByPoolIds(chainId, batch, since),
+          getSwapsByTokenPairsAsPoolHourDatas(chainId, batch, since),
         ]);
         totalSwaps.push(...swaps);
         return poolHourDatas

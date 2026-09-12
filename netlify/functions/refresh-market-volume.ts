@@ -146,7 +146,7 @@ export default async (req: Request) => {
     // Every market that can be refreshed here trades; no pools at all means the lookup failed, and
     // writing the zeros that implies would wipe a good figure rather than refresh it.
     if (!poolIds.length) return jsonResponse({ error: "No pools found for these markets" }, 502);
-    const volumeIndex = await getPoolVolumes(poolIds);
+    const { byPair: volumeIndex } = await getPoolVolumes(poolIds);
 
     const volumes: Record<string, MarketVolumeReply> = {};
     const updates: (MarketVolumeReply & { key: string })[] = [];
