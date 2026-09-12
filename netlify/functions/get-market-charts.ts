@@ -22,7 +22,14 @@ const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUP
 
 const MAX_IDS = 64;
 
-type ChartRow = { series: ChartSeries[]; marketId: string; totalVolumeMarket: string };
+type ChartRow = {
+  series: ChartSeries[];
+  marketId: string;
+  /** Cash volume, as `<amount> <collateral name>`. */
+  totalVolumeMarket: string;
+  /** Notional volume: outcome tokens traded. Absent from blobs written before it was stored. */
+  totalVolumeTokens?: string;
+};
 
 export default async (req: Request) => {
   const preflight = handleCorsPreflight(req);
@@ -68,12 +75,16 @@ export default async (req: Request) => {
     // checksummed for the on-chain-sourced contests and lowercase for the rest, so it is not
     // something a caller can be expected to reproduce.
     const charts = (data ?? []).reduce<
-      Record<string, { series: ChartSeries[]; totalVolumeMarket: string }>
+      Record<
+        string,
+        { series: ChartSeries[]; totalVolumeMarket: string; totalVolumeTokens: string }
+      >
     >((acc, row) => {
       const value = row.value as ChartRow;
       acc[value.marketId.toLowerCase()] = {
         series: value.series ?? [],
         totalVolumeMarket: value.totalVolumeMarket ?? "",
+        totalVolumeTokens: value.totalVolumeTokens ?? "",
       };
       return acc;
     }, {});

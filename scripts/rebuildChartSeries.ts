@@ -79,6 +79,8 @@ async function main() {
           timestamp: row.value.timestamp ?? Date.now(),
           marketId,
           totalVolumeMarket: row.value.totalVolumeMarket ?? "",
+          // Carried across too, or a rebuild would drop the notional count until the next cron run.
+          totalVolumeTokens: row.value.totalVolumeTokens ?? "",
         },
       },
       { onConflict: "key" },

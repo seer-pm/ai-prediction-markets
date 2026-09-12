@@ -1,4 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
+import { VolumeLabel } from "@/components/contest/VolumeLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
@@ -6,7 +7,7 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { useMarketChart } from "@/hooks/useMarketCharts";
+import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 import { useOctantMarketsData } from "@/hooks/useOctantMarketsData";
 import { useProcessOctantPredictions } from "@/hooks/useProcessOctantPredictions";
 import { useRedeemOctant } from "@/hooks/useRedeemOctant";
@@ -17,7 +18,7 @@ import { OctantRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
 import { OCTANT_MARKET_ID } from "@/utils/constants";
 import { parseOctantCSV } from "@/utils/csvParser";
-import { formatAmount, formatPercent } from "@/utils/format";
+import { formatPercent } from "@/utils/format";
 import { sampleOctantPredictions } from "@/utils/sampleOctantPredictions";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
@@ -106,14 +107,12 @@ export const OctantMarkets = () => {
   });
 
   const volumeLabel = useMemo(() => {
-    const [volume] = (chart?.totalVolumeMarket ?? "").split(" ");
+    const volume = chartVolume(chart);
     if (!volume) return undefined;
     return (
-      <>
-        Volume <span className="font-mono text-ink">{formatAmount(Number(volume))} sUSDS</span>
-      </>
+      <VolumeLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
     );
-  }, [chart?.totalVolumeMarket]);
+  }, [chart]);
 
   const chartData = useMemo(
     () => chart?.series.filter((x) => !x.outcomeName.toLowerCase().includes("invalid result")),

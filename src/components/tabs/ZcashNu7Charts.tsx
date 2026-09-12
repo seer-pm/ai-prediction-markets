@@ -1,9 +1,10 @@
 import { ContestChart } from "@/components/contest/ContestChart";
+import { VolumeLabel } from "@/components/contest/VolumeLabel";
 import { SegmentedControl } from "@/components/ui";
-import { useMarketChart } from "@/hooks/useMarketCharts";
+import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 import type { ZcashNu7TableData } from "@/types";
 import { collateral } from "@/utils/constants";
-import { formatAmount } from "@/utils/format";
+
 import { invalidIndexOf } from "@/utils/zcashNu7Markets";
 import { useEffect, useMemo, useState } from "react";
 
@@ -55,17 +56,17 @@ export default function ZcashNu7Charts({
   }, [chart?.series, market]);
 
   const volumeLabel = (() => {
-    // Only the number is taken. The stored string ends in the collateral's *name* ("Savings USDS"),
-    // not its symbol, so splitting a symbol out of it prints "0.20 Savings".
-    const volume = (chart?.totalVolumeMarket ?? "").split(" ")[0];
+    // Only the numbers are taken. The stored string ends in the collateral's *name* ("Savings
+    // USDS"), not its symbol, so splitting a symbol out of it prints "0.20 Savings".
+    const volume = chartVolume(chart);
     if (!volume) return undefined;
     return (
-      <>
-        Volume{" "}
-        <span className="font-mono text-ink">
-          {formatAmount(Number(volume))} {collateral.symbol}
-        </span>
-      </>
+      <VolumeLabel
+        label="Volume"
+        cash={volume.collateral}
+        tokens={volume.tokens}
+        symbol={collateral.symbol}
+      />
     );
   })();
 

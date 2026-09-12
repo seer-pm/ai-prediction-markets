@@ -1,4 +1,4 @@
-import { getToken0Token1, isTwoStringsEqual } from "@/utils/common";
+import { getToken0Token1 } from "@/utils/common";
 import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID } from "@/utils/constants";
 import { createClient } from "@supabase/supabase-js";
 import { Address, isAddress } from "viem";
@@ -6,10 +6,10 @@ import { getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { getPoolIds } from "./utils/getChartData";
 import { fetchMarketsOnChain } from "./utils/marketView";
-import { getPoolVolumes, poolPairKey } from "./utils/poolVolumes";
+import { getPoolVolumes, poolPairKey, sumMarketVolume } from "./utils/poolVolumes";
 
 /**
- * Recomputes `totalVolumeMarket` for the given markets, now, on request.
+ * Recomputes the volume figures — cash and notional — for the given markets, now, on request.
  *
  * The number the tabs render is written by `get-charts-background` on a 15-minute cron, and that
  * cron is the whole of its latency: a trade is invisible until the next run finishes, and the first
@@ -29,6 +29,9 @@ import { getPoolVolumes, poolPairKey } from "./utils/poolVolumes";
  */
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
+
+/** Both ways of counting one market's volume — see `sumMarketVolume`. */
+type MarketVolumeReply = { totalVolumeMarket: string; totalVolumeTokens: string };
 
 /** Same cap as `get-market-charts`: the ids ride in the query string. */
 const MAX_IDS = 64;
@@ -145,32 +148,23 @@ export default async (req: Request) => {
     if (!poolIds.length) return jsonResponse({ error: "No pools found for these markets" }, 502);
     const volumeIndex = await getPoolVolumes(poolIds);
 
-    const volumes: Record<string, string> = {};
-    const updates: { key: string; totalVolumeMarket: string }[] = [];
+    const volumes: Record<string, MarketVolumeReply> = {};
+    const updates: (MarketVolumeReply & { key: string })[] = [];
 
     for (const { marketId, tokens, collateral } of targets) {
-      const matched = tokens.filter((token) => volumeIndex.has(poolPairKey(token, collateral)));
+      const volume = sumMarketVolume(volumeIndex, tokens, collateral);
       // Same reasoning as above, per market: one whose pools this request could not see keeps
       // whatever the cron last wrote.
-      if (!matched.length) continue;
+      if (!volume.matched) continue;
 
-      const total = matched.reduce((acc, token) => {
-        const pool = volumeIndex.get(poolPairKey(token, collateral))!;
-        return (
-          acc + (isTwoStringsEqual(collateral, pool.token0) ? pool.totalVolume0 : pool.totalVolume1)
-        );
-      }, 0);
-      const first = volumeIndex.get(poolPairKey(tokens[0], collateral));
-      const collateralSymbol = first
-        ? isTwoStringsEqual(collateral, first.token0)
-          ? first.token0Name
-          : first.token1Name
-        : "";
-
-      // Same `<amount> <symbol>` shape the cron writes; the tabs split it on the space.
-      const totalVolumeMarket = `${total} ${collateralSymbol}`;
-      volumes[marketId] = totalVolumeMarket;
-      updates.push({ key: getMarketChartSeriesKey(marketId, CHAIN_ID), totalVolumeMarket });
+      // Same shape the cron writes: cash as `<amount> <collateral name>`, which the tabs split on
+      // the space, and the notional token count alongside it.
+      const reply: MarketVolumeReply = {
+        totalVolumeMarket: `${volume.collateral} ${volume.collateralName}`,
+        totalVolumeTokens: `${volume.tokens}`,
+      };
+      volumes[marketId] = reply;
+      updates.push({ key: getMarketChartSeriesKey(marketId, CHAIN_ID), ...reply });
     }
 
     // Read-modify-write: `series` is the cron's to own, and only the volume moves here. A market
@@ -188,9 +182,9 @@ export default async (req: Request) => {
       const existing = new Map((data ?? []).map((row) => [row.key, row.value]));
       const rows = updates
         .filter(({ key }) => existing.has(key))
-        .map(({ key, totalVolumeMarket }) => ({
+        .map(({ key, totalVolumeMarket, totalVolumeTokens }) => ({
           key,
-          value: { ...(existing.get(key) as object), totalVolumeMarket },
+          value: { ...(existing.get(key) as object), totalVolumeMarket, totalVolumeTokens },
         }));
 
       if (rows.length) {

@@ -1,5 +1,5 @@
 import { UniswapGraphQLClient } from "@/config/apollo";
-import { getToken0Token1 } from "@/utils/common";
+import { getToken0Token1, isTwoStringsEqual } from "@/utils/common";
 import { gql } from "@apollo/client";
 import { Address } from "viem";
 
@@ -91,4 +91,49 @@ export async function getPoolVolumes(poolIds: string[]): Promise<Map<string, Poo
   }
 
   return index;
+}
+
+/**
+ * One market's all-time volume, counted both ways.
+ *
+ * Every swap has two legs and the pool keeps a running total of each, so the same trade can be
+ * reported either as the collateral that moved or as the outcome tokens that moved. They are not
+ * interchangeable — a share bought at 0.02 contributes fifty times more to `tokens` than to
+ * `collateral` — so the writers store both and the tabs show one with the other on hover.
+ */
+export type MarketVolume = {
+  /** The collateral leg: what was paid and received — cash, in the market's own collateral. */
+  collateral: number;
+  /** The outcome-token leg: how many shares changed hands, summed over the market's outcomes. */
+  tokens: number;
+  /** The collateral's *name* as the subgraph spells it ("Savings USDS"), not its symbol. */
+  collateralName: string;
+  /** False when no pool of this market was in the index: the totals are zeros, not a reading. */
+  matched: boolean;
+};
+
+/**
+ * Sums a market's pools, which is one pool per outcome token against the market's collateral: the
+ * primary token on a flat market, the parent's outcome token on a conditional one.
+ */
+export function sumMarketVolume(
+  volumeIndex: Map<string, PoolVolumeData>,
+  tokens: Address[],
+  collateral: Address,
+): MarketVolume {
+  const volume: MarketVolume = { collateral: 0, tokens: 0, collateralName: "", matched: false };
+
+  for (const token of tokens) {
+    const pool = volumeIndex.get(poolPairKey(token, collateral));
+    if (!pool) continue;
+    const collateralIsToken0 = isTwoStringsEqual(collateral, pool.token0);
+    volume.collateral += collateralIsToken0 ? pool.totalVolume0 : pool.totalVolume1;
+    volume.tokens += collateralIsToken0 ? pool.totalVolume1 : pool.totalVolume0;
+    if (!volume.matched) {
+      volume.collateralName = collateralIsToken0 ? pool.token0Name : pool.token1Name;
+      volume.matched = true;
+    }
+  }
+
+  return volume;
 }

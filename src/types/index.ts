@@ -303,6 +303,14 @@ export type PoolHourData = {
   liquidity: string;
   pool: {
     id: string;
+    /**
+     * The pool's liquidity *right now*, not during the hour the candle covers: `pool` is a subgraph
+     * relation, so it resolves to the entity's current state on every row. That is what separates a
+     * pool whose LP withdrew from one that simply has not been traded in a while — the sibling
+     * `liquidity` field above cannot, since a candle only exists for hours the pool was touched.
+     * Optional because blobs written before it was carried through do not have it.
+     */
+    liquidity?: string;
     token0: { id: string; name: string };
     token1: { id: string; name: string };
   };

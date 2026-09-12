@@ -1,4 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
+import { VolumeLabel } from "@/components/contest/VolumeLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
@@ -8,7 +9,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { useMarketCharts } from "@/hooks/useMarketCharts";
+import { chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
 import { useRedeemOriginality } from "@/hooks/useRedeemOriginality";
@@ -18,7 +19,7 @@ import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { parseOriginalityCSV } from "@/utils/csvParser";
-import { formatAmount } from "@/utils/format";
+
 import { sampleOriginalityPredictions } from "@/utils/sampleOriginalityPredictions";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
@@ -131,15 +132,27 @@ export const OriginalityMarkets = () => {
   }, [charts, marketIdToRepo]);
 
   const volumeLabel = useMemo(() => {
-    const entries = Object.values(charts ?? {}).map((chart) => chart.totalVolumeMarket);
-    if (!entries.length) return undefined;
-    const average =
-      entries.reduce((acc, curr) => acc + Number(curr.split(" ")[0]), 0) / entries.length;
+    const volumes = Object.values(charts ?? {}).flatMap((chart) => chartVolume(chart) ?? []);
+    if (!volumes.length) return undefined;
+    const cash = volumes.reduce((acc, curr) => acc + curr.collateral, 0) / volumes.length;
+    // Same rule as the other aggregate tabs: an average over a partial set would understate it.
+    const tokens = volumes.every((v) => v.tokens !== undefined)
+      ? volumes.reduce((acc, curr) => acc + curr.tokens!, 0) / volumes.length
+      : undefined;
     return (
-      <>
-        Average volume per repository{" "}
-        <span className="font-mono text-ink">{formatAmount(average)} sUSDS</span>
-      </>
+      <VolumeLabel
+        label="Average volume per repository"
+        cash={cash}
+        tokens={tokens}
+        // Not sUSDS: an Originality market is split against its repository's *parent* outcome
+        // token, so that token — not the collateral behind it — is what the cash leg is paid in.
+        symbol="repo tokens"
+        scope="averaged per repository"
+        note={
+          "A repository's UP/DOWN market trades against its parent outcome token, so the cash " +
+          "leg is denominated in that token rather than in sUSDS."
+        }
+      />
     );
   }, [charts]);
 

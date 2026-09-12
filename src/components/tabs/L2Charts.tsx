@@ -1,7 +1,8 @@
 import { ContestChart } from "@/components/contest/ContestChart";
+import { VolumeLabel } from "@/components/contest/VolumeLabel";
 import { Select } from "@/components/ui";
-import { useMarketChart } from "@/hooks/useMarketCharts";
-import { formatAmount } from "@/utils/format";
+import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+
 import { useEffect, useState } from "react";
 
 /**
@@ -29,15 +30,13 @@ export default function L2Charts({
   const { data: chart, isLoading: isLoadingChart } = useMarketChart(repoSelected);
 
   const volumeLabel = (() => {
-    const [volume, symbol] = (chart?.totalVolumeMarket ?? "").split(" ");
+    const volume = chartVolume(chart);
     if (!volume) return undefined;
+    // A dependency market is collateralised in its parent's outcome token, so the cash leg is
+    // denominated in that token's name rather than in sUSDS.
+    const [, symbol] = (chart?.totalVolumeMarket ?? "").split(" ");
     return (
-      <>
-        Volume{" "}
-        <span className="font-mono text-ink">
-          {formatAmount(Number(volume))} {symbol}
-        </span>
-      </>
+      <VolumeLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol={symbol} />
     );
   })();
 

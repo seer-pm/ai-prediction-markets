@@ -1,4 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
+import { VolumeLabel } from "@/components/contest/VolumeLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { ContestChart } from "@/components/contest/ContestChart";
@@ -6,7 +7,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useL1MarketsData } from "@/hooks/useL1MarketsData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { useMarketChart } from "@/hooks/useMarketCharts";
+import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
 import { useRedeemL1 } from "@/hooks/useRedeemL1";
 import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
@@ -16,7 +17,7 @@ import { PredictionRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
 import { COLLATERAL_TOKENS, CHAIN_ID, L1_MARKET_ID } from "@/utils/constants";
 import { parseCSV } from "@/utils/csvParser";
-import { formatAmount } from "@/utils/format";
+
 import {
   balancesResolved,
   payoutRatios,
@@ -166,14 +167,12 @@ export const L1Markets = () => {
   );
 
   const volumeLabel = useMemo(() => {
-    const [volume] = (chart?.totalVolumeMarket ?? "").split(" ");
+    const volume = chartVolume(chart);
     if (!volume) return undefined;
     return (
-      <>
-        Volume <span className="font-mono text-ink">{formatAmount(Number(volume))} sUSDS</span>
-      </>
+      <VolumeLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
     );
-  }, [chart?.totalVolumeMarket]);
+  }, [chart]);
 
   const chartData = useMemo(
     () =>

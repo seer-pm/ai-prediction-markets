@@ -110,7 +110,60 @@ function getLiquidityWindow(series: ChartWithMarketData[number]) {
 }
 
 /**
- * The resampling grid for ONE series: from its first candle to the last hour it held liquidity.
+ * The pool's liquidity as of right now, largest across the pools behind the series.
+ *
+ * `buildPoolIndex` keys by token pair, so two fee tiers on the same pair merge into one line, and
+ * one of them still being funded is enough to keep it live. `null` means no row carried the field —
+ * a blob written before it was stored — which callers must read as "cannot tell", not as "empty".
+ */
+function getCurrentPoolLiquidity(series: ChartWithMarketData[number]): number | null {
+  let seen = false;
+  let max = 0;
+
+  for (const d of series.poolHourDatas) {
+    const raw = d.pool?.liquidity;
+    if (raw == null) continue;
+
+    const liquidity = Number(raw);
+    if (!isFinite(liquidity)) continue;
+
+    seen = true;
+    if (liquidity > max) max = liquidity;
+  }
+
+  return seen ? max : null;
+}
+
+/**
+ * Where a series' line stops.
+ *
+ * Not the liquidity window, which is only a lower bound on it. `poolHourData.liquidity` exists only
+ * for hours the pool was actually touched, so the last candle reporting liquidity cannot tell "the
+ * LP pulled out" from "nobody has traded since" — and clamping there ended an untraded-but-funded
+ * market's line mid-chart while its neighbours ran to the right edge. Zcash's Blindvault, idle since
+ * 2026-09-04 with 459 sUSDS still in its pools, against 36 markets that traded a week later.
+ *
+ * `pool.liquidity` does tell them apart, because it is the pool's current state rather than the
+ * hour's. Still funded means still tradable at the last price it printed, so the line carries that
+ * price flat to now; only a pool that is empty *today* stops where its liquidity did.
+ */
+function getSeriesEnd(series: ChartWithMarketData[number]) {
+  const window = getLiquidityWindow(series);
+  if (!window) return null;
+
+  const liquidity = getCurrentPoolLiquidity(series);
+  // `null` is an older blob with no `pool.liquidity` in it. Fall back to the window rather than run
+  // a line forward on the assumption that a pool nothing is known about is still funded.
+  if (liquidity == null || liquidity <= 0) return window.end;
+
+  // Floored, not ceiled as `buildTimeline` would: rounding up would draw the line up to half an
+  // hour into the future.
+  const now = Math.floor(Date.now() / 1000 / INTERVAL) * INTERVAL;
+  return Math.max(window.end, now);
+}
+
+/**
+ * The resampling grid for ONE series: from its first candle to where its line ends.
  *
  * Deliberately per-series rather than per-chart. In the browser this grid used to span every series
  * drawn together, which quietly made a series' extent depend on its neighbours — and the charts that
@@ -120,11 +173,11 @@ function getLiquidityWindow(series: ChartWithMarketData[number]) {
  */
 function buildTimeline(series: ChartWithMarketData[number]) {
   const arr = series.poolHourDatas;
-  const window = getLiquidityWindow(series);
-  if (!arr.length || !window) return [];
+  const seriesEnd = getSeriesEnd(series);
+  if (!arr.length || seriesEnd === null) return [];
 
   const start = Math.floor(arr[0].periodStartUnix / INTERVAL) * INTERVAL;
-  const end = Math.ceil(window.end / INTERVAL) * INTERVAL;
+  const end = Math.ceil(seriesEnd / INTERVAL) * INTERVAL;
 
   const timeline: number[] = [];
   for (let t = start; t <= end; t += INTERVAL) {
@@ -135,12 +188,15 @@ function buildTimeline(series: ChartWithMarketData[number]) {
 }
 
 /**
- * The most recent resolvable price for a series, walking back from the end of
- * its liquidity window. Drives both the legend readout and its sort order.
+ * The most recent resolvable price for a series, walking back from where its
+ * line ends. Drives both the legend readout and its sort order.
+ *
+ * The same bound as the line deliberately: a live pool's last swap can sit in
+ * the hour after its last candle starts, and reading the two against different
+ * ends would print a legend figure the right edge of the line disagrees with.
  */
 function getLastPrice(series: ChartWithMarketData[number]): number | null {
-  const window = getLiquidityWindow(series);
-  const end = window?.end ?? Infinity;
+  const end = getSeriesEnd(series) ?? Infinity;
 
   for (let i = series.poolHourDatas.length - 1; i >= 0; i--) {
     const point = series.poolHourDatas[i];
@@ -154,7 +210,7 @@ function getLastPrice(series: ChartWithMarketData[number]): number | null {
 export function buildChartSeries(chartWithMarketData: ChartWithMarketData): ChartSeries[] {
   return chartWithMarketData.map((outcomeData) => {
     const timeline = buildTimeline(outcomeData);
-    const seriesEnd = getLiquidityWindow(outcomeData)?.end ?? Infinity;
+    const seriesEnd = getSeriesEnd(outcomeData) ?? Infinity;
 
     const timestamps = outcomeData.poolHourDatas.map((d) => d.periodStartUnix);
     const points: [number, number][] = [];
@@ -166,7 +222,7 @@ export function buildChartSeries(chartWithMarketData: ChartWithMarketData): Char
     let pendingFlat: [number, number] | null = null;
 
     timeline.forEach((t) => {
-      if (t > seriesEnd) return; // stop past this series' liquidity removal
+      if (t > seriesEnd) return; // stop past this series' end
 
       const idx = findClosestLessThanOrEqualToTimestamp(timestamps, t);
 

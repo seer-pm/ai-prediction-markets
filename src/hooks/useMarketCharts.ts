@@ -14,13 +14,39 @@ import { useMemo } from "react";
  */
 
 export type MarketChart = {
-  series: ChartSeries[];
+  /** Cash volume, as `<amount> <collateral name>` — the collateral leg of every swap. */
   totalVolumeMarket: string;
+  /**
+   * Notional volume: the outcome-token leg of the same swaps, summed over the market's outcomes.
+   * Empty on a blob written before it was stored, until the next cron run or volume refresh.
+   */
+  totalVolumeTokens: string;
+  series: ChartSeries[];
 };
+
+/**
+ * The two numbers behind a volume figure, parsed out of the stored strings.
+ *
+ * `collateral` is what was paid and received; `tokens` is how many shares moved. They differ by the
+ * price the shares traded at, so at a 0.02 price the notional count is fifty times the cash — which
+ * is why every tab shows one and puts the other on hover. `tokens` is `undefined` (not zero) when
+ * the blob predates the field, so a caller can tell "nothing traded" from "not recorded yet".
+ */
+export function chartVolume(chart: MarketChart | undefined) {
+  const [amount] = (chart?.totalVolumeMarket ?? "").split(" ");
+  // Not `Number("")`, which is 0: a market with no blob has no figure, and must print none.
+  if (!amount) return undefined;
+  const collateral = Number(amount);
+  if (!Number.isFinite(collateral)) return undefined;
+  // Same trap on the other field: an older blob carries `""`, and `Number("")` is 0 — which would
+  // report a market as having traded no shares rather than as not having been counted.
+  const tokens = chart?.totalVolumeTokens ? Number(chart.totalVolumeTokens) : NaN;
+  return { collateral, tokens: Number.isFinite(tokens) ? tokens : undefined };
+}
 
 type MarketChartsResponse = Record<string, MarketChart>;
 
-const EMPTY_CHART: MarketChart = { series: [], totalVolumeMarket: "" };
+const EMPTY_CHART: MarketChart = { series: [], totalVolumeMarket: "", totalVolumeTokens: "" };
 
 /**
  * Charts are kept forever and refreshed underneath.
@@ -128,6 +154,8 @@ export function useMarketCharts(marketIds: string[] | undefined) {
   });
 }
 
+type RefreshedVolume = Pick<MarketChart, "totalVolumeMarket" | "totalVolumeTokens">;
+
 /**
  * Recompute the volume figure for these markets right now.
  *
@@ -154,17 +182,20 @@ export function useRefreshMarketVolume() {
 
       const results = await Promise.all(
         chunks.map((chunk) =>
-          fetchAppJson<{ volumes: Record<string, string> }>("refresh-market-volume", {
+          fetchAppJson<{ volumes: Record<string, RefreshedVolume> }>("refresh-market-volume", {
             ids: chunk.join(","),
           }),
         ),
       );
 
-      return Object.assign({}, ...results.map(({ volumes }) => volumes)) as Record<string, string>;
+      return Object.assign({}, ...results.map(({ volumes }) => volumes)) as Record<
+        string,
+        RefreshedVolume
+      >;
     },
     onSuccess: (volumes) => {
       const applyTo = (chart: MarketChart | undefined, id: string) =>
-        chart && volumes[id] !== undefined ? { ...chart, totalVolumeMarket: volumes[id] } : chart;
+        chart && volumes[id] !== undefined ? { ...chart, ...volumes[id] } : chart;
 
       for (const id of Object.keys(volumes)) {
         queryClient.setQueryData<MarketChart>(getMarketChartKey(id), (chart) => applyTo(chart, id));

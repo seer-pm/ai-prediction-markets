@@ -1,4 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
+import { VolumeLabel } from "@/components/contest/VolumeLabel";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { useContest } from "@/components/contest/contestState";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
@@ -6,7 +7,7 @@ import { ZcashTradingInterface } from "@/components/trade/ZcashTradingInterface"
 import { Button, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import { ZcashMarketTable } from "@/components/ZcashMarketTable";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { useMarketCharts } from "@/hooks/useMarketCharts";
+import { chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useProcessZcashPredictions } from "@/hooks/useProcessZcashPredictions";
 import { useRedeemZcash } from "@/hooks/useRedeemZcash";
 import { useSellZcashToCollateral } from "@/hooks/useSellZcashToCollateral";
@@ -17,7 +18,7 @@ import { ZcashRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
 import { tradeDisabledReason } from "@/utils/contest";
 import { parseZcashCSV } from "@/utils/csvParser";
-import { formatAmount } from "@/utils/format";
+
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { isZcashRowFundable } from "@/utils/zcashBudget";
 import { sampleZcashPredictions } from "@/utils/sampleZcashPredictions";
@@ -108,14 +109,23 @@ export const ZcashMarkets = () => {
   }, [charts, marketIdToProject]);
 
   const volumeLabel = useMemo(() => {
-    const entries = Object.values(charts ?? {}).map((chart) => chart.totalVolumeMarket);
-    if (!entries.length) return undefined;
-    const total = entries.reduce((acc, curr) => acc + Number(curr.split(" ")[0]), 0);
+    const volumes = Object.values(charts ?? {}).flatMap((chart) => chartVolume(chart) ?? []);
+    if (!volumes.length) return undefined;
+    const cash = volumes.reduce((acc, curr) => acc + curr.collateral, 0);
+    // One market missing the count would make the total read as if it had not traded, so the
+    // notional figure is only shown once every market carries one.
+    const tokens = volumes.every((v) => v.tokens !== undefined)
+      ? volumes.reduce((acc, curr) => acc + curr.tokens!, 0)
+      : undefined;
     return (
-      <>
-        Total volume <span className="font-mono text-ink">{formatAmount(total)} sUSDS</span> across{" "}
-        {entries.length} markets
-      </>
+      <VolumeLabel
+        label="Total volume"
+        cash={cash}
+        tokens={tokens}
+        symbol="sUSDS"
+        scope={`totalled over ${volumes.length} markets`}
+        suffix={` across ${volumes.length} markets`}
+      />
     );
   }, [charts]);
 
