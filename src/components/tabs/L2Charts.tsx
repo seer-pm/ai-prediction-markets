@@ -1,7 +1,7 @@
 import { ContestChart } from "@/components/contest/ContestChart";
-import { VolumeLabel } from "@/components/contest/VolumeLabel";
+import { FigureLabel } from "@/components/contest/FigureLabel";
 import { Select } from "@/components/ui";
-import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 
 import { useEffect, useState } from "react";
 
@@ -36,7 +36,22 @@ export default function L2Charts({
     // denominated in that token's name rather than in sUSDS.
     const [, symbol] = (chart?.totalVolumeMarket ?? "").split(" ");
     return (
-      <VolumeLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol={symbol} />
+      <FigureLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol={symbol} />
+    );
+  })();
+
+  const liquidityLabel = (() => {
+    const liquidity = chartLiquidity(chart);
+    if (!liquidity) return undefined;
+    // Same collateral as the volume figure — it is the same pools, read at the same instant.
+    const [, symbol] = (chart?.totalLiquidityMarket ?? "").split(" ");
+    return (
+      <FigureLabel
+        label="Liquidity"
+        cash={liquidity.collateral}
+        tokens={liquidity.tokens}
+        symbol={symbol}
+      />
     );
   })();
 
@@ -48,6 +63,7 @@ export default function L2Charts({
       title="Dependency prices over time"
       description="One repository at a time — each has its own set of dependency markets."
       volume={volumeLabel}
+      liquidity={liquidityLabel}
       refreshMarketIds={repoSelected ? [repoSelected] : []}
       actions={
         repoOptions.length > 0 && (

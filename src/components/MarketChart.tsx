@@ -52,6 +52,8 @@ type Props = {
   /** Already resampled by the background job — see `ChartSeries`. Draw it, don't rebuild it. */
   data: ChartSeries[];
   totalVolumeMarket?: string | ReactElement;
+  /** Current pool depth, printed beside the volume figure in the header. */
+  liquidity?: string | ReactElement;
   title?: string;
   eyebrow?: string;
   description?: string;
@@ -74,6 +76,7 @@ function truncateOutcomeName(name: string, maxLength = 14) {
 const MarketChart = React.memo(function MarketChart({
   data,
   totalVolumeMarket,
+  liquidity,
   title = "Price history",
   eyebrow,
   description,
@@ -313,6 +316,7 @@ const MarketChart = React.memo(function MarketChart({
         actions={
           <div className="flex items-center gap-3">
             {totalVolumeMarket && <span className="text-body text-ink-3">{totalVolumeMarket}</span>}
+            {liquidity && <span className="text-body text-ink-3">{liquidity}</span>}
             {actions}
           </div>
         }

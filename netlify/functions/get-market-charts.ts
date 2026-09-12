@@ -29,6 +29,10 @@ type ChartRow = {
   totalVolumeMarket: string;
   /** Notional volume: outcome tokens traded. Absent from blobs written before it was stored. */
   totalVolumeTokens?: string;
+  /** Collateral sitting in the pools now, in the same `<amount> <collateral name>` shape. */
+  totalLiquidityMarket?: string;
+  /** Outcome tokens sitting in the pools now. Absent from blobs written before it was stored. */
+  totalLiquidityTokens?: string;
 };
 
 export default async (req: Request) => {
@@ -77,7 +81,13 @@ export default async (req: Request) => {
     const charts = (data ?? []).reduce<
       Record<
         string,
-        { series: ChartSeries[]; totalVolumeMarket: string; totalVolumeTokens: string }
+        {
+          series: ChartSeries[];
+          totalVolumeMarket: string;
+          totalVolumeTokens: string;
+          totalLiquidityMarket: string;
+          totalLiquidityTokens: string;
+        }
       >
     >((acc, row) => {
       const value = row.value as ChartRow;
@@ -85,6 +95,10 @@ export default async (req: Request) => {
         series: value.series ?? [],
         totalVolumeMarket: value.totalVolumeMarket ?? "",
         totalVolumeTokens: value.totalVolumeTokens ?? "",
+        // Empty, not zero, on a blob the cron has not rewritten since liquidity was stored — the
+        // client tells the two apart and prints nothing rather than a false "0".
+        totalLiquidityMarket: value.totalLiquidityMarket ?? "",
+        totalLiquidityTokens: value.totalLiquidityTokens ?? "",
       };
       return acc;
     }, {});

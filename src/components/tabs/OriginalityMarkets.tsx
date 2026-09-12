@@ -1,5 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
-import { VolumeLabel } from "@/components/contest/VolumeLabel";
+import { FigureLabel } from "@/components/contest/FigureLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
@@ -9,7 +9,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
 import { useRedeemOriginality } from "@/hooks/useRedeemOriginality";
@@ -140,12 +140,32 @@ export const OriginalityMarkets = () => {
       ? volumes.reduce((acc, curr) => acc + curr.tokens!, 0) / volumes.length
       : undefined;
     return (
-      <VolumeLabel
+      <FigureLabel
         label="Average volume per repository"
         cash={cash}
         tokens={tokens}
         // Not sUSDS: an Originality market is split against its repository's *parent* outcome
         // token, so that token — not the collateral behind it — is what the cash leg is paid in.
+        symbol="repo tokens"
+        note="Denominated in the repository's parent outcome token, not in sUSDS."
+      />
+    );
+  }, [charts]);
+
+  // Averaged per repository, matching the volume figure beside it: the child markets are
+  // collateralised in different parent outcome tokens, so a sum across them would add unlike units.
+  const liquidityLabel = useMemo(() => {
+    const pools = Object.values(charts ?? {}).flatMap((chart) => chartLiquidity(chart) ?? []);
+    if (!pools.length) return undefined;
+    const cash = pools.reduce((acc, curr) => acc + curr.collateral, 0) / pools.length;
+    const tokens = pools.every((p) => p.tokens !== undefined)
+      ? pools.reduce((acc, curr) => acc + curr.tokens!, 0) / pools.length
+      : undefined;
+    return (
+      <FigureLabel
+        label="Average liquidity per repository"
+        cash={cash}
+        tokens={tokens}
         symbol="repo tokens"
         note="Denominated in the repository's parent outcome token, not in sUSDS."
       />
@@ -249,6 +269,7 @@ export const OriginalityMarkets = () => {
         title="Share of original work over time"
         description="Each line is a repository's UP price — the market's estimate of how much of it is original."
         volume={volumeLabel}
+        liquidity={liquidityLabel}
         refreshMarketIds={chartMarketIds}
       />
 

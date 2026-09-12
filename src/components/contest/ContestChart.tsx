@@ -12,6 +12,12 @@ interface ContestChartProps {
   description?: string;
   volume?: string | ReactElement;
   /**
+   * Current pool depth, printed beside the volume figure. Same source and same refresh, so the two
+   * are always read at the same instant — which is why the refresh control stays attached to
+   * `volume` rather than being duplicated here.
+   */
+  liquidity?: string | ReactElement;
+  /**
    * The markets `volume` was summed over. Given them, the figure gets a refresh control — the only
    * thing on the card that is written by a cron rather than read live, so the only one worth a way
    * of asking again. See `RefreshVolumeButton`.
@@ -30,6 +36,7 @@ export function ContestChart({
   title,
   description,
   volume,
+  liquidity,
   refreshMarketIds,
   actions,
   formatValue,
@@ -49,6 +56,7 @@ export function ContestChart({
       <MarketChart
         data={data}
         totalVolumeMarket={volumeWithRefresh}
+        liquidity={liquidity}
         eyebrow={eyebrow}
         title={title}
         description={description}

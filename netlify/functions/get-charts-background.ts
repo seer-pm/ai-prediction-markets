@@ -18,8 +18,8 @@ import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
 import {
   getPoolVolumes,
   poolPairKey,
-  sumMarketVolume,
-  type MarketVolume,
+  sumMarketTotals,
+  type MarketTotals,
   type PoolVolumeData,
 } from "./utils/poolVolumes";
 
@@ -100,20 +100,26 @@ const upsertMarketChart = async (
   label: string,
   marketId: string,
   chartWithMarketData: ChartWithMarketData,
-  volume: MarketVolume,
+  totals: MarketTotals,
 ) => {
   const rawKey = `market_chart_hour_data_${marketId}_${CHAIN_ID}_deep_pm`;
   const seriesKey = getMarketChartSeriesKey(marketId, CHAIN_ID);
 
   // `matched` is false when none of this market's pools were in the volume index. Writing the zeros
   // that implies would replace a good figure with `"0 "` rather than refresh it.
-  const volumeFields = volume.matched
+  //
+  // Liquidity is gated on the same flag, but a zero that does get written means something different:
+  // it is a real reading — every LP has withdrawn — where a zero volume on a market that has traded
+  // could only ever be a failed read.
+  const poolFields = totals.matched
     ? {
         // `totalVolumeMarket` keeps its `<amount> <collateral name>` shape — every reader splits it
         // on the space — and the notional count rides alongside as a bare number, since its unit is
-        // always "outcome tokens".
-        totalVolumeMarket: `${volume.collateral} ${volume.collateralName}`,
-        totalVolumeTokens: `${volume.tokens}`,
+        // always "outcome tokens". Liquidity mirrors both, so one parser serves the pair.
+        totalVolumeMarket: `${totals.volume.collateral} ${totals.collateralName}`,
+        totalVolumeTokens: `${totals.volume.tokens}`,
+        totalLiquidityMarket: `${totals.liquidity.collateral} ${totals.collateralName}`,
+        totalLiquidityTokens: `${totals.liquidity.tokens}`,
       }
     : undefined;
 
@@ -137,7 +143,7 @@ const upsertMarketChart = async (
 
   // Nothing new to fold in and nothing to say about volume: leave the blobs untouched rather than
   // rewrite megabytes of identical candles.
-  if (!freshCount && !volumeFields && priorSeries) return;
+  if (!freshCount && !poolFields && priorSeries) return;
   // No candles and no blob to annotate means there is no chart here at all — before the liquidity
   // script runs a market has no pools, and a row of empty series would only mask that.
   if (!freshCount && !priorSeries) return;
@@ -182,7 +188,7 @@ const upsertMarketChart = async (
     // moved" — a volume-only update must not make a stale chart look current.
     rows.push({
       key: rawKey,
-      value: { ...(priorRaw ?? {}), chartData: merged, timestamp, marketId, ...(volumeFields ?? {}) },
+      value: { ...(priorRaw ?? {}), chartData: merged, timestamp, marketId, ...(poolFields ?? {}) },
     });
     rows.push({
       key: seriesKey,
@@ -196,7 +202,7 @@ const upsertMarketChart = async (
         // instead of being silently skipped past.
         candlesThrough: currentRun.through,
         partialHistory,
-        ...(volumeFields ?? {}),
+        ...(poolFields ?? {}),
       },
     });
   } else {
@@ -217,7 +223,7 @@ const upsertMarketChart = async (
         // the run that would have repaired it keeps the flag, and the flag forces a full walk every
         // run thereafter.
         ...(currentRun.incremental ? {} : { partialHistory: false }),
-        ...(volumeFields ?? {}),
+        ...(poolFields ?? {}),
       },
     });
   }
@@ -266,7 +272,7 @@ const getL1Pairs = async (
   const chartDataMarket = wrappedTokens.map((token) => {
     return poolIndex.get(poolPairKey(token, collateral)) ?? [];
   });
-  const volume = sumMarketVolume(volumeIndex, wrappedTokens, collateral);
+  const totals = sumMarketTotals(volumeIndex, wrappedTokens, collateral);
   const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
     return {
       poolHourDatas,
@@ -280,7 +286,7 @@ const getL1Pairs = async (
     "l1",
     L1_MARKET_ID,
     chartWithMarketData,
-    volume,
+    totals,
   );
 };
 
@@ -306,7 +312,7 @@ const getOctantPairs = async (
   const chartDataMarket = wrappedTokens.map((token) => {
     return poolIndex.get(poolPairKey(token, collateral)) ?? [];
   });
-  const volume = sumMarketVolume(volumeIndex, wrappedTokens, collateral);
+  const totals = sumMarketTotals(volumeIndex, wrappedTokens, collateral);
   const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => {
     return {
       poolHourDatas,
@@ -320,7 +326,7 @@ const getOctantPairs = async (
     "octant",
     OCTANT_MARKET_ID,
     chartWithMarketData,
-    volume,
+    totals,
   );
 };
 
@@ -350,7 +356,7 @@ const getFlatMarketPairs = async (
     const chartDataMarket = wrappedTokens.map(
       (token) => poolIndex.get(poolPairKey(token, collateral)) ?? [],
     );
-    const volume = sumMarketVolume(volumeIndex, wrappedTokens, collateral);
+    const totals = sumMarketTotals(volumeIndex, wrappedTokens, collateral);
     const chartWithMarketData = chartDataMarket.map((poolHourDatas, outcomeIndex) => ({
       poolHourDatas,
       outcomeName: outcomes[outcomeIndex],
@@ -362,7 +368,7 @@ const getFlatMarketPairs = async (
       label,
       marketId,
       chartWithMarketData,
-      volume,
+      totals,
     );
   }
 };
@@ -393,7 +399,7 @@ const getOriginalityPairs = async (
     blockTimestamp: string;
   }[];
   for (const market of markets) {
-    const volume = sumMarketVolume(volumeIndex, market.wrappedTokens, market.collateralToken);
+    const totals = sumMarketTotals(volumeIndex, market.wrappedTokens, market.collateralToken);
     const chartDataMarket = market.wrappedTokens.map((token) => {
       return poolIndex.get(poolPairKey(token, market.collateralToken)) ?? [];
     });
@@ -410,7 +416,7 @@ const getOriginalityPairs = async (
       "originality",
       market.id,
       chartWithMarketData,
-      volume,
+      totals,
     );
   }
 };
@@ -443,7 +449,7 @@ const getL2Pairs = async (
     blockTimestamp: string;
   }[];
   for (const market of markets) {
-    const volume = sumMarketVolume(volumeIndex, market.wrappedTokens, market.collateralToken);
+    const totals = sumMarketTotals(volumeIndex, market.wrappedTokens, market.collateralToken);
     const chartDataMarket = market.wrappedTokens.map((token) => {
       return poolIndex.get(poolPairKey(token, market.collateralToken)) ?? [];
     });
@@ -460,7 +466,7 @@ const getL2Pairs = async (
       "l2",
       market.id,
       chartWithMarketData,
-      volume,
+      totals,
     );
   }
 };

@@ -1,5 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
-import { VolumeLabel } from "@/components/contest/VolumeLabel";
+import { FigureLabel } from "@/components/contest/FigureLabel";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { useContest } from "@/components/contest/contestState";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
@@ -7,7 +7,7 @@ import { ZcashTradingInterface } from "@/components/trade/ZcashTradingInterface"
 import { Button, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import { ZcashMarketTable } from "@/components/ZcashMarketTable";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useProcessZcashPredictions } from "@/hooks/useProcessZcashPredictions";
 import { useRedeemZcash } from "@/hooks/useRedeemZcash";
 import { useSellZcashToCollateral } from "@/hooks/useSellZcashToCollateral";
@@ -118,7 +118,7 @@ export const ZcashMarkets = () => {
       ? volumes.reduce((acc, curr) => acc + curr.tokens!, 0)
       : undefined;
     return (
-      <VolumeLabel
+      <FigureLabel
         label="Total volume"
         cash={cash}
         tokens={tokens}
@@ -126,6 +126,18 @@ export const ZcashMarkets = () => {
         suffix={` across ${volumes.length} markets`}
       />
     );
+  }, [charts]);
+
+  // Summed, like the volume beside it: every market here is collateralised in sUSDS, so the totals
+  // are in one unit.
+  const liquidityLabel = useMemo(() => {
+    const pools = Object.values(charts ?? {}).flatMap((chart) => chartLiquidity(chart) ?? []);
+    if (!pools.length) return undefined;
+    const cash = pools.reduce((acc, curr) => acc + curr.collateral, 0);
+    const tokens = pools.every((p) => p.tokens !== undefined)
+      ? pools.reduce((acc, curr) => acc + curr.tokens!, 0)
+      : undefined;
+    return <FigureLabel label="Liquidity" cash={cash} tokens={tokens} symbol="sUSDS" />;
   }, [charts]);
 
   const hasSellTokens = useMemo(
@@ -225,6 +237,7 @@ export const ZcashMarkets = () => {
         title="Approval odds over time"
         description="Each line is one proposal's YES price — the market's estimate of its chance of being approved."
         volume={volumeLabel}
+        liquidity={liquidityLabel}
         refreshMarketIds={chartMarketIds}
       />
 

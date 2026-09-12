@@ -6,10 +6,10 @@ import { getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { getPoolIds } from "./utils/getChartData";
 import { fetchMarketsOnChain } from "./utils/marketView";
-import { getPoolVolumes, poolPairKey, sumMarketVolume } from "./utils/poolVolumes";
+import { getPoolVolumes, poolPairKey, sumMarketTotals } from "./utils/poolVolumes";
 
 /**
- * Recomputes the volume figures — cash and notional — for the given markets, now, on request.
+ * Recomputes a market's pool figures — volume, cash and notional, plus current liquidity — now, on request.
  *
  * The number the tabs render is written by `get-charts-background` on a 15-minute cron, and that
  * cron is the whole of its latency: a trade is invisible until the next run finishes, and the first
@@ -30,8 +30,19 @@ import { getPoolVolumes, poolPairKey, sumMarketVolume } from "./utils/poolVolume
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
 
-/** Both ways of counting one market's volume — see `sumMarketVolume`. */
-type MarketVolumeReply = { totalVolumeMarket: string; totalVolumeTokens: string };
+/**
+ * The four figures one market's pools yield — volume and current liquidity, each counted on both
+ * legs. See `sumMarketTotals`.
+ *
+ * Liquidity rides along because it comes from the same rows: refreshing volume without it would leave
+ * the two numbers printed side by side read at different instants.
+ */
+type MarketVolumeReply = {
+  totalVolumeMarket: string;
+  totalVolumeTokens: string;
+  totalLiquidityMarket: string;
+  totalLiquidityTokens: string;
+};
 
 /** Same cap as `get-market-charts`: the ids ride in the query string. */
 const MAX_IDS = 64;
@@ -152,16 +163,18 @@ export default async (req: Request) => {
     const updates: (MarketVolumeReply & { key: string })[] = [];
 
     for (const { marketId, tokens, collateral } of targets) {
-      const volume = sumMarketVolume(volumeIndex, tokens, collateral);
+      const totals = sumMarketTotals(volumeIndex, tokens, collateral);
       // Same reasoning as above, per market: one whose pools this request could not see keeps
       // whatever the cron last wrote.
-      if (!volume.matched) continue;
+      if (!totals.matched) continue;
 
       // Same shape the cron writes: cash as `<amount> <collateral name>`, which the tabs split on
       // the space, and the notional token count alongside it.
       const reply: MarketVolumeReply = {
-        totalVolumeMarket: `${volume.collateral} ${volume.collateralName}`,
-        totalVolumeTokens: `${volume.tokens}`,
+        totalVolumeMarket: `${totals.volume.collateral} ${totals.collateralName}`,
+        totalVolumeTokens: `${totals.volume.tokens}`,
+        totalLiquidityMarket: `${totals.liquidity.collateral} ${totals.collateralName}`,
+        totalLiquidityTokens: `${totals.liquidity.tokens}`,
       };
       volumes[marketId] = reply;
       updates.push({ key: getMarketChartSeriesKey(marketId, CHAIN_ID), ...reply });
@@ -182,9 +195,9 @@ export default async (req: Request) => {
       const existing = new Map((data ?? []).map((row) => [row.key, row.value]));
       const rows = updates
         .filter(({ key }) => existing.has(key))
-        .map(({ key, totalVolumeMarket, totalVolumeTokens }) => ({
+        .map(({ key, ...figures }) => ({
           key,
-          value: { ...(existing.get(key) as object), totalVolumeMarket, totalVolumeTokens },
+          value: { ...(existing.get(key) as object), ...figures },
         }));
 
       if (rows.length) {

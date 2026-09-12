@@ -1,5 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
-import { VolumeLabel } from "@/components/contest/VolumeLabel";
+import { FigureLabel } from "@/components/contest/FigureLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
@@ -7,7 +7,7 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 import { useOctantMarketsData } from "@/hooks/useOctantMarketsData";
 import { useProcessOctantPredictions } from "@/hooks/useProcessOctantPredictions";
 import { useRedeemOctant } from "@/hooks/useRedeemOctant";
@@ -110,7 +110,20 @@ export const OctantMarkets = () => {
     const volume = chartVolume(chart);
     if (!volume) return undefined;
     return (
-      <VolumeLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
+      <FigureLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
+    );
+  }, [chart]);
+
+  const liquidityLabel = useMemo(() => {
+    const liquidity = chartLiquidity(chart);
+    if (!liquidity) return undefined;
+    return (
+      <FigureLabel
+        label="Liquidity"
+        cash={liquidity.collateral}
+        tokens={liquidity.tokens}
+        symbol="sUSDS"
+      />
     );
   }, [chart]);
 
@@ -185,6 +198,7 @@ export const OctantMarkets = () => {
         eyebrow="Octant"
         title="Project funding share over time"
         volume={volumeLabel}
+        liquidity={liquidityLabel}
         refreshMarketIds={OCTANT_VOLUME_MARKETS}
         formatValue={formatOctantShare}
       />

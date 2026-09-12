@@ -21,32 +21,63 @@ export type MarketChart = {
    * Empty on a blob written before it was stored, until the next cron run or volume refresh.
    */
   totalVolumeTokens: string;
+  /**
+   * Collateral sitting in the market's pools *now*, in the same `<amount> <collateral name>` shape.
+   *
+   * Unlike volume this is a balance, not a running total: it falls when an LP withdraws, and a market
+   * whose pools have all been emptied reads a true zero. Empty on a blob written before it was
+   * stored.
+   */
+  totalLiquidityMarket: string;
+  /** The outcome-token leg of the same reading: shares sitting in the pools now. */
+  totalLiquidityTokens: string;
   series: ChartSeries[];
 };
 
 /**
- * The two numbers behind a volume figure, parsed out of the stored strings.
+ * The two numbers behind a pool figure, parsed out of the stored strings.
  *
- * `collateral` is what was paid and received; `tokens` is how many shares moved. They differ by the
- * price the shares traded at, so at a 0.02 price the notional count is fifty times the cash — which
- * is why every tab shows one and puts the other on hover. `tokens` is `undefined` (not zero) when
- * the blob predates the field, so a caller can tell "nothing traded" from "not recorded yet".
+ * `collateral` is the cash leg; `tokens` is the outcome-token leg. They differ by the price the
+ * shares traded at, so at a 0.02 price the notional count is fifty times the cash — which is why
+ * every tab shows one and puts the other on hover. `tokens` is `undefined` (not zero) when the blob
+ * predates the field, so a caller can tell "none" from "not recorded yet".
  */
-export function chartVolume(chart: MarketChart | undefined) {
-  const [amount] = (chart?.totalVolumeMarket ?? "").split(" ");
+function parseFigure(cashField: string | undefined, tokensField: string | undefined) {
+  const [amount] = (cashField ?? "").split(" ");
   // Not `Number("")`, which is 0: a market with no blob has no figure, and must print none.
   if (!amount) return undefined;
   const collateral = Number(amount);
   if (!Number.isFinite(collateral)) return undefined;
   // Same trap on the other field: an older blob carries `""`, and `Number("")` is 0 — which would
-  // report a market as having traded no shares rather than as not having been counted.
-  const tokens = chart?.totalVolumeTokens ? Number(chart.totalVolumeTokens) : NaN;
+  // report a market as having no shares rather than as not having been counted.
+  const tokens = tokensField ? Number(tokensField) : NaN;
   return { collateral, tokens: Number.isFinite(tokens) ? tokens : undefined };
+}
+
+/** All-time swap volume: what has been paid and received, and how many shares moved. */
+export function chartVolume(chart: MarketChart | undefined) {
+  return parseFigure(chart?.totalVolumeMarket, chart?.totalVolumeTokens);
+}
+
+/**
+ * Current pool depth: the collateral and outcome tokens sitting in the market's pools right now.
+ *
+ * `undefined` means "not recorded" — a blob the cron has not rewritten since liquidity was stored —
+ * which is not the same as a zero, a market whose LPs have all withdrawn.
+ */
+export function chartLiquidity(chart: MarketChart | undefined) {
+  return parseFigure(chart?.totalLiquidityMarket, chart?.totalLiquidityTokens);
 }
 
 type MarketChartsResponse = Record<string, MarketChart>;
 
-const EMPTY_CHART: MarketChart = { series: [], totalVolumeMarket: "", totalVolumeTokens: "" };
+const EMPTY_CHART: MarketChart = {
+  series: [],
+  totalVolumeMarket: "",
+  totalVolumeTokens: "",
+  totalLiquidityMarket: "",
+  totalLiquidityTokens: "",
+};
 
 /**
  * Charts are kept forever and refreshed underneath.
@@ -154,7 +185,10 @@ export function useMarketCharts(marketIds: string[] | undefined) {
   });
 }
 
-type RefreshedVolume = Pick<MarketChart, "totalVolumeMarket" | "totalVolumeTokens">;
+type RefreshedVolume = Pick<
+  MarketChart,
+  "totalVolumeMarket" | "totalVolumeTokens" | "totalLiquidityMarket" | "totalLiquidityTokens"
+>;
 
 /**
  * Recompute the volume figure for these markets right now.
@@ -163,7 +197,8 @@ type RefreshedVolume = Pick<MarketChart, "totalVolumeMarket" | "totalVolumeToken
  * and that is fine — price history is append-only and the line moves visibly on its own. The volume
  * *number* is what people watch after their own trade lands, so it gets its own endpoint
  * (`refresh-market-volume`) that reads the pools' running totals directly, and this writes the
- * answer over `totalVolumeMarket` in every cached entry that carries it — the per-market ones and
+ * answer — volume, and the liquidity read off the same rows — into every cached entry that carries
+ * it — the per-market ones and
  * the batched entry the Zcash and Originality tabs read — leaving `series` alone. No invalidation:
  * refetching the whole chart to move one string would put the tab back through its loading state.
  */

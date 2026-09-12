@@ -1,5 +1,5 @@
 import { ContestBar } from "@/components/contest/ContestBar";
-import { VolumeLabel } from "@/components/contest/VolumeLabel";
+import { FigureLabel } from "@/components/contest/FigureLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { ContestChart } from "@/components/contest/ContestChart";
@@ -7,7 +7,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useL1MarketsData } from "@/hooks/useL1MarketsData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
 import { useRedeemL1 } from "@/hooks/useRedeemL1";
 import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
@@ -170,7 +170,20 @@ export const L1Markets = () => {
     const volume = chartVolume(chart);
     if (!volume) return undefined;
     return (
-      <VolumeLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
+      <FigureLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
+    );
+  }, [chart]);
+
+  const liquidityLabel = useMemo(() => {
+    const liquidity = chartLiquidity(chart);
+    if (!liquidity) return undefined;
+    return (
+      <FigureLabel
+        label="Liquidity"
+        cash={liquidity.collateral}
+        tokens={liquidity.tokens}
+        symbol="sUSDS"
+      />
     );
   }, [chart]);
 
@@ -278,6 +291,7 @@ export const L1Markets = () => {
         eyebrow="Round 2 · L1"
         title="Repository weight in the Ethereum ecosystem"
         volume={volumeLabel}
+        liquidity={liquidityLabel}
         refreshMarketIds={L1_VOLUME_MARKETS}
       />
 

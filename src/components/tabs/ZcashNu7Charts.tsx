@@ -1,7 +1,7 @@
 import { ContestChart } from "@/components/contest/ContestChart";
-import { VolumeLabel } from "@/components/contest/VolumeLabel";
+import { FigureLabel } from "@/components/contest/FigureLabel";
 import { SegmentedControl } from "@/components/ui";
-import { chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
 import type { ZcashNu7TableData } from "@/types";
 import { collateral } from "@/utils/constants";
 
@@ -61,10 +61,23 @@ export default function ZcashNu7Charts({
     const volume = chartVolume(chart);
     if (!volume) return undefined;
     return (
-      <VolumeLabel
+      <FigureLabel
         label="Volume"
         cash={volume.collateral}
         tokens={volume.tokens}
+        symbol={collateral.symbol}
+      />
+    );
+  })();
+
+  const liquidityLabel = (() => {
+    const liquidity = chartLiquidity(chart);
+    if (!liquidity) return undefined;
+    return (
+      <FigureLabel
+        label="Liquidity"
+        cash={liquidity.collateral}
+        tokens={liquidity.tokens}
         symbol={collateral.symbol}
       />
     );
@@ -79,6 +92,7 @@ export default function ZcashNu7Charts({
       // The question itself, which the table's band row states only once per group.
       description={market?.marketName}
       volume={volumeLabel}
+      liquidity={liquidityLabel}
       refreshMarketIds={selected ? [selected] : []}
       actions={
         segments.length > 0 && (
