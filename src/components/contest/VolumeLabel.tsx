@@ -9,11 +9,13 @@ import type { ReactNode } from "react";
  * counted. `cash` is the collateral leg — what was actually paid and received, in the market's own
  * collateral. `tokens` is the outcome-token leg — how many shares changed hands. They differ by the
  * price those shares traded at, which on a market with many outcomes is a large factor: L1's parent
- * pools have moved about 15.8k sUSDS against 1.87M outcome tokens, an average price under a cent.
+ * pools have moved about 18.5k sUSDS against 1.87M outcome tokens, an average price under a cent.
  *
  * Cash is what the tabs print, because it is the figure that compares across markets trading at
- * different prices; the notional count sits in the tooltip rather than in a second line of the
- * header, which is already carrying the refresh control.
+ * different prices; the token count sits in the tooltip rather than in a second line of the header,
+ * which is already carrying the refresh control. The tooltip states the two numbers and nothing
+ * else — a hover is not the place to explain what a swap leg is — and simply omits the token line
+ * on a chart blob written before the count was stored.
  */
 interface VolumeLabelProps {
   /** "Volume", "Total volume", "Average volume per repository" — the tabs differ. */
@@ -26,23 +28,11 @@ interface VolumeLabelProps {
   symbol: string;
   /** Trailing text on the visible label, e.g. " across 37 markets". */
   suffix?: ReactNode;
-  /** How the figures were folded, for the tooltip: "totalled over 37 markets", "averaged per repository". */
-  scope?: string;
-  /** An extra line of tooltip, where the unit itself needs explaining. */
+  /** An extra line of tooltip, where the unit itself needs naming. */
   note?: ReactNode;
 }
 
-export function VolumeLabel({
-  label,
-  cash,
-  tokens,
-  symbol,
-  suffix,
-  scope,
-  note,
-}: VolumeLabelProps) {
-  const over = scope ? `, ${scope}` : "";
-
+export function VolumeLabel({ label, cash, tokens, symbol, suffix, note }: VolumeLabelProps) {
   return (
     <Tooltip
       content={
@@ -51,18 +41,13 @@ export function VolumeLabel({
             <span className="font-mono">
               {formatAmount(cash)} {symbol}
             </span>{" "}
-            cash — the collateral leg of every swap: what was paid and received{over}.
+            cash
           </div>
-          <div>
-            {tokens === undefined ? (
-              "Notional volume has not been recorded for this chart yet."
-            ) : (
-              <>
-                <span className="font-mono">{formatAmount(tokens)}</span> notional — the outcome-token
-                leg: how many shares changed hands{over}.
-              </>
-            )}
-          </div>
+          {tokens !== undefined && (
+            <div>
+              <span className="font-mono">{formatAmount(tokens)}</span> outcome tokens
+            </div>
+          )}
           {note && <div className="text-ink-4">{note}</div>}
         </div>
       }

@@ -123,7 +123,6 @@ export const ZcashMarkets = () => {
         cash={cash}
         tokens={tokens}
         symbol="sUSDS"
-        scope={`totalled over ${volumes.length} markets`}
         suffix={` across ${volumes.length} markets`}
       />
     );

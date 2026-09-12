@@ -147,11 +147,7 @@ export const OriginalityMarkets = () => {
         // Not sUSDS: an Originality market is split against its repository's *parent* outcome
         // token, so that token — not the collateral behind it — is what the cash leg is paid in.
         symbol="repo tokens"
-        scope="averaged per repository"
-        note={
-          "A repository's UP/DOWN market trades against its parent outcome token, so the cash " +
-          "leg is denominated in that token rather than in sUSDS."
-        }
+        note="Denominated in the repository's parent outcome token, not in sUSDS."
       />
     );
   }, [charts]);
