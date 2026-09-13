@@ -30,7 +30,7 @@ const AFTER_RUN_DELAYS = [10_000, 30_000];
  * the reader has just traded, is looking at the figure their own trade moved, and a number that has
  * not moved reads as a bug rather than as a cron they cannot see. The button is what knows *which*
  * markets the figure covers — the L1 and Octant cards sum a fixed pair, Originality sums ninety-
- * eight, the NU7 card sums whichever question is selected — so the run hooks signal only that they
+ * eight, the NU7 card sums all five questions — so the run hooks signal only that they
  * have finished, through `TRADE_RUN_MUTATION_KEY`, and this decides what that means for the figure
  * on screen. The refresh runs on failure too: a run that reverted or was pruned can still have
  * moved pools.

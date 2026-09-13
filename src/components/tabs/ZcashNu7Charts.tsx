@@ -1,7 +1,13 @@
 import { ContestChart } from "@/components/contest/ContestChart";
 import { FigureLabel } from "@/components/contest/FigureLabel";
+import { RefreshVolumeButton } from "@/components/contest/RefreshVolumeButton";
 import { SegmentedControl } from "@/components/ui";
-import { chartLiquidity, chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
+import {
+  chartLiquidity,
+  chartVolume,
+  useMarketCharts,
+  type MarketChart,
+} from "@/hooks/useMarketCharts";
 import type { ZcashNu7TableData } from "@/types";
 import { collateral } from "@/utils/constants";
 
@@ -60,48 +66,26 @@ export default function ZcashNu7Charts({
     return chart.series.filter((entry) => entry.outcomeId.toLowerCase() !== invalidToken);
   }, [chart?.series, market]);
 
-  const volumeLabel = (() => {
-    // Only the numbers are taken. The stored string ends in the collateral's *name* ("Savings
-    // USDS"), not its symbol, so splitting a symbol out of it prints "0.20 Savings".
-    const volume = chartVolume(chart);
-    if (!volume) return undefined;
+  /**
+   * Two levels of figure, told apart by where they sit rather than by a caption.
+   *
+   * The ballot totals sit on top, over the question tabs, and do not move when a tab is picked. The
+   * selected question's own figures sit inside the tab tray, under the tabs, so they read as
+   * belonging to whichever tab is active — whole ballot above, one question below. Every NU7
+   * question is collateralised in sUSDS, so the five are summable as they stand.
+   *
+   * The stack is built here rather than through `ContestChart`'s `volume`/`liquidity` slots, which
+   * lay out in a row beside the actions: side by side, the totals and the tray read as peers, and
+   * the pair is wide enough to squeeze the question text into a column.
+   *
+   * Only the numbers are taken from the stored strings. They end in the collateral's *name*
+   * ("Savings USDS"), not its symbol, so splitting a symbol out of them prints "0.20 Savings".
+   */
+  const volumeTotal = totalLabel("Total volume", charts, chartVolume);
+  const liquidityTotal = totalLabel("Total liquidity", charts, chartLiquidity);
 
-    /**
-     * The ballot total, printed against the selected question's own figure as `question/total`.
-     *
-     * Every NU7 question is collateralised in sUSDS, so the five are summable as they stand. The
-     * pair rides in the one figure rather than taking a slot of its own beside Liquidity: the header
-     * already carries a five-segment control, and the two numbers mean more against each other —
-     * this question's share, of the whole ballot — than they would sitting apart.
-     */
-    const all = Object.values(charts ?? {}).flatMap((entry) => chartVolume(entry) ?? []);
-    const total = all.length > 1 ? all.reduce((acc, curr) => acc + curr.collateral, 0) : undefined;
-
-    return (
-      <FigureLabel
-        label="Volume"
-        cash={volume.collateral}
-        tokens={volume.tokens}
-        symbol={collateral.symbol}
-        total={total}
-        // Without this the second number is an unexplained figure after a slash.
-        note={total !== undefined && `This question, of all ${all.length} questions.`}
-      />
-    );
-  })();
-
-  const liquidityLabel = (() => {
-    const liquidity = chartLiquidity(chart);
-    if (!liquidity) return undefined;
-    return (
-      <FigureLabel
-        label="Liquidity"
-        cash={liquidity.collateral}
-        tokens={liquidity.tokens}
-        symbol={collateral.symbol}
-      />
-    );
-  })();
+  const volume = chartVolume(chart);
+  const liquidity = chartLiquidity(chart);
 
   return (
     <ContestChart
@@ -111,21 +95,81 @@ export default function ZcashNu7Charts({
       title="Outcome prices over time"
       // The question itself, which the table's band row states only once per group.
       description={market?.marketName}
-      volume={volumeLabel}
-      liquidity={liquidityLabel}
-      // Every question, not just the selected one: the header prints a total over all five, and a
-      // refresh that moved one of them would leave that total disagreeing with its own parts.
-      refreshMarketIds={marketIds}
       actions={
         segments.length > 0 && (
-          <SegmentedControl
-            size="sm"
-            segments={segments}
-            value={selected ?? segments[0].id}
-            onChange={setSelected}
-          />
+          <div className="flex flex-col items-end gap-2">
+            {(volumeTotal || liquidityTotal) && (
+              <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-body text-ink-3">
+                {volumeTotal && (
+                  <span className="inline-flex items-center gap-1.5">
+                    {volumeTotal}
+                    {/* Every question, not just the selected one: a refresh that moved one of them
+                        would leave the total disagreeing with its own parts. */}
+                    <RefreshVolumeButton marketIds={marketIds} />
+                  </span>
+                )}
+                {volumeTotal && liquidityTotal && <span className="text-ink-4">·</span>}
+                {liquidityTotal}
+              </div>
+            )}
+            <div className="inline-flex flex-col rounded-md border border-rule bg-sunken p-0.5">
+              <SegmentedControl
+                bare
+                size="sm"
+                segments={segments}
+                value={selected ?? segments[0].id}
+                onChange={setSelected}
+              />
+              {(volume || liquidity) && (
+                <div className="flex items-center justify-center gap-2 px-2 py-1 text-label text-ink-3">
+                  {volume && (
+                    <FigureLabel
+                      label="Vol"
+                      cash={volume.collateral}
+                      tokens={volume.tokens}
+                      symbol={collateral.symbol}
+                      showSymbol={false}
+                    />
+                  )}
+                  {volume && liquidity && <span className="text-ink-4">·</span>}
+                  {liquidity && (
+                    <FigureLabel
+                      label="Liq"
+                      cash={liquidity.collateral}
+                      tokens={liquidity.tokens}
+                      symbol={collateral.symbol}
+                      showSymbol={false}
+                    />
+                  )}
+                  <span>{collateral.symbol}</span>
+                </div>
+              )}
+            </div>
+          </div>
         )
       }
     />
   );
+}
+
+/**
+ * A figure summed over every question on the ballot.
+ *
+ * The token count is summed only when every question has one: a blob written before the count was
+ * stored would otherwise make the total quietly smaller than its parts.
+ */
+function totalLabel(
+  label: string,
+  charts: Record<string, MarketChart> | undefined,
+  read: (chart: MarketChart | undefined) => { collateral: number; tokens?: number } | undefined,
+) {
+  const figures = Object.values(charts ?? {}).flatMap((entry) => read(entry) ?? []);
+  if (!figures.length) return undefined;
+
+  const cash = figures.reduce((acc, figure) => acc + figure.collateral, 0);
+  const tokens = figures.every((figure) => figure.tokens !== undefined)
+    ? figures.reduce((acc, figure) => acc + (figure.tokens ?? 0), 0)
+    : undefined;
+
+  return <FigureLabel label={label} cash={cash} tokens={tokens} symbol={collateral.symbol} />;
 }

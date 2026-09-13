@@ -11,6 +11,8 @@ interface SegmentedControlProps {
   onChange: (id: string) => void;
   className?: string;
   size?: "sm" | "md";
+  /** Drops the control's own tray, for a parent that draws one around it and more besides. */
+  bare?: boolean;
 }
 
 /** Two or three mutually exclusive modes, e.g. Supply / Withdraw. */
@@ -20,12 +22,14 @@ export function SegmentedControl({
   onChange,
   className,
   size = "md",
+  bare = false,
 }: SegmentedControlProps) {
   return (
     <div
       role="tablist"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-md border border-rule bg-sunken p-0.5",
+        "inline-flex items-center gap-0.5",
+        !bare && "rounded-md border border-rule bg-sunken p-0.5",
         className,
       )}
     >

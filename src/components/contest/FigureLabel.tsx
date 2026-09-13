@@ -34,22 +34,27 @@ interface FigureLabelProps {
   /** How to name the collateral: "sUSDS", or a parent outcome token on a conditional market. */
   symbol: string;
   /**
-   * A whole to print `cash` against, as `cash/total symbol` — one market's figure beside the set it
-   * belongs to. Only the bare pair is shown, so say what the second number counts in `note`.
+   * Whether the visible figure names `symbol`. Off where several figures share a row that names it
+   * once; the tooltip names it regardless, since it is read on its own.
    */
-  total?: number;
+  showSymbol?: boolean;
   /** Trailing text on the visible label, e.g. " across 37 markets". */
   suffix?: ReactNode;
   /** An extra line of tooltip, where the unit itself needs naming. */
   note?: ReactNode;
 }
 
-export function FigureLabel({ label, cash, tokens, symbol, total, suffix, note }: FigureLabelProps) {
+export function FigureLabel({
+  label,
+  cash,
+  tokens,
+  symbol,
+  showSymbol = true,
+  suffix,
+  note,
+}: FigureLabelProps) {
   const amount = `${formatAmount(cash)} ${symbol}`;
-  // The pair reads as one figure, so the symbol is named once at the end rather than on each half.
-  // The tooltip keeps printing `amount` alone: both legs there belong to `cash`, not to the whole.
-  const visible =
-    total === undefined ? amount : `${formatAmount(cash)}/${formatAmount(total)} ${symbol}`;
+  const visible = showSymbol ? amount : formatAmount(cash);
 
   if (tokens === undefined && !note) {
     return (
