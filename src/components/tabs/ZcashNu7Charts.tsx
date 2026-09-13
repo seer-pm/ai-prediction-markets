@@ -1,7 +1,7 @@
 import { ContestChart } from "@/components/contest/ContestChart";
 import { FigureLabel } from "@/components/contest/FigureLabel";
 import { SegmentedControl } from "@/components/ui";
-import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
 import type { ZcashNu7TableData } from "@/types";
 import { collateral } from "@/utils/constants";
 
@@ -14,11 +14,12 @@ import { useEffect, useMemo, useState } from "react";
  * A chart per question rather than one chart for the ballot: the outcomes of a single question
  * compete for the same 1 sUSDS and are readable together, while lines from different questions
  * share an axis without sharing a meaning. That is the same reason L2 charts one repository at a
- * time — and, as there, only the selected market's history is fetched, with `useMarketChart`
- * serving a question already looked at straight from the query cache.
+ * time.
  *
- * A `SegmentedControl` rather than L2's `Select`: five fixed questions fit on one row, so the whole
- * ballot stays visible instead of hiding behind a dropdown.
+ * Unlike L2, though, all five questions are fetched at once. The ballot is five markets, not L2's
+ * tens of megabytes of repositories, and the header prints a total across them — which cannot be
+ * summed from the one question that happens to be selected. Switching questions is then free, and
+ * `useMarketCharts` seeds the per-market cache entries on the way past.
  */
 export default function ZcashNu7Charts({
   markets,
@@ -41,7 +42,11 @@ export default function ZcashNu7Charts({
   );
 
   const market = markets.find((entry) => entry.marketId === selected);
-  const { data: chart, isLoading: isLoadingChart } = useMarketChart(selected);
+
+  const marketIds = useMemo(() => markets.map((entry) => entry.marketId), [markets]);
+  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(marketIds);
+  // `useMarketCharts` keys its record by lowercased id — see `fetchMarketCharts`.
+  const chart = selected ? charts?.[selected.toLowerCase()] : undefined;
 
   /**
    * Invalid is never seeded with liquidity, so its series is empty and it would sit in the legend as
@@ -60,12 +65,27 @@ export default function ZcashNu7Charts({
     // USDS"), not its symbol, so splitting a symbol out of it prints "0.20 Savings".
     const volume = chartVolume(chart);
     if (!volume) return undefined;
+
+    /**
+     * The ballot total, printed against the selected question's own figure as `question/total`.
+     *
+     * Every NU7 question is collateralised in sUSDS, so the five are summable as they stand. The
+     * pair rides in the one figure rather than taking a slot of its own beside Liquidity: the header
+     * already carries a five-segment control, and the two numbers mean more against each other —
+     * this question's share, of the whole ballot — than they would sitting apart.
+     */
+    const all = Object.values(charts ?? {}).flatMap((entry) => chartVolume(entry) ?? []);
+    const total = all.length > 1 ? all.reduce((acc, curr) => acc + curr.collateral, 0) : undefined;
+
     return (
       <FigureLabel
         label="Volume"
         cash={volume.collateral}
         tokens={volume.tokens}
         symbol={collateral.symbol}
+        total={total}
+        // Without this the second number is an unexplained figure after a slash.
+        note={total !== undefined && `This question, of all ${all.length} questions.`}
       />
     );
   })();
@@ -86,14 +106,16 @@ export default function ZcashNu7Charts({
   return (
     <ContestChart
       data={series}
-      isLoading={isLoading || isLoadingChart}
+      isLoading={isLoading || isLoadingCharts}
       eyebrow="Zcash · NU7"
       title="Outcome prices over time"
       // The question itself, which the table's band row states only once per group.
       description={market?.marketName}
       volume={volumeLabel}
       liquidity={liquidityLabel}
-      refreshMarketIds={selected ? [selected] : []}
+      // Every question, not just the selected one: the header prints a total over all five, and a
+      // refresh that moved one of them would leave that total disagreeing with its own parts.
+      refreshMarketIds={marketIds}
       actions={
         segments.length > 0 && (
           <SegmentedControl
