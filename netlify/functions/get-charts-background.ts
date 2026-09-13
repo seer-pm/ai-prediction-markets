@@ -17,6 +17,7 @@ import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
 import {
   getPoolVolumes,
+  isStaleReading,
   poolPairKey,
   sumMarketTotals,
   type MarketTotals,
@@ -111,7 +112,7 @@ const upsertMarketChart = async (
   // Liquidity is gated on the same flag, but a zero that does get written means something different:
   // it is a real reading — every LP has withdrawn — where a zero volume on a market that has traded
   // could only ever be a failed read.
-  const poolFields = totals.matched
+  const reading = totals.matched
     ? {
         // `totalVolumeMarket` keeps its `<amount> <collateral name>` shape — every reader splits it
         // on the space — and the notional count rides alongside as a bare number, since its unit is
@@ -120,6 +121,7 @@ const upsertMarketChart = async (
         totalVolumeTokens: `${totals.volume.tokens}`,
         totalLiquidityMarket: `${totals.liquidity.collateral} ${totals.collateralName}`,
         totalLiquidityTokens: `${totals.liquidity.tokens}`,
+        poolTxCount: totals.txCount,
       }
     : undefined;
 
@@ -141,9 +143,21 @@ const upsertMarketChart = async (
   }
   const priorSeries = seriesData?.value as Record<string, unknown> | undefined;
 
+  // A reading that has seen fewer pool events than the stored one came from an indexer missing them,
+  // and would put weeks-old liquidity and an undercounted volume on the tab. The stored figures stay;
+  // the rest of the write — candles, the cursor — goes ahead as usual.
+  const stale = reading !== undefined && isStaleReading(priorSeries, totals.txCount);
+  if (stale) {
+    console.log(
+      `${label} ${marketId}: pool reading at txCount ${totals.txCount} is behind the stored ` +
+        `${priorSeries?.poolTxCount}, keeping the stored figures`,
+    );
+  }
+  const poolFields = stale ? undefined : reading;
+
   // Nothing new to fold in and nothing to say about volume: leave the blobs untouched rather than
   // rewrite megabytes of identical candles.
-  if (!freshCount && !poolFields && priorSeries) return;
+  if (!freshCount && !reading && priorSeries) return;
   // No candles and no blob to annotate means there is no chart here at all — before the liquidity
   // script runs a market has no pools, and a row of empty series would only mask that.
   if (!freshCount && !priorSeries) return;

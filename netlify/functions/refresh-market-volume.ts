@@ -6,7 +6,12 @@ import { getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { getPoolIds } from "./utils/getChartData";
 import { fetchMarketsOnChain } from "./utils/marketView";
-import { getPoolVolumes, poolPairKey, sumMarketTotals } from "./utils/poolVolumes";
+import {
+  getPoolVolumes,
+  isStaleReading,
+  poolPairKey,
+  sumMarketTotals,
+} from "./utils/poolVolumes";
 
 /**
  * Recomputes a market's pool figures — volume, cash and notional, plus current liquidity — now, on request.
@@ -160,7 +165,8 @@ export default async (req: Request) => {
     const { byPair: volumeIndex } = await getPoolVolumes(poolIds);
 
     const volumes: Record<string, MarketVolumeReply> = {};
-    const updates: (MarketVolumeReply & { key: string })[] = [];
+    const updates: (MarketVolumeReply & { key: string; marketId: string; poolTxCount: number })[] =
+      [];
 
     for (const { marketId, tokens, collateral } of targets) {
       const totals = sumMarketTotals(volumeIndex, tokens, collateral);
@@ -177,7 +183,12 @@ export default async (req: Request) => {
         totalLiquidityTokens: `${totals.liquidity.tokens}`,
       };
       volumes[marketId] = reply;
-      updates.push({ key: getMarketChartSeriesKey(marketId, CHAIN_ID), ...reply });
+      updates.push({
+        key: getMarketChartSeriesKey(marketId, CHAIN_ID),
+        marketId,
+        poolTxCount: totals.txCount,
+        ...reply,
+      });
     }
 
     // Read-modify-write: `series` is the cron's to own, and only the volume moves here. A market
@@ -193,11 +204,36 @@ export default async (req: Request) => {
       if (error) throw error;
 
       const existing = new Map((data ?? []).map((row) => [row.key, row.value]));
-      const rows = updates
+      const fresh = updates.filter(({ key, marketId, poolTxCount }) => {
+        const stored = existing.get(key) as (MarketVolumeReply & { poolTxCount?: number }) | undefined;
+        if (!stored || !isStaleReading(stored, poolTxCount)) return true;
+        // This request drew an indexer that is missing pool events (see `isStaleReading`). The
+        // stored figures are the better answer, so they are what the caller gets back, and they are
+        // not overwritten.
+        console.log(
+          `refresh ${marketId}: pool reading at txCount ${poolTxCount} is behind the stored ` +
+            `${stored.poolTxCount}, answering with the stored figures`,
+        );
+        volumes[marketId] = {
+          totalVolumeMarket: stored.totalVolumeMarket,
+          totalVolumeTokens: stored.totalVolumeTokens,
+          totalLiquidityMarket: stored.totalLiquidityMarket,
+          totalLiquidityTokens: stored.totalLiquidityTokens,
+        };
+        return false;
+      });
+      const rows = fresh
         .filter(({ key }) => existing.has(key))
-        .map(({ key, ...figures }) => ({
-          key,
-          value: { ...(existing.get(key) as object), ...figures },
+        .map((update) => ({
+          key: update.key,
+          value: {
+            ...(existing.get(update.key) as object),
+            totalVolumeMarket: update.totalVolumeMarket,
+            totalVolumeTokens: update.totalVolumeTokens,
+            totalLiquidityMarket: update.totalLiquidityMarket,
+            totalLiquidityTokens: update.totalLiquidityTokens,
+            poolTxCount: update.poolTxCount,
+          },
         }));
 
       if (rows.length) {

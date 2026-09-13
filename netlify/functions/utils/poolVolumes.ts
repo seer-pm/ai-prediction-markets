@@ -37,6 +37,8 @@ export type PoolVolumeData = {
    */
   totalLocked0: number;
   totalLocked1: number;
+  /** Summed `txCount` of the pair's pools: how many pool events the reading had seen. */
+  txCount: number;
 };
 
 /** Pools are keyed by their ordered token pair, which is what the writers can reconstruct. */
@@ -49,6 +51,7 @@ const GetPoolVolumesDocument = gql(`
   query GetPoolVolumes($first: Int!, $where: Pool_filter) {
     pools(first: $first, where: $where) {
       id
+      txCount
       liquidity
       volumeToken0
       volumeToken1
@@ -62,6 +65,8 @@ const GetPoolVolumesDocument = gql(`
 
 type PoolVolumeRow = {
   id: string;
+  /** Events the indexer has applied to this pool. Only ever rises, so the larger one is fresher. */
+  txCount: string;
   liquidity: string;
   volumeToken0: string;
   volumeToken1: string;
@@ -85,22 +90,40 @@ const BATCH_SIZE = 100;
  * mislead anything using this to decide which pools still exist.
  *
  * Reading a batch more than once and unioning by pool id converges on the fullest answer: a lagging
- * indexer omits rows, it does not invent them. Two reads is the floor for noticing a disagreement at
- * all; the third is only paid when the second one still moved.
+ * indexer omits rows, it does not invent them.
+ *
+ * Omitting rows is not the only failure. One indexer behind the gateway returns rows that are there
+ * but wrong: it reports the same head block as the others while missing dozens of events per pool,
+ * so an L1 pool emptied weeks ago read 21 sUSDS locked (txCount 55) against the 0.006 actually on
+ * chain (txCount 131). It answered about one read in three, and letting the last read win made both
+ * liquidity and volume change with every run. A pool's `txCount` only ever rises, so when two reads
+ * disagree the larger one is the fresher answer.
+ *
+ * Choosing between answers needs both indexers to have been seen, and an agreeing run proves nothing,
+ * since two bad reads agree too. So reading stops early only after a disagreement has turned up and a
+ * later read added nothing to it.
+ *
+ * Retries cannot be the whole defence, though. The gateway hands the bad indexer out in windows, not
+ * at random per read: 80 back-to-back reads have all come from one indexer, and so has an entire run
+ * of five. What actually holds the stored figure is `isStaleReading`, which refuses to overwrite a
+ * reading with one that has seen fewer pool events. Three reads is enough to catch the common case.
  */
 const BATCH_ATTEMPTS = 3;
 
+const txCountOf = (pool: PoolVolumeRow) => BigInt(pool.txCount || "0");
+
 /**
- * One batch, read until two consecutive reads stop adding pools.
+ * One batch, read until both indexers have been seen and a further read changes nothing.
  *
  * Deduped by pool id *before* anything is summed: unioning raw rows would count a pool's volume once
- * per read that returned it.
+ * per read that returned it. Of a pool's duplicate rows, the one with the highest `txCount` is kept.
  */
 async function readPoolBatch(batch: string[]): Promise<PoolVolumeRow[]> {
   const pools = new Map<string, PoolVolumeRow>();
+  let disagreed = false;
 
   for (let attempt = 0; attempt < BATCH_ATTEMPTS; attempt++) {
-    const before = pools.size;
+    let changed = false;
     try {
       const { data } = await UniswapGraphQLClient.query<{ pools: PoolVolumeRow[] }>({
         query: GetPoolVolumesDocument,
@@ -109,13 +132,28 @@ async function readPoolBatch(batch: string[]): Promise<PoolVolumeRow[]> {
         // lambda the same totals it returned on the previous invocation.
         fetchPolicy: "no-cache",
       });
-      for (const pool of data?.pools ?? []) pools.set(pool.id.toLowerCase(), pool);
+      const rows = data?.pools ?? [];
+      // A short answer after the first read is a disagreement too, even if every row it did return matches.
+      if (attempt > 0 && rows.length !== pools.size) disagreed = true;
+      for (const pool of rows) {
+        const id = pool.id.toLowerCase();
+        const seen = pools.get(id);
+        if (!seen || txCountOf(pool) > txCountOf(seen)) {
+          if (seen || attempt > 0) {
+            changed = true;
+            disagreed = true;
+          }
+          pools.set(id, pool);
+        } else if (txCountOf(pool) < txCountOf(seen)) {
+          disagreed = true;
+        }
+      }
     } catch (e) {
       // A thrown read is just another short one; keep whatever the other attempts found.
       console.log("pool volume batch read failed", (e as Error)?.message);
     }
-    // Settled: this read agreed with every read before it. One read can never establish that.
-    if (attempt > 0 && pools.size === before) break;
+    // Settled: a disagreement has been seen, so both answers are in hand, and this read moved nothing.
+    if (attempt > 0 && disagreed && !changed) break;
   }
 
   return [...pools.values()];
@@ -165,7 +203,9 @@ export async function getPoolVolumes(poolIds: string[]): Promise<PoolVolumeSweep
         totalVolume1: 0,
         totalLocked0: 0,
         totalLocked1: 0,
+        txCount: 0,
       };
+      current.txCount += Number(pool.txCount) || 0;
       current.totalVolume0 += Number(pool.volumeToken0) || 0;
       current.totalVolume1 += Number(pool.volumeToken1) || 0;
       // Summed across the pair's pools for the same reason volume is: one token can trade against the
@@ -210,7 +250,26 @@ export type MarketTotals = {
   collateralName: string;
   /** False when no pool of this market was in the index: the totals are zeros, not a reading. */
   matched: boolean;
+  /**
+   * Pool events behind these figures, summed over the market's pools. Stored with them as
+   * `poolTxCount` so a later reading can be checked against it — see `isStaleReading`.
+   */
+  txCount: number;
 };
+
+/**
+ * True when a new reading has seen fewer pool events than the one already stored, and so must not
+ * replace it.
+ *
+ * `txCount` only ever rises, so a lower sum cannot be a newer view of the same pools: it is an
+ * indexer that is missing events (see `BATCH_ATTEMPTS`), or a read that came back short. Either way
+ * its volume undercounts and its liquidity can be weeks old. A blob with no `poolTxCount` yet —
+ * written before it was stored — accepts anything, and the first reading sets the bar.
+ */
+export function isStaleReading(stored: unknown, txCount: number): boolean {
+  const prior = (stored as { poolTxCount?: unknown } | undefined)?.poolTxCount;
+  return typeof prior === "number" && txCount < prior;
+}
 
 /**
  * Sums a market's pools, which is one pool per outcome token against the market's collateral: the
@@ -226,6 +285,7 @@ export function sumMarketTotals(
     liquidity: { collateral: 0, tokens: 0 },
     collateralName: "",
     matched: false,
+    txCount: 0,
   };
 
   for (const token of tokens) {
@@ -236,6 +296,7 @@ export function sumMarketTotals(
     totals.volume.tokens += collateralIsToken0 ? pool.totalVolume1 : pool.totalVolume0;
     totals.liquidity.collateral += collateralIsToken0 ? pool.totalLocked0 : pool.totalLocked1;
     totals.liquidity.tokens += collateralIsToken0 ? pool.totalLocked1 : pool.totalLocked0;
+    totals.txCount += pool.txCount;
     if (!totals.matched) {
       totals.collateralName = collateralIsToken0 ? pool.token0Name : pool.token1Name;
       totals.matched = true;
