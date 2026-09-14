@@ -11,14 +11,24 @@ import {
   Tr,
 } from "@/components/ui";
 import { useEnsNames } from "@/hooks/useEnsNames";
+import { usePredictionScores } from "@/hooks/usePredictionScores";
 import { useProfiles } from "@/hooks/useProfiles";
 import type {
   LeaderboardApiRow,
+  LeaderboardScope,
   LeaderboardSort,
   LeaderboardSortDir,
 } from "@/hooks/useLeaderboard";
 import { cn } from "@/utils/cn";
-import { EM_DASH, MINUS, formatAmount, formatPercent, preciseValue } from "@/utils/format";
+import {
+  EM_DASH,
+  MINUS,
+  formatAmount,
+  formatPercent,
+  pluralize,
+  preciseValue,
+} from "@/utils/format";
+import type { PredictionScore } from "@/utils/predictionSubmission";
 import { memo, useMemo, type ReactNode, type RefObject } from "react";
 
 /**
@@ -50,8 +60,34 @@ function Roi({ value }: { value: number | null }) {
   );
 }
 
+/**
+ * The wallet's latest leaderboard submission. "Pending" until one of its markets resolves — the
+ * endpoint returns a score, never the predictions, so there is nothing more to show before then.
+ */
+function SubmissionScore({ value }: { value: PredictionScore | undefined }) {
+  if (!value) return <span className="text-ink-4">{EM_DASH}</span>;
+  const submitted = new Date(value.submittedAt).toLocaleString();
+  if (value.score === null) {
+    return (
+      <span
+        className="text-ink-4"
+        title={`Submitted ${submitted} · ${pluralize(value.totalMarkets, "market")} · scored once they resolve`}
+      >
+        Pending
+      </span>
+    );
+  }
+  return (
+    <span title={`${value.scoredMarkets} of ${value.totalMarkets} markets resolved · submitted ${submitted}`}>
+      {value.score.toFixed(1)}
+    </span>
+  );
+}
+
 interface LeaderboardTableProps {
   rows: LeaderboardApiRow[];
+  /** Which submission the Score column reads: the latest anywhere, or the latest in this contest. */
+  scope: LeaderboardScope;
   isLoading: boolean;
   /** The column the ranking follows. The `#` column renumbers with it. */
   sortBy: LeaderboardSort;
@@ -69,6 +105,7 @@ interface LeaderboardTableProps {
 
 export const LeaderboardTable = memo(function LeaderboardTable({
   rows,
+  scope,
   isLoading,
   sortBy,
   sortDir,
@@ -84,9 +121,10 @@ export const LeaderboardTable = memo(function LeaderboardTable({
   const addresses = useMemo(() => rows.map((row) => row.address), [rows]);
   const ensNames = useEnsNames(addresses);
   const profiles = useProfiles(addresses);
+  const scores = usePredictionScores(addresses, scope);
 
   if (isLoading) {
-    return <TableSkeleton rows={8} columns={5} />;
+    return <TableSkeleton rows={8} columns={6} />;
   }
 
   if (rows.length === 0) {
@@ -104,7 +142,7 @@ export const LeaderboardTable = memo(function LeaderboardTable({
 
   return (
     <TableScroller className={className}>
-      <Table minWidth={680}>
+      <Table minWidth={760}>
         <Thead>
           <Th pinned className="w-16">
             #
@@ -126,6 +164,12 @@ export const LeaderboardTable = memo(function LeaderboardTable({
           </Th>
           <Th numeric {...sortProps("roi")}>
             ROI
+          </Th>
+          <Th
+            numeric
+            title="Score of the wallet's latest leaderboard submission, 0–100, higher is better: 100 × (1 − average absolute error) against how each predicted market resolved, so 88 means off by 12 points on average. Predictions stay hidden until their markets end."
+          >
+            Score
           </Th>
         </Thead>
         <Tbody>
@@ -165,6 +209,9 @@ export const LeaderboardTable = memo(function LeaderboardTable({
                 </Td>
                 <Td numeric title={preciseValue(row.roi)}>
                   <Roi value={row.roi} />
+                </Td>
+                <Td numeric>
+                  <SubmissionScore value={scores[address]} />
                 </Td>
               </Tr>
             );

@@ -1,5 +1,9 @@
-import { AmountInput, Button, Dialog, ErrorPanel, Panel } from "@/components/ui";
+import { AmountInput, Button, Dialog, ErrorPanel, Panel, Switch, Tooltip } from "@/components/ui";
+import { InfoIcon } from "@/components/ui/icons";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useSubmitPredictions, type LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
+import { toastError, toastSuccess } from "@/lib/toastify";
 import { DepositInterface } from "./DepositInterface";
 import type { TxProgressState } from "@/hooks/useTxProgress";
 import type { TxPhase } from "@/types";
@@ -67,6 +71,12 @@ export interface StrategyDialogProps {
    * otherwise tick those rows as done on success, reporting work that never happened.
    */
   phases?: TxPhase[];
+  /**
+   * The predictions this run acts on, in the form the leaderboard stores. When given, the dialog
+   * offers the "Leaderboard submit" toggle and, with it on, signs and sends them alongside the run.
+   * Omit on contests that take no submissions.
+   */
+  leaderboardSubmission?: LeaderboardSubmission;
 }
 
 interface FormValues {
@@ -106,6 +116,7 @@ export function StrategyDialog({
   onAmountChange,
   blockedReason,
   phases = STRATEGY_PHASES,
+  leaderboardSubmission,
 }: StrategyDialogProps) {
   const {
     register,
@@ -125,10 +136,54 @@ export function StrategyDialog({
   const { account, tradeExecutor } = useTradeWalletStatus();
   const [depositOpen, setDepositOpen] = useState(false);
 
+  // One preference for every contest, remembered across visits. On unless turned off.
+  const [submitToLeaderboard, setSubmitToLeaderboard] = useLocalStorage("leaderboard-submit", true);
+  const { sign, send } = useSubmitPredictions();
+  const [isSigning, setIsSigning] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
+  const switchId = useId();
+
+  /**
+   * Sign first, then run. A declined signature stops the run rather than trading anyway: with the
+   * toggle on, the user asked for both, and a trade they did not expect to go out alone would be
+   * the worse surprise. The save itself is not awaited — see `useSubmitPredictions`.
+   */
+  const run = async (value: string) => {
+    if (leaderboardSubmission && submitToLeaderboard && leaderboardSubmission.legs.length > 0) {
+      setSignError(null);
+      setIsSigning(true);
+      const signed = await sign(leaderboardSubmission).catch(() => null);
+      setIsSigning(false);
+      if (!signed) {
+        setSignError(
+          "The leaderboard submission was not signed, so nothing ran. Sign it, or turn off Leaderboard submit to trade without it.",
+        );
+        return;
+      }
+      void send(signed).then(
+        (result) =>
+          toastSuccess({
+            title: "Predictions submitted to the leaderboard",
+            subtitle:
+              result.ignored > 0
+                ? `${result.ignored} on markets that already have an answer were left out.`
+                : "They stay hidden until the markets end.",
+          }),
+        (error) =>
+          toastError({
+            title: "Leaderboard submission failed",
+            subtitle: error instanceof Error ? error.message : undefined,
+          }),
+      );
+    }
+    onSubmit(value);
+  };
+
   // Reset only on dismissal — the finished ledger has to survive the run.
   useEffect(() => {
     if (!open) {
       reset();
+      setSignError(null);
       mutation.progress.reset();
       mutation.reset();
     }
@@ -159,7 +214,7 @@ export function StrategyDialog({
       title={title}
       description={description}
       size="md"
-      dismissible={!mutation.isPending}
+      dismissible={!mutation.isPending && !isSigning}
       footer={
         status === "succeeded" ? (
           <Button variant="primary" onClick={() => onOpenChange(false)} fullWidth>
@@ -167,15 +222,19 @@ export function StrategyDialog({
           </Button>
         ) : (
           <>
-            <Button onClick={() => onOpenChange(false)} disabled={mutation.isPending} fullWidth>
+            <Button
+              onClick={() => onOpenChange(false)}
+              disabled={mutation.isPending || isSigning}
+              fullWidth
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               form={formId}
               variant="primary"
-              loading={mutation.isPending}
-              disabled={mutation.isPending || !!disabledReason}
+              loading={mutation.isPending || isSigning}
+              disabled={mutation.isPending || isSigning || !!disabledReason}
               disabledReason={disabledReason}
               fullWidth
             >
@@ -243,7 +302,7 @@ export function StrategyDialog({
         )}
 
         {status !== "succeeded" && (
-        <form id={formId} onSubmit={handleSubmit(({ amount }) => onSubmit(amount))} noValidate>
+        <form id={formId} onSubmit={handleSubmit(({ amount }) => run(amount))} noValidate>
           <AmountInput
             label={`Mint new positions with${needsAmount ? "" : " (optional)"}`}
             unit={collateral.symbol}
@@ -295,6 +354,32 @@ export function StrategyDialog({
             })}
           />
         </form>
+        )}
+
+        {leaderboardSubmission && status !== "succeeded" && (
+          <div className="space-y-1.5">
+            <Tooltip content="Submit your predictions to the leaderboard. They are not revealed before the market ends.">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-rule px-4 py-3">
+                <label
+                  htmlFor={switchId}
+                  className="flex cursor-pointer items-center gap-1.5 text-body font-medium text-ink"
+                >
+                  Leaderboard submit
+                  <InfoIcon className="text-ink-4" />
+                </label>
+                <Switch
+                  id={switchId}
+                  checked={submitToLeaderboard}
+                  onCheckedChange={(checked) => {
+                    setSubmitToLeaderboard(checked);
+                    setSignError(null);
+                  }}
+                  disabled={mutation.isPending || isSigning}
+                />
+              </div>
+            </Tooltip>
+            {signError && <p className="text-body text-short">{signError}</p>}
+          </div>
         )}
 
         <details className="group rounded-lg border border-rule bg-sunken">

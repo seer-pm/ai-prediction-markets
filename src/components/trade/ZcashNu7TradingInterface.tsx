@@ -3,6 +3,7 @@ import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { ZcashNu7TableData } from "@/types";
 import { collateral } from "@/utils/constants";
 import { formatAmount } from "@/utils/format";
+import type { PredictionLeg } from "@/utils/predictionSubmission";
 import { isNu7LegActionable, isZcashNu7RowFundable, zcashNu7ShareOf } from "@/utils/zcashNu7Budget";
 import React, { useMemo, useState } from "react";
 import { Address } from "viem";
@@ -68,11 +69,27 @@ export const ZcashNu7TradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const perQuestion = zcashNu7ShareOf(amount, fundableCount);
 
+  // Every outcome given a number, traded or not — the prediction is what gets scored.
+  const leaderboardLegs = useMemo<PredictionLeg[]>(
+    () =>
+      markets.flatMap((row) =>
+        row.outcomes
+          .filter((leg) => leg.target !== null)
+          .map((leg) => ({
+            marketId: row.marketId,
+            outcomeIndex: leg.outcomeIndex,
+            prediction: leg.target as number,
+          })),
+      ),
+    [markets],
+  );
+
   return (
     <StrategyDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Start trading"
+      leaderboardSubmission={{ contest: "zcash-nu7", legs: leaderboardLegs }}
       phases={["requote", "mint", "sell", "buy", "settle"]}
       stats={[
         { label: "Questions", value: String(fundableCount) },

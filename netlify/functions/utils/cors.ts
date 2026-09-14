@@ -14,8 +14,8 @@ const ALLOWED_ORIGIN_PATTERNS = [
 ];
 
 /**
- * The read functions are all GET. `save-profile` passes "POST, OPTIONS" so it is the only
- * endpoint that advertises a write method.
+ * The read functions are all GET. `save-profile` and `submit-predictions` pass "POST, OPTIONS", so they are the
+ * only endpoints that advertise a write method.
  */
 const DEFAULT_METHODS = "GET, OPTIONS";
 

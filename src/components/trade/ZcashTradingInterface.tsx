@@ -1,6 +1,8 @@
 import { useExecuteZcashStrategy } from "@/hooks/useExecuteZcashStrategy";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { isZcashRowFundable, zcashShareOf } from "@/utils/zcashBudget";
+import { YES_INDEX } from "@/utils/zcashMarkets";
+import type { PredictionLeg } from "@/utils/predictionSubmission";
 import { ZcashTableData } from "@/types";
 import { collateral } from "@/utils/constants";
 import { formatAmount } from "@/utils/format";
@@ -55,11 +57,26 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const perMarket = zcashShareOf(amount, fundableCount);
 
+  // Every market given a number, traded or not — the prediction is what gets scored. The CSV's
+  // probability is the YES price, so it is submitted against the YES outcome.
+  const leaderboardLegs = useMemo<PredictionLeg[]>(
+    () =>
+      markets
+        .filter((market) => market.predictedProbability !== null && market.marketId)
+        .map((market) => ({
+          marketId: market.marketId,
+          outcomeIndex: YES_INDEX,
+          prediction: market.predictedProbability as number,
+        })),
+    [markets],
+  );
+
   return (
     <StrategyDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Start trading"
+      leaderboardSubmission={{ contest: "zcash", legs: leaderboardLegs }}
       stats={[
         { label: "Markets", value: String(fundableCount) },
         { label: "Above market", value: String(aboveCount), tone: "long" },

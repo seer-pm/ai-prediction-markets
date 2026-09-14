@@ -27,4 +27,5 @@ export { MultiSelect, Select } from "./Select";
 export type { Option } from "./Select";
 export { Skeleton } from "./Skeleton";
 export { Spinner } from "./Spinner";
+export { Switch } from "./Switch";
 export { Tooltip, TooltipProvider } from "./Tooltip";

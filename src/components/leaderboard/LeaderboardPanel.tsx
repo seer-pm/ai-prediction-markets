@@ -240,6 +240,7 @@ export function LeaderboardPanel() {
 
       <LeaderboardTable
         rows={query.data?.rows ?? []}
+        scope={scope}
         isLoading={query.isLoading}
         sortBy={sortBy}
         sortDir={sortDir}
