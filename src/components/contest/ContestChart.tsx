@@ -5,8 +5,17 @@ import type { ChartSeries } from "@/types";
 import type { ReactElement, ReactNode } from "react";
 
 interface ContestChartProps {
+  /**
+   * `undefined` means the chart has not arrived yet; `[]` means it arrived with nothing to draw.
+   * Every tab keeps that distinction, and this card depends on it — see the render below.
+   */
   data: ChartSeries[] | undefined;
   isLoading: boolean;
+  /**
+   * The chart request's failure, if it failed. Without it a failed request is indistinguishable
+   * from one still in flight — both have no data — and the card would skeleton forever.
+   */
+  error?: Error | null;
   eyebrow?: string;
   title: string;
   description?: string;
@@ -32,6 +41,7 @@ interface ContestChartProps {
 export function ContestChart({
   data,
   isLoading,
+  error,
   eyebrow,
   title,
   description,
@@ -69,7 +79,16 @@ export function ContestChart({
   return (
     <Card flush>
       <CardHeader eyebrow={eyebrow} title={title} description={description} actions={actions} />
-      {isLoading ? (
+      {error ? (
+        <EmptyState title="The chart could not be loaded" description={error.message} />
+      ) : /*
+         * `!data` counts as loading, and not only `isLoading`. A chart query is disabled until the
+         * tab knows which markets to ask about, and React Query derives `isLoading` as
+         * `isPending && isFetching` — so a disabled query reports `false` while holding no data at
+         * all. Keyed on `isLoading` alone this card announced "No price history yet" every time a
+         * tab was opened, for as long as the market list took to arrive.
+         */
+        isLoading || !data ? (
         <div className="space-y-3 p-6">
           <Skeleton height={16} width="30%" />
           <Skeleton height={320} className="rounded-md" />

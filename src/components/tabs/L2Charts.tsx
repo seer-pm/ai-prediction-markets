@@ -1,7 +1,7 @@
 import { ContestChart } from "@/components/contest/ContestChart";
 import { FigureLabel } from "@/components/contest/FigureLabel";
 import { Select } from "@/components/ui";
-import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, liveSeries, useMarketChart } from "@/hooks/useMarketCharts";
 
 import { useEffect, useState } from "react";
 
@@ -27,7 +27,11 @@ export default function L2Charts({
     }
   }, [repoOptions, repoSelected]);
 
-  const { data: chart, isLoading: isLoadingChart } = useMarketChart(repoSelected);
+  const {
+    data: chart,
+    isLoading: isLoadingChart,
+    error: chartError,
+  } = useMarketChart(repoSelected);
 
   const volumeLabel = (() => {
     const volume = chartVolume(chart);
@@ -57,8 +61,9 @@ export default function L2Charts({
 
   return (
     <ContestChart
-      data={chart?.series}
+      data={liveSeries(chart)}
       isLoading={isLoading || isLoadingChart}
+      error={chartError}
       eyebrow="Round 2 · L2"
       title="Dependency prices over time"
       description="One repository at a time — each has its own set of dependency markets."

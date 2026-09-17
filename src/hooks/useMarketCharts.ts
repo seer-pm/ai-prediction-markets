@@ -69,6 +69,43 @@ export function chartLiquidity(chart: MarketChart | undefined) {
   return parseFigure(chart?.totalLiquidityMarket, chart?.totalLiquidityTokens);
 }
 
+/** The 30-minute grid `buildChartSeries` resamples onto. */
+const SERIES_INTERVAL = 30 * 60;
+
+/**
+ * A market's series, with a line whose pools are still funded carried forward to the present.
+ *
+ * The stored points stop where the background job last saw a candle. `buildChartSeries` does extend a
+ * funded market's line to "now" — but it resolves that `now` at *write* time, and the job only
+ * rebuilds `series` for a market that produced fresh candles; one that produced none takes the
+ * volume-only path, which advances the cursor and leaves the points untouched. So a market nothing
+ * has traded in a day keeps a line that ends a day ago while its neighbours run to the right edge,
+ * and a chart of forty markets ends in forty different places for no reason the reader can see.
+ *
+ * `totalLiquidityMarket` is the right thing to key that on: it *is* rewritten on every run, the
+ * volume-only path included, so it says whether the pools hold collateral now rather than when the
+ * points were last built. An empty field means "not recorded" rather than "empty" (see
+ * `chartLiquidity`), and is left alone for the same reason the job leaves it alone — a pool nothing
+ * is known about must not have a line run forward on its behalf.
+ */
+export function liveSeries(chart: MarketChart | undefined): ChartSeries[] | undefined {
+  if (!chart?.series) return undefined;
+
+  const liquidity = chartLiquidity(chart);
+  if (!liquidity || liquidity.collateral <= 0) return chart.series;
+
+  // Floored, matching the grid the points sit on: rounding up would draw half an hour into the future.
+  const now = Math.floor(Date.now() / 1000 / SERIES_INTERVAL) * SERIES_INTERVAL;
+
+  return chart.series.map((series) => {
+    const last = series.points[series.points.length - 1];
+    // A series with no points has no price to hold, and one already at the edge needs no help.
+    if (!last || last[0] >= now) return series;
+    // The price held until something traded against it, which is exactly what a flat run means here.
+    return { ...series, points: [...series.points, [now, last[1]] as [number, number]] };
+  });
+}
+
 type MarketChartsResponse = Record<string, MarketChart>;
 
 const EMPTY_CHART: MarketChart = {

@@ -7,7 +7,7 @@ import { ZcashTradingInterface } from "@/components/trade/ZcashTradingInterface"
 import { Button, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import { ZcashMarketTable } from "@/components/ZcashMarketTable";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartLiquidity, chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, liveSeries, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useProcessZcashPredictions } from "@/hooks/useProcessZcashPredictions";
 import { useRedeemZcash } from "@/hooks/useRedeemZcash";
 import { useSellZcashToCollateral } from "@/hooks/useSellZcashToCollateral";
@@ -72,7 +72,11 @@ export const ZcashMarkets = () => {
 
   // 37 proposals share one chart, so they are fetched together rather than 37 times over.
   const chartMarketIds = useMemo(() => Object.keys(marketIdToProject), [marketIdToProject]);
-  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(chartMarketIds);
+  const {
+    data: charts,
+    isLoading: isLoadingCharts,
+    error: chartsError,
+  } = useMarketCharts(chartMarketIds);
 
   // Raw market data for redeem scope (React Query dedupes with useProcessZcashPredictions).
   const { data: zcashMarketData } = useZcashMarketsData();
@@ -103,7 +107,7 @@ export const ZcashMarkets = () => {
     if (!charts) return undefined;
     return Object.entries(marketIdToProject).flatMap(([marketId, project]) => {
       // Index 0 is YES — the number this pilot exists to publish.
-      const series = charts[marketId.toLowerCase()]?.series[YES_INDEX];
+      const series = liveSeries(charts[marketId.toLowerCase()])?.[YES_INDEX];
       return series ? [{ ...series, outcomeName: project }] : [];
     });
   }, [charts, marketIdToProject]);
@@ -233,6 +237,7 @@ export const ZcashMarkets = () => {
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
+        error={chartsError}
         eyebrow="Zcash · Q3 2026"
         title="Approval odds over time"
         description="Each line is one proposal's YES price — the market's estimate of its chance of being approved."

@@ -9,7 +9,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartLiquidity, chartVolume, useMarketCharts } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, liveSeries, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
 import { useRedeemOriginality } from "@/hooks/useRedeemOriginality";
@@ -76,7 +76,11 @@ export const OriginalityMarkets = () => {
   // One chart, one line per repository — so every child market is needed at once, and the batch
   // endpoint fetches them in a single request rather than one per repository.
   const chartMarketIds = useMemo(() => Object.keys(marketIdToRepo), [marketIdToRepo]);
-  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(chartMarketIds);
+  const {
+    data: charts,
+    isLoading: isLoadingCharts,
+    error: chartsError,
+  } = useMarketCharts(chartMarketIds);
 
   // Raw market data for withdraw (React Query will deduplicate with useProcessOriginalityPredictions)
   const { data: originalityMarketData } = useOriginalityMarketsData();
@@ -126,7 +130,7 @@ export const OriginalityMarkets = () => {
   const chartData = useMemo(() => {
     if (!charts) return undefined;
     return Object.entries(marketIdToRepo).flatMap(([marketId, repo]) => {
-      const series = charts[marketId.toLowerCase()]?.series[1]; //outcome UP
+      const series = liveSeries(charts[marketId.toLowerCase()])?.[1]; //outcome UP
       return series ? [{ ...series, outcomeName: repo }] : [];
     });
   }, [charts, marketIdToRepo]);
@@ -265,6 +269,7 @@ export const OriginalityMarkets = () => {
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
+        error={chartsError}
         eyebrow="Round 2 · Originality"
         title="Share of original work over time"
         description="Each line is a repository's UP price — the market's estimate of how much of it is original."

@@ -7,7 +7,7 @@ import { PredictionDropzone } from "@/components/predictions/PredictionDropzone"
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useL1MarketsData } from "@/hooks/useL1MarketsData";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, liveSeries, useMarketChart } from "@/hooks/useMarketCharts";
 import { useProcessL1Predictions } from "@/hooks/useProcessL1Predictions";
 import { useRedeemL1 } from "@/hooks/useRedeemL1";
 import { useSellL1ToCollateral } from "@/hooks/useSellL1ToCollateral";
@@ -87,7 +87,11 @@ export const L1Markets = () => {
 
   // Chart history is its own query: it is far larger than the table data and changes on a different
   // clock, so bundling the two only meant neither could be shown until both had arrived.
-  const { data: chart, isLoading: isLoadingChart } = useMarketChart(L1_MARKET_ID);
+  const {
+    data: chart,
+    isLoading: isLoadingChart,
+    error: chartError,
+  } = useMarketChart(L1_MARKET_ID);
 
   const sellAll = useSellL1ToCollateral();
   const redeem = useRedeemL1();
@@ -189,13 +193,13 @@ export const L1Markets = () => {
 
   const chartData = useMemo(
     () =>
-      chart?.series.filter(
+      liveSeries(chart)?.filter(
         (x) =>
           !["invalid result", "other repositories"].some((name) =>
             x.outcomeName.toLowerCase().includes(name),
           ),
       ),
-    [chart?.series],
+    [chart],
   );
 
   const tradableCount = useMemo(
@@ -288,6 +292,7 @@ export const L1Markets = () => {
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingChart}
+        error={chartError}
         eyebrow="Round 2 · L1"
         title="Repository weight in the Ethereum ecosystem"
         volume={volumeLabel}

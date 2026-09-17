@@ -7,7 +7,7 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { Button, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { chartLiquidity, chartVolume, useMarketChart } from "@/hooks/useMarketCharts";
+import { chartLiquidity, chartVolume, liveSeries, useMarketChart } from "@/hooks/useMarketCharts";
 import { useOctantMarketsData } from "@/hooks/useOctantMarketsData";
 import { useProcessOctantPredictions } from "@/hooks/useProcessOctantPredictions";
 import { useRedeemOctant } from "@/hooks/useRedeemOctant";
@@ -71,7 +71,11 @@ export const OctantMarkets = () => {
   } = useProcessOctantPredictions(predictions);
 
   // Its own query, so the table need not wait on the price history — see `useMarketCharts`.
-  const { data: chart, isLoading: isLoadingChart } = useMarketChart(OCTANT_MARKET_ID);
+  const {
+    data: chart,
+    isLoading: isLoadingChart,
+    error: chartError,
+  } = useMarketChart(OCTANT_MARKET_ID);
 
   const sellAll = useSellOctantToCollateral();
   const redeem = useRedeemOctant();
@@ -128,8 +132,8 @@ export const OctantMarkets = () => {
   }, [chart]);
 
   const chartData = useMemo(
-    () => chart?.series.filter((x) => !x.outcomeName.toLowerCase().includes("invalid result")),
-    [chart?.series],
+    () => liveSeries(chart)?.filter((x) => !x.outcomeName.toLowerCase().includes("invalid result")),
+    [chart],
   );
 
   const tradableCount = useMemo(
@@ -195,6 +199,7 @@ export const OctantMarkets = () => {
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingChart}
+        error={chartError}
         eyebrow="Octant"
         title="Project funding share over time"
         volume={volumeLabel}

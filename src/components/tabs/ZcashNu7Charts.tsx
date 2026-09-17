@@ -5,6 +5,7 @@ import { SegmentedControl } from "@/components/ui";
 import {
   chartLiquidity,
   chartVolume,
+  liveSeries,
   useMarketCharts,
   type MarketChart,
 } from "@/hooks/useMarketCharts";
@@ -50,7 +51,11 @@ export default function ZcashNu7Charts({
   const market = markets.find((entry) => entry.marketId === selected);
 
   const marketIds = useMemo(() => markets.map((entry) => entry.marketId), [markets]);
-  const { data: charts, isLoading: isLoadingCharts } = useMarketCharts(marketIds);
+  const {
+    data: charts,
+    isLoading: isLoadingCharts,
+    error: chartsError,
+  } = useMarketCharts(marketIds);
   // `useMarketCharts` keys its record by lowercased id — see `fetchMarketCharts`.
   const chart = selected ? charts?.[selected.toLowerCase()] : undefined;
 
@@ -60,11 +65,12 @@ export default function ZcashNu7Charts({
    * place that rule lives, and matching on "Invalid result" would break the moment it is reworded.
    */
   const series = useMemo(() => {
-    if (!chart?.series) return undefined;
+    const drawn = liveSeries(chart);
+    if (!drawn) return undefined;
     const invalidToken = market?.wrappedTokens[invalidIndexOf(market.wrappedTokens)]?.toLowerCase();
-    if (!invalidToken) return chart.series;
-    return chart.series.filter((entry) => entry.outcomeId.toLowerCase() !== invalidToken);
-  }, [chart?.series, market]);
+    if (!invalidToken) return drawn;
+    return drawn.filter((entry) => entry.outcomeId.toLowerCase() !== invalidToken);
+  }, [chart, market]);
 
   /**
    * Two levels of figure, told apart by where they sit rather than by a caption.
@@ -91,6 +97,7 @@ export default function ZcashNu7Charts({
     <ContestChart
       data={series}
       isLoading={isLoading || isLoadingCharts}
+      error={chartsError}
       eyebrow="Zcash · NU7"
       title="Outcome prices over time"
       // The question itself, which the table's band row states only once per group.
