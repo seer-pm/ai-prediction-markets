@@ -235,7 +235,8 @@ export const ZcashNu7Markets = () => {
         }
       />
 
-      {hasNoLiquidity && (
+      {/* Pools can be pulled after resolution; on a settled contest that is not "not tradable yet". */}
+      {hasNoLiquidity && !finished && (
         <Panel tone="info" title="Not tradable yet">
           All five markets are live on Optimism, but no liquidity has been seeded, so there are no
           pools to price them. Predictions can be uploaded now. Prices and trading turn on once the

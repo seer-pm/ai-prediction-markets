@@ -62,7 +62,7 @@ export const DEEP_CONTESTS = [
     id: "zcash-nu7",
     label: "Zcash · NU7",
     marketIds: ZCASH_NU7_MARKET_IDS,
-    finished: false,
+    finished: true,
     leaderboard: false,
   },
   {
