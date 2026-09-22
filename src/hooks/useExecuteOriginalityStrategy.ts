@@ -5,13 +5,7 @@ import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
 import { CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps, TxStateChange } from "@/types";
-import {
-  CHAIN_ID,
-  COLLATERAL_TOKENS,
-  DECIMALS,
-  ORIGINALITY_PARENT_MARKET_ID,
-  ROUTER_ADDRESSES,
-} from "@/utils/constants";
+import { CHAIN_ID, COLLATERAL_TOKENS, DECIMALS, ROUTER_ADDRESSES } from "@/utils/constants";
 import { safeParseUnits } from "@/utils/format";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
@@ -87,10 +81,19 @@ const getTradeExecutorCalls = ({
   return [...calls];
 };
 
+/**
+ * Whether `compareOriginalityQuotes` can spend this row's budget: it needs the prediction on both
+ * sides, or the UP+DOWN>1 arbitrage, which ignores the prediction.
+ */
+const canSpend = (row: OriginalityTradeProps["tableData"][number]) =>
+  (!!row.upDifference && !!row.downDifference) ||
+  (row.volumeUntilUpEqual > 0 && row.volumeUntilDownEqual > 0);
+
 const executeOriginalityStrategy = async ({
   amount,
   tableData,
   tradeExecutor,
+  parentMarketId,
   onStateChange,
 }: OriginalityTradeProps & { onStateChange: TxStateChange }) => {
   if (!tableData?.length) {
@@ -137,12 +140,26 @@ const executeOriginalityStrategy = async ({
   const didMint = Number(amount) > 0;
   const mintValue = safeParseUnits(amount, DECIMALS);
 
+  // Splitting `amount` on the parent mints `amount` of EACH parent outcome token, and a row spends
+  // its own collateral token. In round 2 every repo has its own parent token, so each row gets the
+  // whole mint. In round 3 ~33 rows share a bundle token, so that token's mint is divided among the
+  // rows that can spend it — handing each the whole amount would overdraw it ~33 times over.
+  const spendersPerToken = new Map<string, bigint>();
+  for (const row of tableData) {
+    if (!canSpend(row)) continue;
+    const key = row.collateralToken.toLowerCase();
+    spendersPerToken.set(key, (spendersPerToken.get(key) ?? 0n) + 1n);
+  }
+
   const newTableData = tableData.map((initialRow) => {
     const row = { ...initialRow };
+    let sellProceeds = 0n;
     //update volumeUntilPrice
     for (let i = 0; i < row.wrappedTokens.length; i++) {
-      const data = sellTokenMapping[row.wrappedTokens[i]];
+      // `sellTokenMapping` is keyed lowercase; MarketView returns checksummed addresses.
+      const data = sellTokenMapping[row.wrappedTokens[i].toLowerCase()];
       if (data) {
+        sellProceeds += data.value;
         if (i === 0) {
           row.volumeUntilDownPrice =
             row.volumeUntilDownPrice - Number(formatUnits(data.sellAmount, DECIMALS));
@@ -153,8 +170,9 @@ const executeOriginalityStrategy = async ({
           row.upBalance = row.upBalance ? row.upBalance - data.sellAmount : row.upBalance;
         }
       }
-      row.amount = formatUnits((data?.value ?? 0n) + mintValue, DECIMALS);
     }
+    const spenders = spendersPerToken.get(row.collateralToken.toLowerCase()) ?? 1n;
+    row.amount = formatUnits(sellProceeds + mintValue / spenders, DECIMALS);
     return row;
   });
   const originalityQuoteResults = await getOriginalityQuotes({
@@ -175,7 +193,7 @@ const executeOriginalityStrategy = async ({
         collateral: mainCollateral,
         mainCollateral,
         amount,
-        market: ORIGINALITY_PARENT_MARKET_ID,
+        market: parentMarketId,
       }),
       message: "Minting complete sets",
       phase: "mint",
@@ -213,7 +231,7 @@ export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["useOriginalityMarketsData"] });
+        queryClient.refetchQueries({ queryKey: ["fetchOriginalityMarketsData"] });
         queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
         queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
         queryClient.invalidateQueries({ queryKey: ["useGetOriginalityQuotes"] });
@@ -221,7 +239,7 @@ export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
     },
     onError() {
       setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["useOriginalityMarketsData"] });
+        queryClient.refetchQueries({ queryKey: ["fetchOriginalityMarketsData"] });
         queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
         queryClient.refetchQueries({ queryKey: ["useTokensBalances"] });
         queryClient.invalidateQueries({ queryKey: ["useGetOriginalityQuotes"] });

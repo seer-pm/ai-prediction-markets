@@ -104,10 +104,11 @@ async function resolveTargets(ids: string[]): Promise<VolumeTarget[]> {
     if (!row && !market) continue;
 
     const tokens = [...((row?.wrappedTokens ?? market?.wrappedTokens ?? []) as Address[])];
-    // The indexed contests carry the collateral the market was actually split against — sUSDS for
-    // the top-level ones, the parent's outcome token for an Originality or L2 child. The on-chain
-    // sets are all top-level, and the cron pairs those against sUSDS.
-    const collateral = (row?.collateralToken ?? primary) as Address;
+    // The collateral the market was actually split against — sUSDS for the top-level ones, the
+    // parent's outcome token for an Originality or L2 child. MarketView reports it too, which
+    // matters for round-3 Originality: its children are on-chain only and NOT collateralized in
+    // sUSDS, so falling back to `primary` would find no pools.
+    const collateral = (row?.collateralToken ?? market?.collateralToken ?? primary) as Address;
 
     if (id === L1_MARKET_ID.toLowerCase()) {
       tokens.push(...(await l1ChildTokens()));

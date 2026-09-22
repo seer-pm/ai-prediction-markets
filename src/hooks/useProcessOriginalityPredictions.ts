@@ -1,5 +1,6 @@
 import { OriginalityRow } from "@/types";
 import { ARB_SUM_THRESHOLD, MIN_PRICE } from "@/utils/constants";
+import { ORIGINALITY_ROUND_2, OriginalityRound } from "@/utils/originalityRounds";
 import { useMemo } from "react";
 import { zeroAddress } from "viem";
 import { useAccount } from "wagmi";
@@ -8,10 +9,13 @@ import { useCheckTradeExecutorCreated } from "./useCheckTradeExecutorCreated";
 import { useOriginalityMarketsData } from "./useOriginalityMarketsData";
 import { useTokensBalances } from "./useTokensBalances";
 
-export const useProcessOriginalityPredictions = (predictions: OriginalityRow[]) => {
+export const useProcessOriginalityPredictions = (
+  predictions: OriginalityRow[],
+  round: OriginalityRound = ORIGINALITY_ROUND_2,
+) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
-  const { data, isLoading, isFetching, error } = useOriginalityMarketsData();
+  const { data, isLoading, isFetching, error } = useOriginalityMarketsData(round);
   const tokens = useMemo(
     () => data?.markets?.map((market) => market.wrappedTokens)?.flat(),
     [data?.markets],

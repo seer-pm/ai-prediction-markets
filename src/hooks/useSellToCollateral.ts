@@ -4,7 +4,7 @@ import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllQuotes } from "@/lib/trade/getQuote";
 import { CallBatchesInput, OriginalityTableData, TxStateChange } from "@/types";
 import { minBigIntArray } from "@/utils/common";
-import { CHAIN_ID, ORIGINALITY_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
+import { CHAIN_ID, ROUTER_ADDRESSES } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
@@ -15,11 +15,16 @@ import { getQuoteTradeCalls } from "@/utils/trade";
 interface SellAllProps {
   tradeExecutor: Address;
   tableData: OriginalityTableData[];
+  parentMarketId: Address;
+  /** The parent's Invalid outcome token — a complete set includes it. */
+  parentInvalidToken: Address;
 }
 
 async function sellToCollateral({
   tradeExecutor,
   tableData,
+  parentMarketId,
+  parentInvalidToken,
   onStateChange,
 }: SellAllProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
@@ -52,19 +57,19 @@ async function sellToCollateral({
     throw sellResult.error;
   }
   onStateChange({ phase: "merge", label: "Reading collateral balances" });
-  const balances = await fetchTokensBalances(
-    tradeExecutor,
-    tableData.map((x) => x.collateralToken),
-  );
+  // One entry per parent outcome token. Round 2 has one per repo already; in round 3 ~33 repos
+  // share each bundle token, and listing it 33 times would only repeat its approve.
+  const parentOutcomeTokens = [
+    ...new Map(tableData.map((x) => [x.collateralToken.toLowerCase(), x.collateralToken])).values(),
+  ];
+  const balances = await fetchTokensBalances(tradeExecutor, parentOutcomeTokens);
 
   const mergeAmount = minBigIntArray(balances);
   if (mergeAmount > 0n) {
-    const INVALID = "0x2281bb55063b8d036e5077f5b654c9bb1b397a34";
-
     const mergeCalls = [
-      ...mergeFromRouter(router, mergeAmount, ORIGINALITY_PARENT_MARKET_ID, [
-        ...tableData.map((x) => x.collateralToken),
-        INVALID,
+      ...mergeFromRouter(router, mergeAmount, parentMarketId, [
+        ...parentOutcomeTokens,
+        parentInvalidToken,
       ]),
     ];
     const mergeInput: CallBatchesInput = [];

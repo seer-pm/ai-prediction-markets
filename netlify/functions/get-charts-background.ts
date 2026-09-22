@@ -13,6 +13,7 @@ import { Address } from "viem";
 import { buildChartSeries, getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getChartData, getPoolIds } from "./utils/getChartData";
 import type { MarketOnChain } from "./utils/marketView";
+import { fetchOriginalityR3MarketsOnChain } from "./utils/originalityR3OnChain";
 import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
 import {
@@ -347,7 +348,8 @@ const getOctantPairs = async (
 /**
  * The two Zcash contests are sets of separate top-level markets, so unlike the single-market
  * contests above this writes one chart blob *per market* and reads the market set from chain rather
- * than Supabase, which has no rows for either.
+ * than Supabase, which has no rows for either. Round-3 Originality goes through here too: its 98
+ * repo markets are not in Supabase either.
  *
  * A market with no pool data in the index is never upserted empty — before the liquidity script runs
  * there are no pools at all, and a run of empty blobs would only mask that. That call belongs to
@@ -363,10 +365,10 @@ const getFlatMarketPairs = async (
   poolIndex: Map<string, PoolHourData[]>,
   volumeIndex: Map<string, PoolVolumeData>,
 ) => {
-  const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address;
-
   for (const market of markets) {
-    const { id: marketId, wrappedTokens, outcomes } = market;
+    // The market's own collateral: sUSDS for the Zcash sets, a parent outcome token for a
+    // conditional market such as a round-3 Originality repo.
+    const { id: marketId, wrappedTokens, outcomes, collateralToken: collateral } = market;
     const chartDataMarket = wrappedTokens.map(
       (token) => poolIndex.get(poolPairKey(token, collateral)) ?? [],
     );
@@ -591,22 +593,21 @@ export default async () => {
   // history yet" indefinitely even though the pools exist. Deduped because a pool present in more
   // than one list would be fetched twice.
   let allPoolIds = poolIds;
-  const onChainCollateral = COLLATERAL_TOKENS[CHAIN_ID].primary.address as Address;
-
   // Resolved once and reused by the writers below — the market set is the same read either way, and
   // these are 42 `getMarket` calls across two multicalls, not something to pay for twice.
   const onChainContests: { label: string; markets: MarketOnChain[] }[] = [];
   for (const [label, fetchMarkets] of [
     ["zcash", fetchZcashMarketsOnChain],
     ["zcash-nu7", fetchZcashNu7MarketsOnChain],
+    ["originality-r3", fetchOriginalityR3MarketsOnChain],
   ] as const) {
     try {
       const contestMarkets = await fetchMarkets();
       onChainContests.push({ label, markets: contestMarkets });
       const contestPoolIds = await getPoolIds(
-        contestMarkets.flatMap(({ wrappedTokens }) =>
+        contestMarkets.flatMap(({ wrappedTokens, collateralToken }) =>
           // Invalid is never seeded, and it is always the last outcome.
-          wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, onChainCollateral)),
+          wrappedTokens.slice(0, -1).map((token) => getToken0Token1(token, collateralToken)),
         ),
       );
       allPoolIds = [...new Set([...allPoolIds, ...contestPoolIds.map((id) => id.toLowerCase())])];
