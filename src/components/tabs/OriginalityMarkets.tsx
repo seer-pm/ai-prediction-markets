@@ -19,6 +19,7 @@ import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { parseOriginalityCSV } from "@/utils/csvParser";
+import { ORIGINALITY_ROUND_2, ORIGINALITY_ROUND_3, OriginalityRound } from "@/utils/originalityRounds";
 
 import { sampleOriginalityPredictions } from "@/utils/sampleOriginalityPredictions";
 import { MarketStatus } from "@seer-pm/sdk";
@@ -51,9 +52,9 @@ const ORIGINALITY_SAMPLE_CONFIG: SampleCsvConfig = {
   filename: "originality-predictions",
 };
 
-export const OriginalityMarkets = () => {
+export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: OriginalityRound }) => {
   const [predictions, setPredictions] = useLocalStorage<OriginalityRow[]>(
-    "originality-default",
+    round.predictionsStorageKey,
     [],
   );
   const { finished } = useContest();
@@ -71,7 +72,7 @@ export const OriginalityMarkets = () => {
     isLoadingBalances,
     error,
     marketIdToRepo,
-  } = useProcessOriginalityPredictions(predictions);
+  } = useProcessOriginalityPredictions(predictions, round);
 
   // One chart, one line per repository — so every child market is needed at once, and the batch
   // endpoint fetches them in a single request rather than one per repository.
@@ -83,7 +84,7 @@ export const OriginalityMarkets = () => {
   } = useMarketCharts(chartMarketIds);
 
   // Raw market data for withdraw (React Query will deduplicate with useProcessOriginalityPredictions)
-  const { data: originalityMarketData } = useOriginalityMarketsData();
+  const { data: originalityMarketData } = useOriginalityMarketsData(round);
 
   const sellAll = useSellToCollateral();
   const redeem = useRedeemOriginality();
@@ -148,13 +149,13 @@ export const OriginalityMarkets = () => {
         label="Average volume per repository"
         cash={cash}
         tokens={tokens}
-        // Not sUSDS: an Originality market is split against its repository's *parent* outcome
-        // token, so that token — not the collateral behind it — is what the cash leg is paid in.
-        symbol="repo tokens"
-        note="Denominated in the repository's parent outcome token, not in sUSDS."
+        // Not sUSDS: an Originality market is split against a *parent* outcome token, so that
+        // token — not the collateral behind it — is what the cash leg is paid in.
+        symbol={round.collateralUnit.symbol}
+        note={round.collateralUnit.note}
       />
     );
-  }, [charts]);
+  }, [charts, round]);
 
   // Averaged per repository, matching the volume figure beside it: the child markets are
   // collateralised in different parent outcome tokens, so a sum across them would add unlike units.
@@ -170,11 +171,11 @@ export const OriginalityMarkets = () => {
         label="Average liquidity per repository"
         cash={cash}
         tokens={tokens}
-        symbol="repo tokens"
-        note="Denominated in the repository's parent outcome token, not in sUSDS."
+        symbol={round.collateralUnit.symbol}
+        note={round.collateralUnit.note}
       />
     );
-  }, [charts]);
+  }, [charts, round]);
 
   const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
   const hasSellTokens = useMemo(
@@ -205,8 +206,13 @@ export const OriginalityMarkets = () => {
 
   const handleSellAll = useCallback(() => {
     if (!tableData || !tradeExecutor) return;
-    sellAll.mutate({ tradeExecutor, tableData });
-  }, [tableData, sellAll, tradeExecutor]);
+    sellAll.mutate({
+      tradeExecutor,
+      tableData,
+      parentMarketId: round.parentMarketId,
+      parentInvalidToken: round.parentInvalidToken,
+    });
+  }, [tableData, sellAll, tradeExecutor, round]);
 
   const exportWeight = useCallback(() => {
     if (!tableData) return;
@@ -270,7 +276,7 @@ export const OriginalityMarkets = () => {
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
         error={chartsError}
-        eyebrow="Round 2 · Originality"
+        eyebrow={round.eyebrow}
         title="Share of original work over time"
         description="Each line is a repository's UP price — the market's estimate of how much of it is original."
         volume={volumeLabel}
@@ -348,6 +354,7 @@ export const OriginalityMarkets = () => {
           tradeExecutor={tradeExecutor}
           markets={tableData}
           isLoadingBalances={isLoadingBalances}
+          parentMarketId={round.parentMarketId}
         />
       )}
 
@@ -389,6 +396,7 @@ export const OriginalityMarkets = () => {
           redeem.mutate({
             tradeExecutor,
             closedMarkets,
+            parentMarketId: round.parentMarketId,
             parentTokens,
             isOldWallet: isUseOldWallet,
           })
@@ -405,3 +413,6 @@ export const OriginalityMarkets = () => {
     </>
   );
 };
+
+/** Round 3: same view, over the bundled multi-scalar parent. The bundles never surface here. */
+export const OriginalityR3Markets = () => <OriginalityMarkets round={ORIGINALITY_ROUND_3} />;

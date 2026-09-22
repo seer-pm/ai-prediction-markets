@@ -13,6 +13,8 @@ interface TradingInterfaceProps {
   markets: OriginalityTableData[];
   tradeExecutor: Address;
   isLoadingBalances: boolean;
+  /** The parent market the sUSDS is split on. */
+  parentMarketId: Address;
 }
 
 export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -21,6 +23,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   tradeExecutor,
   markets,
   isLoadingBalances,
+  parentMarketId,
 }) => {
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -68,7 +71,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
           : undefined
       }
       onSubmit={(value) =>
-        executeTradeMutation.mutate({ amount: value, tableData: markets, tradeExecutor })
+        executeTradeMutation.mutate({ amount: value, tableData: markets, tradeExecutor, parentMarketId })
       }
       howItWorks={
         <>

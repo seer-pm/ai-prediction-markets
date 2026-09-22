@@ -212,6 +212,8 @@ export interface OriginalityTradeProps {
   tradeExecutor: Address;
   amount: string;
   tableData: OriginalityTableData[];
+  /** The parent market the sUSDS is split on — round 2's or round 3's. */
+  parentMarketId: Address;
 }
 
 export interface L2TradeProps {

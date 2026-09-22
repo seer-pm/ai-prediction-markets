@@ -1,5 +1,6 @@
 import { PoolInfo } from "@/types";
 import { fetchAppJson } from "@/utils/common";
+import { ORIGINALITY_ROUND_2, OriginalityRound } from "@/utils/originalityRounds";
 import { MarketStatus } from "@seer-pm/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
@@ -24,10 +25,7 @@ interface GetOriginalityMarketsDataApiResult {
   parentWrappedTokens: Address[];
 }
 
-const fetchOriginalityMarketsData = () =>
-  fetchAppJson<GetOriginalityMarketsDataApiResult>("get-originality-markets-data");
-
-export const useOriginalityMarketsData = () => {
+export const useOriginalityMarketsData = (round: OriginalityRound = ORIGINALITY_ROUND_2) => {
   return useQuery({
     retry: false,
     refetchOnWindowFocus: false,
@@ -39,7 +37,7 @@ export const useOriginalityMarketsData = () => {
     refetchInterval: false,
     staleTime: 30 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    queryKey: ["fetchOriginalityMarketsData"],
-    queryFn: fetchOriginalityMarketsData,
+    queryKey: round.queryKey,
+    queryFn: () => fetchAppJson<GetOriginalityMarketsDataApiResult>(round.dataFunction),
   });
 };

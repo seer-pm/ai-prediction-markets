@@ -2,7 +2,7 @@ import { queryClient } from "@/config/queryClient";
 import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxOwner, toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { CallBatchesInput, TxStateChange } from "@/types";
-import { CHAIN_ID, COLLATERAL_TOKENS, ORIGINALITY_PARENT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
+import { CHAIN_ID, COLLATERAL_TOKENS, ROUTER_ADDRESSES } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
@@ -15,6 +15,8 @@ interface RedeemOriginalityProps {
   tradeExecutor: Address;
   /** Only markets with marketStatus === CLOSED */
   closedMarkets: { id: Address; collateralToken: Address; wrappedTokens: Address[] }[];
+  /** The Originality parent market — round 2's or round 3's. */
+  parentMarketId: Address;
   /** The Originality parent market's outcome tokens */
   parentTokens: Address[];
   /**
@@ -28,6 +30,7 @@ interface RedeemOriginalityProps {
 async function redeemOriginality({
   tradeExecutor,
   closedMarkets,
+  parentMarketId,
   parentTokens: parentTokensInput,
   isOldWallet,
   onStateChange,
@@ -133,7 +136,7 @@ async function redeemOriginality({
     const parentBatches = chunkRedeemFromRouter(
       router,
       collateral.address,
-      ORIGINALITY_PARENT_MARKET_ID,
+      parentMarketId,
       parentRedeemTokens,
       parentOutcomeIndexes,
       parentAmounts,

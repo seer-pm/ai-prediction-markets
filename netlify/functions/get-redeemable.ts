@@ -7,6 +7,7 @@ import {
   ORIGINALITY_PARENT_MARKET_ID,
   OTHER_MARKET_ID,
 } from "@/utils/constants";
+import { ORIGINALITY_R3_MARKET_IDS, ORIGINALITY_R3_PARENT_MARKET_ID } from "@/utils/originalityR3Markets";
 import { ZCASH_MARKET_IDS } from "@/utils/zcashMarkets";
 import { ZCASH_NU7_MARKET_IDS } from "@/utils/zcashNu7Markets";
 import { MarketStatus } from "@seer-pm/sdk";
@@ -123,6 +124,8 @@ async function fetchClosedTokensByContest(): Promise<Record<string, ClosedTokens
         OTHER_MARKET_ID,
         ...ZCASH_MARKET_IDS,
         ...ZCASH_NU7_MARKET_IDS,
+        ORIGINALITY_R3_PARENT_MARKET_ID,
+        ...ORIGINALITY_R3_MARKET_IDS,
       ] as Address[]),
     ]);
 
@@ -140,6 +143,8 @@ async function fetchClosedTokensByContest(): Promise<Record<string, ClosedTokens
     "round2-l1": tokensOf([L1_MARKET_ID, OTHER_MARKET_ID]),
     zcash: tokensOf(ZCASH_MARKET_IDS),
     "zcash-nu7": tokensOf(ZCASH_NU7_MARKET_IDS),
+    // Not in Supabase: created 2026-09-22, after Seer's Optimism indexer stalled.
+    round3: tokensOf([ORIGINALITY_R3_PARENT_MARKET_ID, ...ORIGINALITY_R3_MARKET_IDS]),
   };
 }
 

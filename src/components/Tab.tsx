@@ -12,7 +12,7 @@ import { AiMarkets } from "./tabs/AiMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
-import { OriginalityMarkets } from "./tabs/OriginalityMarkets";
+import { OriginalityMarkets, OriginalityR3Markets } from "./tabs/OriginalityMarkets";
 import { ZcashMarkets } from "./tabs/ZcashMarkets";
 import { ZcashNu7Markets } from "./tabs/ZcashNu7Markets";
 import { SeerPromo } from "./SeerPromo";
@@ -23,6 +23,7 @@ import { SeerPromo } from "./SeerPromo";
  * what the contests are.
  */
 const CONTEST_COMPONENTS: Record<string, ComponentType> = {
+  round3: OriginalityR3Markets,
   "zcash-nu7": ZcashNu7Markets,
   zcash: ZcashMarkets,
   octant: OctantMarkets,
@@ -43,7 +44,7 @@ const ARCHIVED_TABS = TABS.filter((tab) => tab.finished);
 // The live contest. Keep it in step with the `finished` flags in `@/utils/contests` — landing a
 // first-time visitor in the archive would be odd. It also has to be a tab that survives the
 // `hidden` filter, or the fallback lands on nothing.
-const DEFAULT_TAB: string = "zcash";
+const DEFAULT_TAB: string = "round3";
 
 /**
  * Four of five contests have ended, so they sit in an archive menu rather than

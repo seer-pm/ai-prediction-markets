@@ -11,6 +11,8 @@ import {
   L2_PARENT_MARKET_ID,
   OCTANT_MARKET_ID,
   ORIGINALITY_PARENT_MARKET_ID,
+  ORIGINALITY_R3_MARKET_IDS,
+  ORIGINALITY_R3_PARENT_MARKET_ID,
   ZCASH_MARKET_IDS,
   ZCASH_NU7_MARKET_IDS,
 } from "./constants";
@@ -58,6 +60,16 @@ export interface Contest {
 }
 
 export const DEEP_CONTESTS = [
+  {
+    id: "round3",
+    label: "Round 3 · Originality",
+    marketId: ORIGINALITY_R3_PARENT_MARKET_ID,
+    // Seer's Optimism indexer stalled on 2026-08-29, so nothing can expand this parent to its
+    // children by query — list them. See `originalityR3Markets.ts`.
+    marketIds: ORIGINALITY_R3_MARKET_IDS,
+    finished: false,
+    leaderboard: false,
+  },
   {
     id: "zcash-nu7",
     label: "Zcash · NU7",
