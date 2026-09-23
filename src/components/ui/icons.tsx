@@ -66,6 +66,13 @@ export const InfoIcon = (props: IconProps) => (
   </svg>
 );
 
+export const HelpIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <circle cx="8" cy="8" r="6" />
+    <path d="M6.3 6.4a1.75 1.75 0 1 1 2.45 1.6c-.45.2-.75.6-.75 1.1v.3M8 11.2h.01" />
+  </svg>
+);
+
 export const CopyIcon = (props: IconProps) => (
   <svg {...base(props)}>
     <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />

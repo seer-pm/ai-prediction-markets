@@ -2,8 +2,10 @@ import { cn } from "@/utils/cn";
 
 interface DeltaCellProps {
   value: number | null | undefined;
-  /** Largest absolute delta in the loaded set — scales every bar in the table. */
-  max: number;
+  /** Largest absolute delta in the loaded set — scales every bar in the table. Unused without a bar. */
+  max?: number;
+  /** Draw the bar gutter. Off for a table that prints the number alone. */
+  bar?: boolean;
   /** How the number itself reads. Defaults to a signed 4-decimal weight. */
   format: (value: number) => string;
   title?: string;
@@ -24,15 +26,17 @@ const MIN_FILL = 2;
  *
  * The sign glyph is always present, so colour is never the only channel.
  */
-export function DeltaCell({ value, max, format, title, className }: DeltaCellProps) {
+export function DeltaCell({ value, max = 0, bar = true, format, title, className }: DeltaCellProps) {
   const hasValue = typeof value === "number" && !Number.isNaN(value) && value !== 0;
 
   if (!hasValue) {
     return (
       <div className={cn("flex items-center justify-end gap-2.5", className)}>
-        <span aria-hidden className="block shrink-0" style={{ width: TRACK }}>
-          <span className="mx-auto block h-4 w-px bg-rule" />
-        </span>
+        {bar && (
+          <span aria-hidden className="block shrink-0" style={{ width: TRACK }}>
+            <span className="mx-auto block h-4 w-px bg-rule" />
+          </span>
+        )}
         <span className="font-mono text-body text-ink-4">—</span>
       </div>
     );
@@ -44,16 +48,18 @@ export function DeltaCell({ value, max, format, title, className }: DeltaCellPro
 
   return (
     <div className={cn("flex items-center justify-end gap-2.5", className)} title={title}>
-      <span aria-hidden className="relative block h-4 shrink-0" style={{ width: TRACK }}>
-        <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-rule-strong" />
-        <span
-          className={cn(
-            "absolute top-1/2 h-1.5 -translate-y-1/2 rounded-[2px]",
-            positive ? "left-1/2 bg-long" : "right-1/2 bg-short",
-          )}
-          style={{ width: fill }}
-        />
-      </span>
+      {bar && (
+        <span aria-hidden className="relative block h-4 shrink-0" style={{ width: TRACK }}>
+          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-rule-strong" />
+          <span
+            className={cn(
+              "absolute top-1/2 h-1.5 -translate-y-1/2 rounded-[2px]",
+              positive ? "left-1/2 bg-long" : "right-1/2 bg-short",
+            )}
+            style={{ width: fill }}
+          />
+        </span>
+      )}
       <span
         className={cn("font-mono text-body font-semibold", positive ? "text-long" : "text-short")}
       >
