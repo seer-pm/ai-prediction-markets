@@ -62,7 +62,9 @@ async function sellToCollateral({
   const parentOutcomeTokens = [
     ...new Map(tableData.map((x) => [x.collateralToken.toLowerCase(), x.collateralToken])).values(),
   ];
-  const balances = await fetchTokensBalances(tradeExecutor, parentOutcomeTokens);
+  // The Invalid leg is never traded, so it only holds what was minted; once every outcome token has
+  // grown past that through profitable sells, merging the outcome-token minimum would revert.
+  const balances = await fetchTokensBalances(tradeExecutor, [...parentOutcomeTokens, parentInvalidToken]);
 
   const mergeAmount = minBigIntArray(balances);
   if (mergeAmount > 0n) {

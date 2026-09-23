@@ -1,4 +1,4 @@
-import { useExecuteOriginalityStrategy } from "@/hooks/useExecuteOriginalityStrategy";
+import { getOriginalityMinMint, useExecuteOriginalityStrategy } from "@/hooks/useExecuteOriginalityStrategy";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { OriginalityTableData } from "@/types";
 import { collateral } from "@/utils/constants";
@@ -49,6 +49,8 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
     };
   }, [markets]);
 
+  const minMint = useMemo(() => getOriginalityMinMint(markets), [markets]);
+
   return (
     <StrategyDialog
       open={open}
@@ -69,6 +71,14 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
         repoCount === 0
           ? "Every prediction already matches the market — there is nothing to trade."
           : undefined
+      }
+      minAmount={
+        minMint === undefined
+          ? undefined
+          : {
+              value: String(minMint),
+              reason: "the amount is shared across the repositories that trade, and each needs enough to quote.",
+            }
       }
       onSubmit={(value) =>
         executeTradeMutation.mutate({ amount: value, tableData: markets, tradeExecutor, parentMarketId })

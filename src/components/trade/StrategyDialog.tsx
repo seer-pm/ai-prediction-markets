@@ -64,6 +64,12 @@ export interface StrategyDialogProps {
   /** Extra reason the run can't start, beyond the built-in ones. */
   blockedReason?: string;
   /**
+   * The smallest mint that can produce a trade, when a contest has one: below it every market's
+   * share of the budget is under the quote minimum and the run dies on "No quote found". Shown in
+   * the hint and enforced on a non-empty amount — an empty one still trades held tokens.
+   */
+  minAmount?: { value: string; reason: string };
+  /**
    * The stages this contest's run actually walks through. Defaults to `STRATEGY_PHASES`.
    *
    * Overridden by a contest whose run skips stages the shared list assumes — an owner-signed
@@ -115,6 +121,7 @@ export function StrategyDialog({
   onSubmit,
   onAmountChange,
   blockedReason,
+  minAmount,
   phases = STRATEGY_PHASES,
   leaderboardSubmission,
 }: StrategyDialogProps) {
@@ -321,6 +328,7 @@ export function StrategyDialog({
                 {needsAmount
                   ? "You hold no outcome tokens here, so the run has nothing to trade with until you fund it."
                   : "Leave empty to trade only with outcome tokens you already hold."}
+                {minAmount && ` Minimum ${minAmount.value} ${collateral.symbol} — ${minAmount.reason}`}
                 {account && tradeExecutor && (
                   <>
                     {" "}
@@ -348,6 +356,9 @@ export function StrategyDialog({
                     ? formatAmount(Number(formatUnits(balance.value, balance.decimals)))
                     : "0.00";
                   return `That is more than the trade wallet's ${available} ${collateral.symbol}.`;
+                }
+                if (minAmount && parsed < safeParseUnits(minAmount.value, balance?.decimals ?? 18)) {
+                  return `Enter at least ${minAmount.value} ${collateral.symbol} — ${minAmount.reason}`;
                 }
                 return true;
               },
