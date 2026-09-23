@@ -174,6 +174,8 @@ export const L2Markets = () => {
       description="A CSV of predicted dependency weights, diffed against what the market currently prices."
     >
       <PredictionDropzone
+        storageKey={"l2-default"}
+        loadedCount={0}
         className="w-full max-w-lg"
         compact
         parseFn={parseL2CSV}
@@ -252,6 +254,8 @@ export const L2Markets = () => {
       />
 
       <GenericCSVUpload<L2Row>
+        storageKey={"l2-default"}
+        loadedCount={predictions.length}
         open={isCsvDialogOpen}
         onOpenChange={setIsCsvDialogOpen}
         onDataParsed={setPredictions}

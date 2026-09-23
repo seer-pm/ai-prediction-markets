@@ -1,11 +1,19 @@
 import { Button } from "@/components/ui";
-import { UploadIcon } from "@/components/ui/icons";
+import { CheckIcon, UploadIcon } from "@/components/ui/icons";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { cn } from "@/utils/cn";
 import { useCallback, useRef, useState } from "react";
 
 interface PredictionDropzoneProps<T> {
   parseFn: (text: string) => T[];
   onDataParsed: (rows: T[]) => void;
+  /**
+   * The tab's predictions storage key. The loaded file's name is kept beside it, so every dropzone
+   * of a tab — the empty table's and the upload dialog's — names the same file.
+   */
+  storageKey: string;
+  /** How many predictions the tab holds now; 0 means no file is loaded, whatever name is stored. */
+  loadedCount: number;
   /** Compact form for the empty-table state; full form for the dialog. */
   compact?: boolean;
   className?: string;
@@ -19,32 +27,34 @@ interface PredictionDropzoneProps<T> {
 export function PredictionDropzone<T>({
   parseFn,
   onDataParsed,
+  storageKey,
+  loadedCount,
   compact = false,
   className,
 }: PredictionDropzoneProps<T>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string>();
-  const [fileName, setFileName] = useState<string>();
+  const [fileName, setFileName] = useLocalStorage(`${storageKey}-file`, "");
+  const hasFile = loadedCount > 0;
 
   const readFile = useCallback(
     async (file: File | undefined) => {
       if (!file) return;
       setError(undefined);
-      setFileName(file.name);
       try {
         const rows = parseFn(await file.text());
         if (rows.length === 0) {
           setError("That file parsed to zero rows. Check the column headers and try again.");
           return;
         }
+        setFileName(file.name);
         onDataParsed(rows);
       } catch (cause) {
-        setFileName(undefined);
         setError(cause instanceof Error ? cause.message : "That file could not be read as CSV.");
       }
     },
-    [parseFn, onDataParsed],
+    [parseFn, onDataParsed, setFileName],
   );
 
   return (
@@ -66,17 +76,27 @@ export function PredictionDropzone<T>({
           dragging ? "border-primary bg-primary-bg" : "border-rule-strong bg-surface",
         )}
       >
-        <span className="text-ink-3">
-          <UploadIcon width={24} height={24} />
+        <span className={hasFile ? "text-long" : "text-ink-3"}>
+          {hasFile ? <CheckIcon width={24} height={24} /> : <UploadIcon width={24} height={24} />}
         </span>
-        <div className="space-y-1">
-          <p className="text-lede font-semibold text-ink">Drop your predictions CSV here</p>
-          <p className="text-body text-ink-3">
-            {fileName ? `Loaded ${fileName}` : "or choose a file from your computer"}
-          </p>
-        </div>
+        {hasFile ? (
+          <div className="min-w-0 space-y-1">
+            <p className="font-mono text-lede font-semibold break-all text-ink">
+              {fileName || "Predictions file"}
+            </p>
+            <p className="text-body text-ink-3">
+              {loadedCount} {loadedCount === 1 ? "prediction" : "predictions"} loaded · drop another
+              file to replace it
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-lede font-semibold text-ink">Drop your predictions CSV here</p>
+            <p className="text-body text-ink-3">or choose a file from your computer</p>
+          </div>
+        )}
         <Button size="sm" onClick={() => inputRef.current?.click()}>
-          Choose file
+          {hasFile ? "Replace file" : "Choose file"}
         </Button>
         <input
           ref={inputRef}

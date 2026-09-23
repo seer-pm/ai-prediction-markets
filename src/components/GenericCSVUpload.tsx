@@ -1,6 +1,7 @@
 import { Button, Dialog } from "@/components/ui";
 import { DownloadIcon } from "@/components/ui/icons";
 import { downloadCsv } from "@/utils/common";
+import { useEffect, useState } from "react";
 import { PredictionDropzone } from "./predictions/PredictionDropzone";
 
 export interface CSVFormatInfo {
@@ -35,6 +36,10 @@ interface GenericCSVUploadProps<T> {
   parseFn: (text: string) => T[];
   formatInfo: CSVFormatInfo;
   sampleConfig: SampleCsvConfig;
+  /** The tab's predictions storage key — the dropzone keeps the loaded file's name beside it. */
+  storageKey: string;
+  /** How many predictions the tab holds now. */
+  loadedCount: number;
 }
 
 export function GenericCSVUpload<T>({
@@ -44,7 +49,16 @@ export function GenericCSVUpload<T>({
   parseFn,
   formatInfo,
   sampleConfig,
+  storageKey,
+  loadedCount,
 }: GenericCSVUploadProps<T>) {
+  // Stays open after a load so the dropzone's "current file" is actually seen — closing on parse
+  // left the table to change behind the popup with nothing saying it worked.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (open) setLoaded(false);
+  }, [open]);
+
   const downloadSampleCsv = () =>
     downloadCsv(
       sampleConfig.columns,
@@ -59,6 +73,13 @@ export function GenericCSVUpload<T>({
       title="Upload predictions"
       description={formatInfo.description}
       size="md"
+      footer={
+        loaded && (
+          <Button variant="primary" onClick={() => onOpenChange(false)} fullWidth>
+            Done
+          </Button>
+        )
+      }
     >
       <div className="space-y-4">
         <div className="rounded-lg border border-rule bg-sunken px-4 py-4">
@@ -84,9 +105,11 @@ export function GenericCSVUpload<T>({
 
         <PredictionDropzone
           parseFn={parseFn}
+          storageKey={storageKey}
+          loadedCount={loadedCount}
           onDataParsed={(rows) => {
             onDataParsed(rows);
-            onOpenChange(false);
+            setLoaded(true);
           }}
         />
       </div>

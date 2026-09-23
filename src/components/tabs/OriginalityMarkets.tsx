@@ -237,6 +237,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       description="A CSV of predicted originality per repository, diffed against what the market currently prices."
     >
       <PredictionDropzone
+        storageKey={round.predictionsStorageKey}
+        loadedCount={0}
         className="w-full max-w-lg"
         compact
         parseFn={parseOriginalityCSV}
@@ -244,7 +246,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       />
     </EmptyState>
     ),
-    [setPredictions],
+    [setPredictions, round.predictionsStorageKey],
   );
 
   if (error) {
@@ -339,6 +341,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       />
 
       <GenericCSVUpload<OriginalityRow>
+        storageKey={round.predictionsStorageKey}
+        loadedCount={predictions.length}
         open={isCsvDialogOpen}
         onOpenChange={setIsCsvDialogOpen}
         onDataParsed={setPredictions}

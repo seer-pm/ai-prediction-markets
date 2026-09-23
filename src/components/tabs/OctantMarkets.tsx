@@ -174,6 +174,8 @@ export const OctantMarkets = () => {
       description="A CSV of predicted funding shares, diffed against what the market currently prices."
     >
       <PredictionDropzone
+        storageKey={"octant-default"}
+        loadedCount={0}
         className="w-full max-w-lg"
         compact
         parseFn={parseOctantCSV}
@@ -262,6 +264,8 @@ export const OctantMarkets = () => {
       />
 
       <GenericCSVUpload<OctantRow>
+        storageKey={"octant-default"}
+        loadedCount={predictions.length}
         open={isCsvDialogOpen}
         onOpenChange={setIsCsvDialogOpen}
         onDataParsed={setPredictions}

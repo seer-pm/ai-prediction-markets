@@ -209,6 +209,8 @@ export const ZcashMarkets = () => {
         description="Upload a file giving each proposal a probability between 0 and 1. It sits next to the market price so you can see where you disagree."
       >
         <PredictionDropzone
+          storageKey={"zcash-probability"}
+          loadedCount={0}
           className="w-full max-w-lg"
           compact
           parseFn={parseZcashCSV}
@@ -308,6 +310,8 @@ export const ZcashMarkets = () => {
       />
 
       <GenericCSVUpload<ZcashRow>
+        storageKey={"zcash-probability"}
+        loadedCount={predictions.length}
         open={isCsvDialogOpen}
         onOpenChange={setIsCsvDialogOpen}
         onDataParsed={setPredictions}

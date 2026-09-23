@@ -271,6 +271,8 @@ export const ZcashNu7Markets = () => {
       />
 
       <GenericCSVUpload<ZcashNu7Row>
+        storageKey={"zcash-nu7-predictions"}
+        loadedCount={predictions.length}
         open={isCsvDialogOpen}
         onOpenChange={setIsCsvDialogOpen}
         onDataParsed={setPredictions}
