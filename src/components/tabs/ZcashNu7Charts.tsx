@@ -135,7 +135,6 @@ export default function ZcashNu7Charts({
                       cash={volume.collateral}
                       tokens={volume.tokens}
                       symbol={collateral.symbol}
-                      showSymbol={false}
                     />
                   )}
                   {volume && liquidity && <span className="text-ink-4">·</span>}
@@ -145,10 +144,8 @@ export default function ZcashNu7Charts({
                       cash={liquidity.collateral}
                       tokens={liquidity.tokens}
                       symbol={collateral.symbol}
-                      showSymbol={false}
                     />
                   )}
-                  <span>{collateral.symbol}</span>
                 </div>
               )}
             </div>

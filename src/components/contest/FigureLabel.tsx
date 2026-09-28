@@ -1,4 +1,6 @@
 import { Tooltip } from "@/components/ui";
+import { useSusdsUsdRate } from "@/hooks/useConvertSavingsTokens";
+import { collateral } from "@/utils/constants";
 import { formatAmount } from "@/utils/format";
 import type { ReactNode } from "react";
 
@@ -13,10 +15,10 @@ import type { ReactNode } from "react";
  * sUSDS against 1.87M outcome tokens, an average price under a cent.
  *
  * Cash is what the tabs print, because it is the figure that compares across markets trading at
- * different prices; the token count sits in the tooltip rather than in a second line of the header,
- * which is already carrying the refresh control. The tooltip states the two amounts against each
- * other — a hover is not the place to explain what a pool leg is, and the collateral line needs no
- * label of its own once the token line names what it is being contrasted with.
+ * different prices; the notional — the token count, each token paying out at most one unit of
+ * collateral — sits in the tooltip rather than in a second line of the header, which is already
+ * carrying the refresh control. Both are printed in dollars when the unit is sUSDS; a conditional
+ * market's parent outcome token has no dollar price, so those stay in their own unit.
  *
  * A chart blob written before the token count was stored has nothing to contrast, so there is no
  * tooltip at all and no dotted underline promising one — a hover that only restates the number
@@ -33,28 +35,23 @@ interface FigureLabelProps {
   tokens?: number;
   /** How to name the collateral: "sUSDS", or a parent outcome token on a conditional market. */
   symbol: string;
-  /**
-   * Whether the visible figure names `symbol`. Off where several figures share a row that names it
-   * once; the tooltip names it regardless, since it is read on its own.
-   */
-  showSymbol?: boolean;
   /** Trailing text on the visible label, e.g. " across 37 markets". */
   suffix?: ReactNode;
   /** An extra line of tooltip, where the unit itself needs naming. */
   note?: ReactNode;
 }
 
-export function FigureLabel({
-  label,
-  cash,
-  tokens,
-  symbol,
-  showSymbol = true,
-  suffix,
-  note,
-}: FigureLabelProps) {
-  const amount = `${formatAmount(cash)} ${symbol}`;
-  const visible = showSymbol ? amount : formatAmount(cash);
+export function FigureLabel({ label, cash, tokens, symbol, suffix, note }: FigureLabelProps) {
+  // sUSDS figures read in dollars. Until the rate arrives they stay in sUSDS rather than
+  // pretending one sUSDS is one dollar.
+  const susdsRate = useSusdsUsdRate();
+  const usdRate = symbol === collateral.symbol ? susdsRate : undefined;
+
+  const format = (value: number) =>
+    usdRate === undefined
+      ? `${formatAmount(value)} ${symbol}`
+      : `$${formatAmount(value * usdRate)}`;
+  const visible = format(cash);
 
   if (tokens === undefined && !note) {
     return (
@@ -71,9 +68,13 @@ export function FigureLabel({
         <div className="space-y-1.5">
           {tokens !== undefined && (
             <>
-              <div className="font-mono">{amount}</div>
               <div>
-                <span className="font-mono">{formatAmount(tokens)}</span> outcome tokens
+                <span className="font-mono">{visible}</span> cash
+              </div>
+              <div>
+                {/* An outcome token pays out at most one unit of collateral, so the token count
+                    is the notional: what the traded shares would be worth if they all won. */}
+                <span className="font-mono">{format(tokens)}</span> notional
               </div>
             </>
           )}

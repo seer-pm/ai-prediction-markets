@@ -115,4 +115,22 @@ export function maxAbs(values: Array<number | null | undefined>): number {
   return max;
 }
 
+/**
+ * Sort comparator for a numeric column. A missing value sinks to the bottom in either direction,
+ * so flipping the sort never floods the top with blanks.
+ */
+export function compareNullsLast(
+  a: number | null,
+  b: number | null,
+  dir: "asc" | "desc",
+): number {
+  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
+  return dir === "asc" ? a - b : b - a;
+}
+
+/** Size of a delta, sign ignored — how far off a market is, whichever way it runs. */
+export function magnitude(value: number | null): number | null {
+  return value === null ? null : Math.abs(value);
+}
+
 export { EM_DASH, MINUS };

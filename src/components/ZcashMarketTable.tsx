@@ -17,15 +17,20 @@ import {
 import { ExternalIcon } from "@/components/ui/icons";
 import { ZcashTableData } from "@/types";
 import { DECIMALS, getSeerMarketUrl } from "@/utils/constants";
+import { useTableSort } from "@/hooks/useTableSort";
 import {
+  compareNullsLast,
   formatSignedWeight,
   formatTokenAmount,
   formatWeight,
+  magnitude,
   maxAbs,
   preciseValue,
 } from "@/utils/format";
 import { ZCASH_FORUM_URL } from "@/utils/zcashMarkets";
 import React, { useMemo, type ReactNode } from "react";
+
+type SortColumn = "project" | "price" | "difference";
 
 interface MarketTableProps {
   markets: ZcashTableData[];
@@ -48,6 +53,24 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
   // the NO difference is its mirror whenever YES+NO sits at 1, and where it does not, that gap is
   // the arbitrage rather than the user's edge.
   const scale = useMemo(() => maxAbs(markets.map((market) => market.yesDifference)), [markets]);
+
+  const { sort, sortProps } = useTableSort<SortColumn>(["project"]);
+
+  const sorted = useMemo(() => {
+    if (!sort) return markets;
+    const { column, dir } = sort;
+    return [...markets].sort((a, b) => {
+      if (column === "project") {
+        return (dir === "asc" ? 1 : -1) * a.project.localeCompare(b.project);
+      }
+      // Differences sort by size: the largest disagreements lead whichever way they run.
+      const order =
+        column === "price"
+          ? compareNullsLast(a.yesPrice, b.yesPrice, dir)
+          : compareNullsLast(magnitude(a.yesDifference), magnitude(b.yesDifference), dir);
+      return order || a.project.localeCompare(b.project);
+    });
+  }, [markets, sort]);
 
   return (
     <Card flush>
@@ -87,15 +110,28 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
         <TableScroller>
           <Table minWidth={900}>
             <Thead>
-              <Th pinned>Proposal</Th>
-              <Th title="What the market pays for yes and for no, out of one.">Market</Th>
+              <Th pinned {...sortProps("project")}>
+                Proposal
+              </Th>
+              <Th
+                title="What the market pays for yes and for no, out of one. Sorts by the yes price."
+                {...sortProps("price")}
+              >
+                Market
+              </Th>
               <Th numeric>Yes balance</Th>
               <Th numeric>No balance</Th>
               <Th numeric>Predicted</Th>
-              <Th numeric>Difference</Th>
+              <Th
+                numeric
+                title="Sorts by size, whether the market is above or below your prediction."
+                {...sortProps("difference")}
+              >
+                Difference
+              </Th>
             </Thead>
             <Tbody>
-              {markets.map((market) => (
+              {sorted.map((market) => (
                 <Tr key={market.marketId}>
                   <Td pinned>
                     {/* The row's title doubles as the link to the market on Seer — the icon is what
