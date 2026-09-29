@@ -27,7 +27,7 @@ import type { ReactNode } from "react";
  * discloses that the figure is not denominated in sUSDS.
  */
 interface FigureLabelProps {
-  /** "Volume", "Liquidity", "Average volume per repository" — the tabs differ. */
+  /** "Volume", "Liquidity", "Total volume" — the tabs differ. */
   label: string;
   /** The collateral leg, in `symbol` units. */
   cash: number;

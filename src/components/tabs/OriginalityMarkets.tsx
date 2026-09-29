@@ -139,14 +139,14 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
   const volumeLabel = useMemo(() => {
     const volumes = Object.values(charts ?? {}).flatMap((chart) => chartVolume(chart) ?? []);
     if (!volumes.length) return undefined;
-    const cash = volumes.reduce((acc, curr) => acc + curr.collateral, 0) / volumes.length;
-    // Same rule as the other aggregate tabs: an average over a partial set would understate it.
+    const cash = volumes.reduce((acc, curr) => acc + curr.collateral, 0);
+    // Same rule as the other aggregate tabs: a sum over a partial set would understate it.
     const tokens = volumes.every((v) => v.tokens !== undefined)
-      ? volumes.reduce((acc, curr) => acc + curr.tokens!, 0) / volumes.length
+      ? volumes.reduce((acc, curr) => acc + curr.tokens!, 0)
       : undefined;
     return (
       <FigureLabel
-        label="Average volume per repository"
+        label="Total volume"
         cash={cash}
         tokens={tokens}
         // Not sUSDS: an Originality market is split against a *parent* outcome token, so that
@@ -157,18 +157,18 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     );
   }, [charts, round]);
 
-  // Averaged per repository, matching the volume figure beside it: the child markets are
-  // collateralised in different parent outcome tokens, so a sum across them would add unlike units.
+  // Summed across repositories, matching the volume figure beside it. Each child market is
+  // collateralised in its own parent outcome token, but they all share the round's collateral unit.
   const liquidityLabel = useMemo(() => {
     const pools = Object.values(charts ?? {}).flatMap((chart) => chartLiquidity(chart) ?? []);
     if (!pools.length) return undefined;
-    const cash = pools.reduce((acc, curr) => acc + curr.collateral, 0) / pools.length;
+    const cash = pools.reduce((acc, curr) => acc + curr.collateral, 0);
     const tokens = pools.every((p) => p.tokens !== undefined)
-      ? pools.reduce((acc, curr) => acc + curr.tokens!, 0) / pools.length
+      ? pools.reduce((acc, curr) => acc + curr.tokens!, 0)
       : undefined;
     return (
       <FigureLabel
-        label="Average liquidity per repository"
+        label="Total liquidity"
         cash={cash}
         tokens={tokens}
         symbol={round.collateralUnit.symbol}
