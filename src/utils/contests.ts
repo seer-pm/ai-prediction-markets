@@ -26,9 +26,10 @@ import {
  * reads this array; registering a new deep market is one entry here.
  *
  * The ids double as Seer's leaderboard sub-ids: `id` is what
- * `netlify/functions/utils/seerLeaderboard.ts` prefixes with `deepfund:`, and it matches
- * `SEER_APPS.deepfund.markets` upstream. A new contest has to be registered there too before its
- * board exists.
+ * `netlify/functions/utils/seerLeaderboard.ts` prefixes with `deepfund:`. Seer only builds a board
+ * for a contest in `SEER_APPS.deepfund.markets`, and that list is generated from this array:
+ * after adding or editing a contest, run `npm run sync:seer` to open the Seer PR
+ * (`scripts/syncSeerApps.ts`).
  *
  * `marketId` is the PARENT market. Trading happens on its children, so anything touching
  * on-chain activity has to expand parent → children first.
@@ -46,9 +47,9 @@ export interface Contest {
   /** The contest has ended: trading is closed, only redeeming remains. */
   finished: boolean;
   /**
-   * Whether Seer materializes a leaderboard for this contest. Defaults to true; set false while
-   * the contest is missing from `SEER_APPS.deepfund.markets` upstream, so the scope button is not
-   * offered for a board that would come back empty.
+   * Whether Seer materializes a leaderboard for this contest. Defaults to true; set false for a
+   * new contest until its board exists on Seer, so the scope button is not offered for a board
+   * that would come back empty. `npm run sync:seer -- --check` says when it can come off.
    */
   leaderboard?: boolean;
   /**
