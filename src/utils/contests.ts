@@ -29,7 +29,7 @@ import {
  * `netlify/functions/utils/seerLeaderboard.ts` prefixes with `deepfund:`. Seer only builds a board
  * for a contest in `SEER_APPS.deepfund.markets`, and that list is generated from this array:
  * after adding or editing a contest, run `npm run sync:seer` to open the Seer PR
- * (`scripts/syncSeerApps.ts`).
+ * (`scripts/syncSeerApps.ts`). Until that PR is deployed the contest's board simply reads empty.
  *
  * `marketId` is the PARENT market. Trading happens on its children, so anything touching
  * on-chain activity has to expand parent → children first.
@@ -47,12 +47,6 @@ export interface Contest {
   /** The contest has ended: trading is closed, only redeeming remains. */
   finished: boolean;
   /**
-   * Whether Seer materializes a leaderboard for this contest. Defaults to true; set false for a
-   * new contest until its board exists on Seer, so the scope button is not offered for a board
-   * that would come back empty. `npm run sync:seer -- --check` says when it can come off.
-   */
-  leaderboard?: boolean;
-  /**
    * Temporarily hide the contest from the tab bar without unregistering it. Everything else —
    * market ids, the component wiring in `Tab.tsx`, the netlify functions — stays intact, so
    * bringing the contest back is deleting the flag.
@@ -69,14 +63,12 @@ export const DEEP_CONTESTS = [
     // children by query — list them. See `originalityR3Markets.ts`.
     marketIds: ORIGINALITY_R3_MARKET_IDS,
     finished: false,
-    leaderboard: false,
   },
   {
     id: "zcash-nu7",
     label: "Zcash · NU7",
     marketIds: ZCASH_NU7_MARKET_IDS,
     finished: true,
-    leaderboard: false,
   },
   {
     // Relabelled from plain "Zcash" when NU7 landed: two live Zcash contests in the bar, and the
@@ -85,7 +77,6 @@ export const DEEP_CONTESTS = [
     label: "Zcash · Grants",
     marketIds: ZCASH_MARKET_IDS,
     finished: false,
-    leaderboard: false,
   },
   { id: "octant", label: "Octant", marketId: OCTANT_MARKET_ID, finished: true },
   { id: "round2-l2", label: "Round 2 · L2", marketId: L2_PARENT_MARKET_ID, finished: true },
@@ -109,7 +100,3 @@ export function isContestId(id: string): id is ContestId {
   return DEEP_CONTESTS.some((contest) => contest.id === id);
 }
 
-/** Contests Seer has a board for — the only ones worth offering as a leaderboard scope. */
-export const LEADERBOARD_CONTESTS = DEEP_CONTESTS.filter(
-  (contest) => (contest as Contest).leaderboard !== false,
-);

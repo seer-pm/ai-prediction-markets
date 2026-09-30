@@ -112,6 +112,8 @@ interface SeerApiRow {
 interface SeerApiResult {
   total: number;
   rows: SeerApiRow[];
+  /** False when Seer does not know the scope yet; the page is then empty. */
+  registered: boolean;
 }
 
 function toBoardRow(row: SeerApiRow): BoardRow {
@@ -147,10 +149,15 @@ async function fetchSeerPage(
   const body = (await response.json().catch(() => ({}))) as Partial<SeerApiResult> & {
     error?: string;
   };
+  // A contest Seer has not registered yet (its `npm run sync:seer` PR is not deployed) is rejected
+  // with the list of valid app ids. That is a board with nobody on it, not an outage.
+  if (response.status === 400 && body.error?.startsWith("app must be one of")) {
+    return { total: 0, rows: [], registered: false };
+  }
   if (!response.ok) {
     throw new Error(body.error ?? `Seer leaderboard request failed (${response.status})`);
   }
-  return { total: Number(body.total) || 0, rows: body.rows ?? [] };
+  return { total: Number(body.total) || 0, rows: body.rows ?? [], registered: true };
 }
 
 /**
@@ -167,13 +174,15 @@ async function fetchSeerPage(
 export async function fetchSeerBoard(
   scope: string,
   period: LeaderboardPeriod,
-): Promise<{ rows: BoardRow[]; updatedAt: string | null }> {
+): Promise<{ rows: BoardRow[]; updatedAt: string | null; registered: boolean }> {
   const rows: BoardRow[] = [];
   let total = 0;
+  let registered = true;
 
   for (let offset = 0; ; offset += SEER_PAGE_SIZE) {
     const page = await fetchSeerPage(scope, period, offset);
     total = page.total;
+    registered = page.registered;
     rows.push(...page.rows.map(toBoardRow));
     if (page.rows.length === 0 || rows.length >= total) break;
   }
@@ -184,5 +193,5 @@ export async function fetchSeerBoard(
     if (row.updatedAt && (oldest === null || row.updatedAt < oldest)) oldest = row.updatedAt;
   }
 
-  return { rows, updatedAt: oldest };
+  return { rows, updatedAt: oldest, registered };
 }

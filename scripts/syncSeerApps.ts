@@ -10,15 +10,15 @@
  *   npm run sync:seer                 open a PR on seer-pm/demo with the regenerated file
  *   npm run sync:seer -- --dry-run    print the diff against Seer's origin/main, change nothing
  *   npm run sync:seer -- --write      write the file into the Seer checkout, no git
- *   npm run sync:seer -- --check      report which contests Seer already has a board for
+ *   npm run sync:seer -- --check      report each contest's board on Seer
  *
  * The Seer checkout defaults to `D:\Code\demo`; override with `SEER_REPO`. The PR is built in a
  * throwaway git worktree off `origin/main`, so the checkout's own branch and working tree are
  * never touched.
  *
- * A board appears only after the PR is merged and Seer redeploys, and then fills as the refresh
- * reaches each wallet (a lap is several hours). `--check` says when a contest's
- * `leaderboard: false` can come off.
+ * Until the PR is merged and Seer redeploys, the contest's board reads empty here (Seer rejects the
+ * scope and `fetchSeerBoard` treats that as no rows). After that it fills as the refresh reaches
+ * each wallet, a lap of several hours.
  */
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -112,21 +112,16 @@ function diffStrings(before: string, after: string): string {
 
 async function check() {
   for (const contest of DEEP_CONTESTS as readonly Contest[]) {
-    const flagged = contest.leaderboard === false;
     let status: string;
     try {
-      const { rows, updatedAt } = await fetchSeerBoard(contest.id, "all");
-      status = rows.length
-        ? `${rows.length} rows, oldest ${updatedAt ?? "?"}`
-        : "registered, board still empty";
-      if (rows.length && flagged) status += "  <- ready: remove `leaderboard: false`";
+      const { rows, updatedAt, registered } = await fetchSeerBoard(contest.id, "all");
+      if (!registered) status = "not registered on Seer: run sync:seer";
+      else if (!rows.length) status = "registered, board still empty";
+      else status = `${rows.length} rows, oldest ${updatedAt ?? "?"}`;
     } catch (error) {
-      const message = (error as Error).message;
-      // Seer answers an unregistered scope with the full list of valid app ids; that is noise here.
-      status = message.startsWith("app must be one of") ? "not registered on Seer" : `error: ${message}`;
-      if (!flagged) status += "  <- set `leaderboard: false` or run sync:seer";
+      status = `error: ${(error as Error).message}`;
     }
-    console.log(`${contest.id.padEnd(12)} ${flagged ? "[off]" : "[on] "} ${status}`);
+    console.log(`${contest.id.padEnd(12)} ${status}`);
   }
 }
 
