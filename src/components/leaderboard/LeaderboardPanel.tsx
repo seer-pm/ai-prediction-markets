@@ -6,8 +6,10 @@ import {
   EmptyState,
   ErrorPanel,
   SegmentedControl,
+  Select,
   TableToolbar,
   TextInput,
+  type Option,
 } from "@/components/ui";
 import { SearchIcon } from "@/components/ui/icons";
 import {
@@ -19,7 +21,6 @@ import {
   type LeaderboardSortDir,
 } from "@/hooks/useLeaderboard";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
-import { cn } from "@/utils/cn";
 import { DEEP_CONTESTS, getContest } from "@/utils/contests";
 import { pluralize } from "@/utils/format";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +42,11 @@ const SORT_LABELS: Record<LeaderboardSort, string> = {
   roi: "ROI",
 };
 
+const SCOPE_OPTIONS: Option[] = [
+  { id: "global", text: "All deep markets" },
+  ...DEEP_CONTESTS.map(({ id, label }) => ({ id, text: label })),
+];
+
 function scopeLabel(scope: LeaderboardScope): string {
   return scope === "global" ? "All deep markets" : (getContest(scope)?.label ?? scope);
 }
@@ -56,7 +62,7 @@ function formatUpdatedAt(updatedAt: string | null | undefined): string | null {
  * Profit & loss ranking across the deep markets — the whole of the Leaderboard page.
  *
  * Every board, including `All deep markets`, comes from Seer's leaderboard (see
- * `netlify/functions/utils/seerLeaderboard.ts`); the Market chips below scope it to one contest.
+ * `netlify/functions/utils/seerLeaderboard.ts`); the Market dropdown below scopes it to one contest.
  * Everything is denominated in USD, which is what Seer materializes.
  */
 export function LeaderboardPanel() {
@@ -154,31 +160,21 @@ export function LeaderboardPanel() {
       />
 
       <TableToolbar>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <span className="text-label font-semibold tracking-wider text-ink-4 uppercase">
             Market
           </span>
-          {[{ id: "global", label: "All" }, ...DEEP_CONTESTS].map((option) => {
-            const active = scope === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  setScope(option.id);
-                  resetView();
-                }}
-                className={cn(
-                  "cursor-pointer rounded-md border px-2.5 py-1 text-body font-medium transition-colors",
-                  active
-                    ? "border-primary-rule bg-primary-bg text-primary"
-                    : "border-rule text-ink-3 hover:text-ink",
-                )}
-              >
-                {option.label}
-              </button>
-            );
-          })}
+          <Select
+            className="w-full sm:w-64"
+            placeholder="All deep markets"
+            options={SCOPE_OPTIONS}
+            selectedId={scope}
+            onChange={(id) => {
+              if (!id || id === scope) return;
+              setScope(id);
+              resetView();
+            }}
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
