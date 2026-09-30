@@ -1,6 +1,12 @@
 import { isContestId } from "@/utils/contests";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
+import { canonicalAddress, readOwnerMap } from "./utils/executorOwners";
+import {
+  listSubmitters,
+  scoreAddresses,
+  submissionContestsFor,
+} from "./utils/predictionSubmissions";
 import {
   type BoardRow,
   fetchSeerBoard,
@@ -19,11 +25,14 @@ import {
  * them, so one participant is one row before we ever see it.
  *
  * What this function still owns is the shape the table needs and Seer's endpoint does not offer:
- * ranking by `sortBy` (P/L, volume or ROI — the three sortable columns), a `search` that filters
+ * ranking by `sortBy` (P/L, volume, ROI or submission score), a `search` that filters
  * without renumbering the board, and `rankFor` answering for whichever column is being ranked
  * rather than always for P/L. All three need the whole board, which is why nothing here paginates
  * upstream: the sets are small — 121 wallets globally, at most ~70 in a contest — so the board is
  * pulled once, sorted and sliced in memory, behind a 60 s edge cache.
+ *
+ * The one thing added to Seer's board is prediction submitters it does not list — see
+ * `withSubmitters`.
  */
 
 const DEFAULT_LIMIT = 25;
@@ -90,6 +99,68 @@ function paginate(args: {
   };
 }
 
+/**
+ * Seer's board plus every wallet that submitted predictions in this scope but is not on it, as a
+ * zero row, so the Score column has a row to land on.
+ *
+ * Seer lists a wallet only once its refresh has scored it in that scope, which is not the same set
+ * as "entered the contest". A submission is sent before the trade it rides with and does not wait
+ * for it, so a submitter may never have traded; and a wallet that did trade is missing from a
+ * contest board until Seer's next lap over it after the contest's `sync:seer` deploy — the NU7
+ * board read 2 rows against 9 wallets Seer had already scored on its markets.
+ *
+ * Matched by owner identity, not address: submissions are stored under the canonical owner, and a
+ * Seer row may carry the owner or, unfolded, one of its executors. The added row's `members`
+ * carries the owner's executors so search and "Your rank" find it the same way as a Seer row.
+ */
+async function withSubmitters(rows: BoardRow[], scope: string): Promise<BoardRow[]> {
+  const contests = submissionContestsFor(scope);
+  if (contests.length === 0) return rows;
+
+  const submitters = await listSubmitters(contests);
+  if (submitters.length === 0) return rows;
+
+  const owners = await readOwnerMap();
+  const onBoard = new Set(
+    rows.flatMap((row) => row.members.map((member) => canonicalAddress(member, owners))),
+  );
+  const missing = submitters.filter((address) => !onBoard.has(canonicalAddress(address, owners)));
+  if (missing.length === 0) return rows;
+
+  const executorsByOwner = new Map<string, string[]>();
+  for (const [executor, owner] of Object.entries(owners)) {
+    executorsByOwner.set(owner, [...(executorsByOwner.get(owner) ?? []), executor]);
+  }
+
+  return [
+    ...rows,
+    ...missing.map((address) => ({
+      address,
+      pnl: 0,
+      volume: 0,
+      roi: null,
+      marketCount: 0,
+      members: [address, ...(executorsByOwner.get(address) ?? [])],
+      updatedAt: null,
+    })),
+  ];
+}
+
+/**
+ * Attach each row's submission score, for ranking by it. The Score column is otherwise fetched per
+ * page by `get-prediction-scores`; ranking needs it for the whole board, so it is computed here, and
+ * only when asked for — it costs the contests' on-chain market reads. Keyed by the row's address,
+ * which `scoreAddresses` resolves to its owner's submission exactly as that endpoint does, so the
+ * sort and the column cannot disagree.
+ */
+async function withScores(rows: BoardRow[], scope: string): Promise<BoardRow[]> {
+  const scores = await scoreAddresses(
+    rows.map((row) => row.address),
+    scope,
+  );
+  return rows.map((row) => ({ ...row, score: scores[row.address]?.score ?? null }));
+}
+
 /** A connected trade-executor ranks where its owner does — `members` carries both. */
 function rankFor(rows: BoardRow[], address: string) {
   const index = rows.findIndex((row) => row.members.includes(address));
@@ -114,7 +185,7 @@ export default async (req: Request) => {
       return jsonResponse({ error: "period must be one of: 1d, 1w, 1m, all" }, 400, corsHeaders);
     }
     if (!isLeaderboardSort(sortBy)) {
-      return jsonResponse({ error: "sortBy must be one of: pnl, volume, roi" }, 400, corsHeaders);
+      return jsonResponse({ error: "sortBy must be one of: pnl, volume, roi, score" }, 400, corsHeaders);
     }
     if (!isLeaderboardSortDir(sortDir)) {
       return jsonResponse({ error: "sortDir must be one of: desc, asc" }, 400, corsHeaders);
@@ -136,7 +207,12 @@ export default async (req: Request) => {
 
     // Ranked before both `rankFor` and `paginate`, so "Your rank" answers for the board the user
     // is actually looking at rather than always for the P/L one.
-    const rows = sortRows(board.rows, sortBy, sortDir);
+    const boardRows = await withSubmitters(board.rows, scope);
+    const rows = sortRows(
+      sortBy === "score" ? await withScores(boardRows, scope) : boardRows,
+      sortBy,
+      sortDir,
+    );
 
     if (rankForRaw) {
       return jsonResponse(rankFor(rows, rankForRaw), 200, {

@@ -1,19 +1,6 @@
 import { isContestId } from "@/utils/contests";
-import {
-  SUBMISSION_CONTESTS,
-  isSubmissionContest,
-  type PredictionScore,
-  type SubmissionContestId,
-} from "@/utils/predictionSubmission";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
-import { canonicalAddress, readOwnerMap } from "./utils/executorOwners";
-import type { MarketOnChain } from "./utils/marketView";
-import {
-  fetchContestMarkets,
-  readSubmissions,
-  scoreSubmission,
-  type StoredSubmission,
-} from "./utils/predictionSubmissions";
+import { scoreAddresses } from "./utils/predictionSubmissions";
 
 /**
  * Leaderboard submission scores for a batch of addresses: `?addresses=0xa,0xb&scope=global`.
@@ -60,41 +47,7 @@ export default async (req: Request) => {
       return jsonResponse({ error: "addresses must be 0x-prefixed" }, 400, corsHeaders);
     }
 
-    const contests: readonly SubmissionContestId[] =
-      scope === "global" ? SUBMISSION_CONTESTS : isSubmissionContest(scope) ? [scope] : [];
-    if (requested.length === 0 || contests.length === 0) {
-      return jsonResponse({ scores: {} }, 200, corsHeaders);
-    }
-
-    const owners = await readOwnerMap();
-    const canonicalOf = new Map(
-      requested.map((address) => [address, canonicalAddress(address, owners)]),
-    );
-    const submissions = await readSubmissions(contests, [...new Set(canonicalOf.values())]);
-
-    const latest = new Map<string, StoredSubmission>();
-    for (const submission of submissions) {
-      const current = latest.get(submission.address);
-      if (!current || submission.submittedAt > current.submittedAt) {
-        latest.set(submission.address, submission);
-      }
-    }
-
-    // Only the contests somebody on this page actually submitted to cost an RPC read.
-    const neededContests = [...new Set([...latest.values()].map((s) => s.contest))];
-    const marketsByContest = new Map<SubmissionContestId, Map<string, MarketOnChain>>(
-      await Promise.all(
-        neededContests.map(async (contest) => [contest, await fetchContestMarkets(contest)] as const),
-      ),
-    );
-
-    const scores: Record<string, PredictionScore> = {};
-    for (const [address, canonical] of canonicalOf) {
-      const submission = latest.get(canonical);
-      const markets = submission && marketsByContest.get(submission.contest);
-      if (submission && markets) scores[address] = scoreSubmission(submission, markets);
-    }
-
+    const scores = await scoreAddresses(requested, scope);
     return jsonResponse({ scores }, 200, corsHeaders);
   } catch (e) {
     console.log(e);

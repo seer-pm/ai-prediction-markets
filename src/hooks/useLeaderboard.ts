@@ -6,8 +6,8 @@ export type LeaderboardPeriod = "1d" | "1w" | "1m" | "all";
 /** `global` spans every deep market; anything else is a contest id from `@/utils/contests`. */
 export type LeaderboardScope = "global" | string;
 
-/** The three ranked columns. Kept in sync with `netlify/functions/utils/seerLeaderboard.ts`. */
-export type LeaderboardSort = "pnl" | "volume" | "roi";
+/** The ranked columns. Kept in sync with `netlify/functions/utils/seerLeaderboard.ts`. */
+export type LeaderboardSort = "pnl" | "volume" | "roi" | "score";
 export type LeaderboardSortDir = "desc" | "asc";
 
 export interface LeaderboardApiRow {

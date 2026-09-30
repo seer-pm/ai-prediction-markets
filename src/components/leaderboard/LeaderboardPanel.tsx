@@ -40,6 +40,7 @@ const SORT_LABELS: Record<LeaderboardSort, string> = {
   pnl: "profit/loss",
   volume: "volume",
   roi: "ROI",
+  score: "submission score",
 };
 
 const SCOPE_OPTIONS: Option[] = [

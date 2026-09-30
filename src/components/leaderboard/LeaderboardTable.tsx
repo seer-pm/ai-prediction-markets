@@ -168,6 +168,7 @@ export const LeaderboardTable = memo(function LeaderboardTable({
           <Th
             numeric
             title="Score of the wallet's latest leaderboard submission, 0–100, higher is better: 100 × (1 − average absolute error) against how each predicted market resolved, so 88 means off by 12 points on average. Predictions stay hidden until their markets end."
+            {...sortProps("score")}
           >
             Score
           </Th>

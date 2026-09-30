@@ -36,10 +36,10 @@ export function isLeaderboardPeriod(value: string): value is LeaderboardPeriod {
   return (LEADERBOARD_PERIODS as string[]).includes(value);
 }
 
-export type LeaderboardSort = "pnl" | "volume" | "roi";
+export type LeaderboardSort = "pnl" | "volume" | "roi" | "score";
 export type LeaderboardSortDir = "desc" | "asc";
 
-export const LEADERBOARD_SORTS: LeaderboardSort[] = ["pnl", "volume", "roi"];
+export const LEADERBOARD_SORTS: LeaderboardSort[] = ["pnl", "volume", "roi", "score"];
 
 export function isLeaderboardSort(value: string): value is LeaderboardSort {
   return (LEADERBOARD_SORTS as string[]).includes(value);
@@ -65,15 +65,20 @@ export interface BoardRow {
   members: string[];
   /** When Seer last scored this wallet, ISO-8601. */
   updatedAt: string | null;
+  /**
+   * Prediction submission score, 0–100. Ours, not Seer's: attached only when ranking by it (see
+   * `get-leaderboard.ts`), and null for a wallet with no submission or none of its markets resolved.
+   */
+  score?: number | null;
 }
 
 /**
- * Rank the board by one of the three columns the table shows.
+ * Rank the board by one of the sortable columns the table shows.
  *
- * A null `roi` sinks to the bottom in *both* directions: it means the wallet deployed no
- * measurable capital, which is unknown rather than worst, and the column renders it as an
- * em-dash. Sorting it as -Infinity would put those rows at the top of an ascending board, which
- * reads as a ranking of the worst traders.
+ * A null `roi` or `score` sinks to the bottom in *both* directions: it means the wallet deployed
+ * no measurable capital, or has nothing scored yet, which is unknown rather than worst, and the
+ * column renders it as an em-dash or "Pending". Sorting it as -Infinity would put those rows at
+ * the top of an ascending board, which reads as a ranking of the worst.
  *
  * Address tiebreak, so paging is stable across requests.
  */
@@ -84,11 +89,13 @@ export function sortRows(
 ): BoardRow[] {
   const sign = dir === "asc" ? -1 : 1;
   return [...rows].sort((a, b) => {
-    if (by === "roi") {
-      if (a.roi === null && b.roi === null) return a.address.localeCompare(b.address);
-      if (a.roi === null) return 1;
-      if (b.roi === null) return -1;
-      return sign * (b.roi - a.roi) || a.address.localeCompare(b.address);
+    if (by === "roi" || by === "score") {
+      const av = a[by] ?? null;
+      const bv = b[by] ?? null;
+      if (av === null && bv === null) return a.address.localeCompare(b.address);
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return sign * (bv - av) || a.address.localeCompare(b.address);
     }
     return sign * (b[by] - a[by]) || a.address.localeCompare(b.address);
   });

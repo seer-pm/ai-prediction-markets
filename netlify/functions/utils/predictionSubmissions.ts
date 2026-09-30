@@ -1,11 +1,14 @@
 import { CHAIN_ID } from "@/utils/constants";
-import type {
-  PredictionLeg,
-  PredictionScore,
-  SubmissionContestId,
+import {
+  SUBMISSION_CONTESTS,
+  isSubmissionContest,
+  type PredictionLeg,
+  type PredictionScore,
+  type SubmissionContestId,
 } from "@/utils/predictionSubmission";
 import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { canonicalAddress, readOwnerMap } from "./executorOwners";
 import type { MarketOnChain } from "./marketView";
 import { fetchZcashMarketsOnChain } from "./zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./zcashNu7OnChain";
@@ -65,6 +68,29 @@ export async function readSubmissions(
   }
 
   return submissions;
+}
+
+/**
+ * Every address holding a submission in any of `contests` — canonical owners, as stored.
+ *
+ * Read from the keys alone: the address is the key's last segment, so no submission body leaves
+ * the table. `_` is a LIKE wildcard, so the prefix is escaped — unescaped, `…_zcash_` would also
+ * match `…_zcash-nu7_…` — and checked again exactly, in case the escape is ever lost upstream.
+ */
+export async function listSubmitters(contests: readonly SubmissionContestId[]): Promise<string[]> {
+  const addresses = new Set<string>();
+  for (const contest of contests) {
+    const prefix = submissionKey(contest, "");
+    const { data, error } = await supabase
+      .from("key_value")
+      .select("key")
+      .like("key", `${prefix.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    if (error) throw error;
+    for (const { key } of data ?? []) {
+      if (typeof key === "string" && key.startsWith(prefix)) addresses.add(key.slice(prefix.length));
+    }
+  }
+  return [...addresses];
 }
 
 export async function writeSubmission(submission: StoredSubmission): Promise<void> {
@@ -152,4 +178,58 @@ export function scoreSubmission(
     scoredMarkets: scoredMarkets.size,
     totalMarkets: allMarkets.size,
   };
+}
+
+/** The contests a leaderboard scope reads submissions from: all of them globally, else its own. */
+export function submissionContestsFor(scope: string): readonly SubmissionContestId[] {
+  return scope === "global" ? SUBMISSION_CONTESTS : isSubmissionContest(scope) ? [scope] : [];
+}
+
+/**
+ * Submission scores for `addresses`, keyed by the lowercased address as asked. Wallets that never
+ * submitted are absent.
+ *
+ * `scope=global` scores each wallet's most recent submission in any contest; a contest scope scores
+ * its submission in that contest. An executor address resolves to its owner's submission, which is
+ * the identity submissions are stored under.
+ */
+export async function scoreAddresses(
+  addresses: string[],
+  scope: string,
+): Promise<Record<string, PredictionScore>> {
+  const contests = submissionContestsFor(scope);
+  if (addresses.length === 0 || contests.length === 0) return {};
+
+  const owners = await readOwnerMap();
+  const canonicalOf = new Map(
+    addresses.map((address) => {
+      const lower = address.toLowerCase();
+      return [lower, canonicalAddress(lower, owners)] as const;
+    }),
+  );
+  const submissions = await readSubmissions(contests, [...new Set(canonicalOf.values())]);
+
+  const latest = new Map<string, StoredSubmission>();
+  for (const submission of submissions) {
+    const current = latest.get(submission.address);
+    if (!current || submission.submittedAt > current.submittedAt) {
+      latest.set(submission.address, submission);
+    }
+  }
+
+  // Only the contests somebody asked about actually submitted to cost an RPC read.
+  const neededContests = [...new Set([...latest.values()].map((s) => s.contest))];
+  const marketsByContest = new Map<SubmissionContestId, Map<string, MarketOnChain>>(
+    await Promise.all(
+      neededContests.map(async (contest) => [contest, await fetchContestMarkets(contest)] as const),
+    ),
+  );
+
+  const scores: Record<string, PredictionScore> = {};
+  for (const [address, canonical] of canonicalOf) {
+    const submission = latest.get(canonical);
+    const markets = submission && marketsByContest.get(submission.contest);
+    if (submission && markets) scores[address] = scoreSubmission(submission, markets);
+  }
+  return scores;
 }
