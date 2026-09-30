@@ -96,7 +96,7 @@ function diffStrings(before: string, after: string): string {
     writeFileSync(join(dir, "origin-main.ts"), before);
     writeFileSync(join(dir, "generated.ts"), after);
     try {
-      execFileSync("git", ["diff", "--no-index", "--no-color", "origin-main.ts", "generated.ts"], {
+      execFileSync("git", ["-c", "core.autocrlf=false", "diff", "--no-index", "--no-color", "origin-main.ts", "generated.ts"], {
         cwd: dir,
         encoding: "utf8",
       });
