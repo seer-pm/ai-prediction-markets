@@ -18,8 +18,11 @@ import type { ReactNode } from "react";
  * and get a plain figure with no hover.
  *
  * A conditional market's collateral is another market's outcome token, which has no dollar price.
- * The tab passes `unitPrice` — one sUSDS spread over that parent market's outcomes — and the figure
- * carries a `~` rather than naming a token the trader never sees.
+ * The tab passes `unitPrice` — one sUSDS spread over that parent market's outcomes — and the cash
+ * figure carries a `~` rather than naming a token the trader never sees.
+ *
+ * The notional is not scaled by it: it counts every outcome token at one sUSDS, whichever market the
+ * token belongs to.
  */
 interface FigureLabelProps {
   /** "Volume", "Liquidity", "Total volume" — the tabs differ. */
@@ -28,7 +31,10 @@ interface FigureLabelProps {
   cash: number;
   /** The outcome-token leg. Absent on liquidity, and on a blob written before it was stored. */
   tokens?: number;
-  /** sUSDS per unit of collateral: 1 on an sUSDS market, 1 / parent outcomes on a conditional one. */
+  /**
+   * sUSDS per unit of collateral: 1 on an sUSDS market, 1 / parent outcomes on a conditional one.
+   * Applies to `cash` only; the notional is always 1 token = 1 sUSDS.
+   */
   unitPrice?: number;
   /** Trailing text on the visible label, e.g. " across 37 markets". */
   suffix?: ReactNode;
@@ -39,13 +45,11 @@ export function FigureLabel({ label, cash, tokens, unitPrice = 1, suffix }: Figu
   const usdRate = useSusdsUsdRate();
   const estimated = unitPrice !== 1;
 
-  const format = (value: number) => {
-    const susds = value * unitPrice;
-    return usdRate === undefined
+  const format = (susds: number) =>
+    usdRate === undefined
       ? `${formatAmount(susds)} ${collateral.symbol}`
       : `$${formatAmount(susds * usdRate)}`;
-  };
-  const visible = `${estimated ? "~" : ""}${format(cash)}`;
+  const visible = `${estimated ? "~" : ""}${format(cash * unitPrice)}`;
 
   if (tokens === undefined) {
     return (
