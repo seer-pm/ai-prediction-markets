@@ -10,7 +10,6 @@ import {
   type MarketChart,
 } from "@/hooks/useMarketCharts";
 import type { ZcashNu7TableData } from "@/types";
-import { collateral } from "@/utils/constants";
 
 import { invalidIndexOf } from "@/utils/zcashNu7Markets";
 import { useEffect, useMemo, useState } from "react";
@@ -87,8 +86,8 @@ export default function ZcashNu7Charts({
    * Only the numbers are taken from the stored strings. They end in the collateral's *name*
    * ("Savings USDS"), not its symbol, so splitting a symbol out of them prints "0.20 Savings".
    */
-  const volumeTotal = totalLabel("Total volume", charts, chartVolume);
-  const liquidityTotal = totalLabel("Total liquidity", charts, chartLiquidity);
+  const volumeTotal = totalLabel("Total volume", charts, chartVolume, true);
+  const liquidityTotal = totalLabel("Total liquidity", charts, chartLiquidity, false);
 
   const volume = chartVolume(chart);
   const liquidity = chartLiquidity(chart);
@@ -130,22 +129,10 @@ export default function ZcashNu7Charts({
               {(volume || liquidity) && (
                 <div className="flex items-center justify-center gap-2 px-2 py-1 text-label text-ink-3">
                   {volume && (
-                    <FigureLabel
-                      label="Vol"
-                      cash={volume.collateral}
-                      tokens={volume.tokens}
-                      symbol={collateral.symbol}
-                    />
+                    <FigureLabel label="Vol" cash={volume.collateral} tokens={volume.tokens} />
                   )}
                   {volume && liquidity && <span className="text-ink-4">·</span>}
-                  {liquidity && (
-                    <FigureLabel
-                      label="Liq"
-                      cash={liquidity.collateral}
-                      tokens={liquidity.tokens}
-                      symbol={collateral.symbol}
-                    />
-                  )}
+                  {liquidity && <FigureLabel label="Liq" cash={liquidity.collateral} />}
                 </div>
               )}
             </div>
@@ -160,20 +147,23 @@ export default function ZcashNu7Charts({
  * A figure summed over every question on the ballot.
  *
  * The token count is summed only when every question has one: a blob written before the count was
- * stored would otherwise make the total quietly smaller than its parts.
+ * stored would otherwise make the total quietly smaller than its parts. Liquidity leaves it out
+ * altogether (`withShares`): a share count on a pool's holdings tells a trader nothing.
  */
 function totalLabel(
   label: string,
   charts: Record<string, MarketChart> | undefined,
   read: (chart: MarketChart | undefined) => { collateral: number; tokens?: number } | undefined,
+  withShares: boolean,
 ) {
   const figures = Object.values(charts ?? {}).flatMap((entry) => read(entry) ?? []);
   if (!figures.length) return undefined;
 
   const cash = figures.reduce((acc, figure) => acc + figure.collateral, 0);
-  const tokens = figures.every((figure) => figure.tokens !== undefined)
-    ? figures.reduce((acc, figure) => acc + (figure.tokens ?? 0), 0)
-    : undefined;
+  const tokens =
+    withShares && figures.every((figure) => figure.tokens !== undefined)
+      ? figures.reduce((acc, figure) => acc + (figure.tokens ?? 0), 0)
+      : undefined;
 
-  return <FigureLabel label={label} cash={cash} tokens={tokens} symbol={collateral.symbol} />;
+  return <FigureLabel label={label} cash={cash} tokens={tokens} />;
 }

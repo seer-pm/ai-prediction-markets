@@ -31,8 +31,6 @@ export interface OriginalityRound {
   queryKey: readonly string[];
   /** localStorage key for the uploaded predictions — one per round, so a round-2 CSV never trades round 3. */
   predictionsStorageKey: string;
-  /** How the volume/liquidity figures name their unit: the repo markets' collateral is not sUSDS. */
-  collateralUnit: { symbol: string; note: string };
 }
 
 export const ORIGINALITY_ROUND_2: OriginalityRound = {
@@ -43,10 +41,6 @@ export const ORIGINALITY_ROUND_2: OriginalityRound = {
   dataFunction: "get-originality-markets-data",
   queryKey: ["fetchOriginalityMarketsData"],
   predictionsStorageKey: "originality-default",
-  collateralUnit: {
-    symbol: "repo tokens",
-    note: "Denominated in the repository's parent outcome token, not in sUSDS.",
-  },
 };
 
 export const ORIGINALITY_ROUND_3: OriginalityRound = {
@@ -59,8 +53,4 @@ export const ORIGINALITY_ROUND_3: OriginalityRound = {
   // prefix refetch of `["fetchOriginalityMarketsData"]` refreshes both rounds.
   queryKey: ["fetchOriginalityMarketsData", "round3"],
   predictionsStorageKey: "originality-r3",
-  collateralUnit: {
-    symbol: "parent tokens",
-    note: "Denominated in the parent market's outcome token, not in sUSDS.",
-  },
 };

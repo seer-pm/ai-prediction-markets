@@ -113,22 +113,13 @@ export const OctantMarkets = () => {
   const volumeLabel = useMemo(() => {
     const volume = chartVolume(chart);
     if (!volume) return undefined;
-    return (
-      <FigureLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol="sUSDS" />
-    );
+    return <FigureLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} />;
   }, [chart]);
 
   const liquidityLabel = useMemo(() => {
     const liquidity = chartLiquidity(chart);
     if (!liquidity) return undefined;
-    return (
-      <FigureLabel
-        label="Liquidity"
-        cash={liquidity.collateral}
-        tokens={liquidity.tokens}
-        symbol="sUSDS"
-      />
-    );
+    return <FigureLabel label="Liquidity" cash={liquidity.collateral} />;
   }, [chart]);
 
   const chartData = useMemo(

@@ -126,7 +126,6 @@ export const ZcashMarkets = () => {
         label="Total volume"
         cash={cash}
         tokens={tokens}
-        symbol="sUSDS"
         suffix={` across ${volumes.length} markets`}
       />
     );
@@ -138,10 +137,7 @@ export const ZcashMarkets = () => {
     const pools = Object.values(charts ?? {}).flatMap((chart) => chartLiquidity(chart) ?? []);
     if (!pools.length) return undefined;
     const cash = pools.reduce((acc, curr) => acc + curr.collateral, 0);
-    const tokens = pools.every((p) => p.tokens !== undefined)
-      ? pools.reduce((acc, curr) => acc + curr.tokens!, 0)
-      : undefined;
-    return <FigureLabel label="Liquidity" cash={cash} tokens={tokens} symbol="sUSDS" />;
+    return <FigureLabel label="Liquidity" cash={cash} />;
   }, [charts]);
 
   const hasSellTokens = useMemo(

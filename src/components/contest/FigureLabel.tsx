@@ -5,55 +5,49 @@ import { formatAmount } from "@/utils/format";
 import type { ReactNode } from "react";
 
 /**
- * A pool figure above a contest chart — volume, or current liquidity — with the other way of counting
- * it on hover.
+ * A pool figure above a contest chart — volume, or current liquidity — printed in dollars.
  *
- * A pool holds and moves two tokens, and the same quantity reads very differently depending on which
- * one is counted. `cash` is the collateral leg — the money side, in the market's own collateral.
- * `tokens` is the outcome-token leg — the share side. They differ by the price those shares trade at,
+ * A pool holds and moves two tokens. `cash` is the collateral leg — the money side. `tokens` is the
+ * outcome-token leg — the shares, each paying out at most one unit of collateral, so their count is
+ * what the traded shares would pay if they all won. The two differ by the price the shares trade at,
  * which on a market with many outcomes is a large factor: L1's parent pools have moved about 18.5k
  * sUSDS against 1.87M outcome tokens, an average price under a cent.
  *
- * Cash is what the tabs print, because it is the figure that compares across markets trading at
- * different prices; the notional — the token count, each token paying out at most one unit of
- * collateral — sits in the tooltip rather than in a second line of the header, which is already
- * carrying the refresh control. Both are printed in dollars when the unit is sUSDS; a conditional
- * market's parent outcome token has no dollar price, so those stay in their own unit.
+ * Cash is what the tabs print; the share count sits in the tooltip as the notional volume, and only
+ * on volume — for liquidity it answers nothing a trader asks, so liquidity callers leave `tokens` out
+ * and get a plain figure with no hover.
  *
- * A chart blob written before the token count was stored has nothing to contrast, so there is no
- * tooltip at all and no dotted underline promising one — a hover that only restates the number
- * already on screen is worse than no hover. The exception is a market whose `note` has something to
- * say regardless, which is the whole reason the note exists: on a conditional market it is what
- * discloses that the figure is not denominated in sUSDS.
+ * A conditional market's collateral is another market's outcome token, which has no dollar price.
+ * The tab passes `unitPrice` — one sUSDS spread over that parent market's outcomes — and the figure
+ * carries a `~` rather than naming a token the trader never sees.
  */
 interface FigureLabelProps {
   /** "Volume", "Liquidity", "Total volume" — the tabs differ. */
   label: string;
-  /** The collateral leg, in `symbol` units. */
+  /** The collateral leg, in collateral units. */
   cash: number;
-  /** The outcome-token leg. Absent on a chart blob written before the count was stored. */
+  /** The outcome-token leg. Absent on liquidity, and on a blob written before it was stored. */
   tokens?: number;
-  /** How to name the collateral: "sUSDS", or a parent outcome token on a conditional market. */
-  symbol: string;
+  /** sUSDS per unit of collateral: 1 on an sUSDS market, 1 / parent outcomes on a conditional one. */
+  unitPrice?: number;
   /** Trailing text on the visible label, e.g. " across 37 markets". */
   suffix?: ReactNode;
-  /** An extra line of tooltip, where the unit itself needs naming. */
-  note?: ReactNode;
 }
 
-export function FigureLabel({ label, cash, tokens, symbol, suffix, note }: FigureLabelProps) {
-  // sUSDS figures read in dollars. Until the rate arrives they stay in sUSDS rather than
-  // pretending one sUSDS is one dollar.
-  const susdsRate = useSusdsUsdRate();
-  const usdRate = symbol === collateral.symbol ? susdsRate : undefined;
+export function FigureLabel({ label, cash, tokens, unitPrice = 1, suffix }: FigureLabelProps) {
+  // Until the rate arrives the figure stays in sUSDS rather than pretending one sUSDS is one dollar.
+  const usdRate = useSusdsUsdRate();
+  const estimated = unitPrice !== 1;
 
-  const format = (value: number) =>
-    usdRate === undefined
-      ? `${formatAmount(value)} ${symbol}`
-      : `$${formatAmount(value * usdRate)}`;
-  const visible = format(cash);
+  const format = (value: number) => {
+    const susds = value * unitPrice;
+    return usdRate === undefined
+      ? `${formatAmount(susds)} ${collateral.symbol}`
+      : `$${formatAmount(susds * usdRate)}`;
+  };
+  const visible = `${estimated ? "~" : ""}${format(cash)}`;
 
-  if (tokens === undefined && !note) {
+  if (tokens === undefined) {
     return (
       <span>
         {label} <span className="font-mono text-ink">{visible}</span>
@@ -65,20 +59,8 @@ export function FigureLabel({ label, cash, tokens, symbol, suffix, note }: Figur
   return (
     <Tooltip
       content={
-        <div className="space-y-1.5">
-          {tokens !== undefined && (
-            <>
-              <div>
-                <span className="font-mono">{visible}</span> cash
-              </div>
-              <div>
-                {/* An outcome token pays out at most one unit of collateral, so the token count
-                    is the notional: what the traded shares would be worth if they all won. */}
-                <span className="font-mono">{format(tokens)}</span> notional
-              </div>
-            </>
-          )}
-          {note && <div className="text-ink-4">{note}</div>}
+        <div>
+          Notional volume: <span className="font-mono">{format(tokens)}</span>
         </div>
       }
     >

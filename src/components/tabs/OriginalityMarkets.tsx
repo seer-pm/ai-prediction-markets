@@ -136,9 +136,14 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     });
   }, [charts, marketIdToRepo]);
 
+  // A repo market is split against a parent outcome token, not sUSDS. The parent's outcomes (Invalid
+  // aside) share one sUSDS between them, so each token is valued at an even share of it. Until the
+  // parent's tokens load there is no price, and no figure rather than a wrong one.
+  const unitPrice = parentTokens.length > 1 ? 1 / (parentTokens.length - 1) : undefined;
+
   const volumeLabel = useMemo(() => {
     const volumes = Object.values(charts ?? {}).flatMap((chart) => chartVolume(chart) ?? []);
-    if (!volumes.length) return undefined;
+    if (!volumes.length || unitPrice === undefined) return undefined;
     const cash = volumes.reduce((acc, curr) => acc + curr.collateral, 0);
     // Same rule as the other aggregate tabs: a sum over a partial set would understate it.
     const tokens = volumes.every((v) => v.tokens !== undefined)
@@ -149,33 +154,19 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
         label="Total volume"
         cash={cash}
         tokens={tokens}
-        // Not sUSDS: an Originality market is split against a *parent* outcome token, so that
-        // token — not the collateral behind it — is what the cash leg is paid in.
-        symbol={round.collateralUnit.symbol}
-        note={round.collateralUnit.note}
+        unitPrice={unitPrice}
       />
     );
-  }, [charts, round]);
+  }, [charts, unitPrice]);
 
   // Summed across repositories, matching the volume figure beside it. Each child market is
-  // collateralised in its own parent outcome token, but they all share the round's collateral unit.
+  // collateralised in its own parent outcome token, all valued at the same share of a sUSDS.
   const liquidityLabel = useMemo(() => {
     const pools = Object.values(charts ?? {}).flatMap((chart) => chartLiquidity(chart) ?? []);
-    if (!pools.length) return undefined;
+    if (!pools.length || unitPrice === undefined) return undefined;
     const cash = pools.reduce((acc, curr) => acc + curr.collateral, 0);
-    const tokens = pools.every((p) => p.tokens !== undefined)
-      ? pools.reduce((acc, curr) => acc + curr.tokens!, 0)
-      : undefined;
-    return (
-      <FigureLabel
-        label="Total liquidity"
-        cash={cash}
-        tokens={tokens}
-        symbol={round.collateralUnit.symbol}
-        note={round.collateralUnit.note}
-      />
-    );
-  }, [charts, round]);
+    return <FigureLabel label="Total liquidity" cash={cash} unitPrice={unitPrice} />;
+  }, [charts, unitPrice]);
 
   const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
   const hasSellTokens = useMemo(

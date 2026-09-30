@@ -2,6 +2,7 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { FigureLabel } from "@/components/contest/FigureLabel";
 import { Select } from "@/components/ui";
 import { chartLiquidity, chartVolume, liveSeries, useMarketChart } from "@/hooks/useMarketCharts";
+import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 
 import { useEffect, useState } from "react";
 
@@ -12,6 +13,12 @@ import { useEffect, useState } from "react";
  * app, tens of megabytes — to draw the one the dropdown had selected. Now it fetches that one, and
  * switching back to a repository already seen is served from the query cache.
  */
+/**
+ * A dependency market is collateralised in its parent's outcome token, not sUSDS. The parent's
+ * repositories (Invalid aside) share one sUSDS between them, so each token is valued at an even share.
+ */
+const UNIT_PRICE = 1 / (l2MarketOutcomes.length - 1);
+
 export default function L2Charts({
   repoOptions,
   isLoading,
@@ -36,27 +43,20 @@ export default function L2Charts({
   const volumeLabel = (() => {
     const volume = chartVolume(chart);
     if (!volume) return undefined;
-    // A dependency market is collateralised in its parent's outcome token, so the cash leg is
-    // denominated in that token's name rather than in sUSDS.
-    const [, symbol] = (chart?.totalVolumeMarket ?? "").split(" ");
     return (
-      <FigureLabel label="Volume" cash={volume.collateral} tokens={volume.tokens} symbol={symbol} />
+      <FigureLabel
+        label="Volume"
+        cash={volume.collateral}
+        tokens={volume.tokens}
+        unitPrice={UNIT_PRICE}
+      />
     );
   })();
 
   const liquidityLabel = (() => {
     const liquidity = chartLiquidity(chart);
     if (!liquidity) return undefined;
-    // Same collateral as the volume figure — it is the same pools, read at the same instant.
-    const [, symbol] = (chart?.totalLiquidityMarket ?? "").split(" ");
-    return (
-      <FigureLabel
-        label="Liquidity"
-        cash={liquidity.collateral}
-        tokens={liquidity.tokens}
-        symbol={symbol}
-      />
-    );
+    return <FigureLabel label="Liquidity" cash={liquidity.collateral} unitPrice={UNIT_PRICE} />;
   })();
 
   return (
