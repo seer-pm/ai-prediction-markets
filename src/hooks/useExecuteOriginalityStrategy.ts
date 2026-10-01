@@ -155,6 +155,7 @@ const executeOriginalityStrategy = async ({
   tableData,
   tradeExecutor,
   parentMarketId,
+  middleMarkets,
   onStateChange,
 }: OriginalityTradeProps & { onStateChange: TxStateChange }) => {
   if (!tableData?.length) {
@@ -201,11 +202,13 @@ const executeOriginalityStrategy = async ({
   const didMint = Number(amount) > 0;
   const mintValue = safeParseUnits(amount, DECIMALS);
 
-  // Splitting `amount` on the parent mints `amount` of EACH parent outcome token, and a row spends
-  // its own collateral token. In round 2 every repo has its own parent token, so each row gets the
-  // whole mint. In round 3 ~33 rows share a bundle token, so that token's mint — and the proceeds
-  // of the balance sells above, which land in it too — are divided among the rows that can spend
-  // them, by how much each can use. Handing each the whole amount would overdraw it ~33 times over.
+  // Splitting `amount` on the parent mints `amount` of EACH parent outcome token, and splitting
+  // that on a middle market mints `amount` of each of ITS outcome tokens in turn; a row spends its
+  // own collateral token. Where every repo has its own token (round 2, and round 3 through its
+  // middle markets) each row gets the whole mint. In the incorrect round-3 set ~33 rows share a
+  // bundle token, so that token's mint — and the proceeds of the balance sells above, which land
+  // in it too — are divided among the rows that can spend them, by how much each can use. Handing
+  // each the whole amount would overdraw it ~33 times over.
   const sellProceedsPerRow: bigint[] = [];
   const adjustedRows = tableData.map((initialRow) => {
     const row = { ...initialRow };
@@ -283,6 +286,20 @@ const executeOriginalityStrategy = async ({
       message: "Minting complete sets",
       phase: "mint",
       skipFailCalls: false,
+    });
+    // One batch per middle market, not one for all of them: a split wraps every outcome token,
+    // and a ~34-outcome middle market measured ~5.5M gas (2026-10-01), so three in a transaction
+    // would pass Optimism's 2^24 cap. If one fails the run stops with the parent's tokens still
+    // whole, and "Sell all positions" merges them back.
+    (middleMarkets ?? []).forEach(({ marketId, collateralToken }, index, all) => {
+      input.push({
+        calls: getSplitCalls({ collateral: collateralToken, mainCollateral, amount, market: marketId }),
+        message: "Minting repository tokens",
+        phase: "mint",
+        step: index + 1,
+        of: all.length,
+        skipFailCalls: false,
+      });
     });
   }
   for (let i = 0; i < tradeExecutorCalls.length; i += 100) {

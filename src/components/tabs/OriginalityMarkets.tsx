@@ -19,7 +19,13 @@ import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { parseOriginalityCSV } from "@/utils/csvParser";
-import { ORIGINALITY_ROUND_2, ORIGINALITY_ROUND_3, OriginalityRound } from "@/utils/originalityRounds";
+import { OriginalityRoundNotice } from "@/components/contest/OriginalityRoundNotice";
+import {
+  ORIGINALITY_ROUND_2,
+  ORIGINALITY_ROUND_3,
+  ORIGINALITY_ROUND_3_INCORRECT,
+  OriginalityRound,
+} from "@/utils/originalityRounds";
 
 import { sampleOriginalityPredictions } from "@/utils/sampleOriginalityPredictions";
 import { MarketStatus } from "@seer-pm/sdk";
@@ -138,8 +144,11 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 
   // A repo market is split against a parent outcome token, not sUSDS. The parent's outcomes (Invalid
   // aside) share one sUSDS between them, so each token is valued at an even share of it. Until the
-  // parent's tokens load there is no price, and no figure rather than a wrong one.
-  const unitPrice = parentTokens.length > 1 ? 1 / (parentTokens.length - 1) : undefined;
+  // parent's tokens load there is no price, and no figure rather than a wrong one. A round with a
+  // middle level states the price itself: its repo tokens are two splits away from sUSDS.
+  const unitPrice =
+    round.collateralUnitPrice ??
+    (parentTokens.length > 1 ? 1 / (parentTokens.length - 1) : undefined);
 
   const volumeLabel = useMemo(() => {
     const volumes = Object.values(charts ?? {}).flatMap((chart) => chartVolume(chart) ?? []);
@@ -202,6 +211,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       tableData,
       parentMarketId: round.parentMarketId,
       parentInvalidToken: round.parentInvalidToken,
+      middleMarkets: round.middleMarkets,
     });
   }, [tableData, sellAll, tradeExecutor, round]);
 
@@ -265,6 +275,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 
   return (
     <>
+      <OriginalityRoundNotice round={round} />
+
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
@@ -304,7 +316,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
                   </Button>
                 )}
                 {redeemButton}
-                {!finished && (
+                {/* An incorrect set takes no new trades; selling out of it stays open above. */}
+                {!finished && !round.incorrect && (
                   <Button
                     size="sm"
                     variant="primary"
@@ -350,6 +363,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           markets={tableData}
           isLoadingBalances={isLoadingBalances}
           parentMarketId={round.parentMarketId}
+          middleMarkets={round.middleMarkets}
         />
       )}
 
@@ -411,3 +425,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 
 /** Round 3: same view, over the bundled multi-scalar parent. The bundles never surface here. */
 export const OriginalityR3Markets = () => <OriginalityMarkets round={ORIGINALITY_ROUND_3} />;
+
+/** The first round-3 set, built without its middle level. Withdraw-only. */
+export const OriginalityR3IncorrectMarkets = () => (
+  <OriginalityMarkets round={ORIGINALITY_ROUND_3_INCORRECT} />
+);

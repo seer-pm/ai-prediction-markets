@@ -13,6 +13,8 @@ import {
   ORIGINALITY_PARENT_MARKET_ID,
   ORIGINALITY_R3_MARKET_IDS,
   ORIGINALITY_R3_PARENT_MARKET_ID,
+  ORIGINALITY_R3_V3_MARKET_IDS,
+  ORIGINALITY_R3_V3_PARENT_MARKET_ID,
   ZCASH_MARKET_IDS,
   ZCASH_NU7_MARKET_IDS,
 } from "./constants";
@@ -52,17 +54,33 @@ export interface Contest {
    * bringing the contest back is deleting the flag.
    */
   hidden?: boolean;
+  /**
+   * The market set was built wrongly and replaced by another contest. It stays in the bar, marked,
+   * so the people holding positions in it can sell back and withdraw; it takes no new trades.
+   * It has no leaderboard — see `LEADERBOARD_CONTESTS`.
+   */
+  incorrect?: boolean;
 }
 
 export const DEEP_CONTESTS = [
   {
     id: "round3",
     label: "Round 3 · Originality",
+    marketId: ORIGINALITY_R3_V3_PARENT_MARKET_ID,
+    // Listed rather than expanded from the parent: the repo markets sit two levels below it, under
+    // the three middle markets. See `originalityR3V3Markets.ts`.
+    marketIds: ORIGINALITY_R3_V3_MARKET_IDS,
+    finished: false,
+  },
+  {
+    // The first round-3 set, created 2026-09-22 without its middle level and replaced by the
+    // contest above. Not `finished`: that would close "Sell all positions", which is the way out.
+    id: "round3-incorrect",
+    label: "Round 3 · Incorrect market",
     marketId: ORIGINALITY_R3_PARENT_MARKET_ID,
-    // Seer's Optimism indexer stalled on 2026-08-29, so nothing can expand this parent to its
-    // children by query — list them. See `originalityR3Markets.ts`.
     marketIds: ORIGINALITY_R3_MARKET_IDS,
     finished: false,
+    incorrect: true,
   },
   {
     id: "zcash-nu7",
@@ -91,6 +109,16 @@ export const DEEP_CONTESTS = [
 ] as const satisfies readonly Contest[];
 
 export type ContestId = (typeof DEEP_CONTESTS)[number]["id"];
+
+/**
+ * The contests that are ranked. An incorrect market set is left out: trades in it were made
+ * against a structure that does not settle as intended, so it gets no board of its own, is not
+ * offered as a leaderboard scope, and is not registered with Seer — which also keeps it out of the
+ * summed "all deep markets" board.
+ */
+export const LEADERBOARD_CONTESTS: readonly Contest[] = (DEEP_CONTESTS as readonly Contest[]).filter(
+  (contest) => !contest.incorrect,
+);
 
 export function getContest(id: string): Contest | undefined {
   return DEEP_CONTESTS.find((contest) => contest.id === id);

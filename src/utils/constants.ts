@@ -11,6 +11,9 @@ export const ORIGINALITY_PARENT_MARKET_ID = "0xdb3aae8d1c964767eeaa17805be25cded
 // Round 3 is a separate parent. Round 2's constant stays: its positions are still redeemable, and
 // overwriting a round's parent id is how round 1 was orphaned (b6d2cd9).
 export { ORIGINALITY_R3_MARKET_IDS, ORIGINALITY_R3_PARENT_MARKET_ID } from "./originalityR3Markets";
+// The corrected round-3 set. The first one stays above for the same reason round 2's does: its
+// holders still need it to get out.
+export { ORIGINALITY_R3_V3_MARKET_IDS, ORIGINALITY_R3_V3_PARENT_MARKET_ID } from "./originalityR3V3Markets";
 export const L1_MARKET_ID = "0x3220a208aaf4d2ceecde5a2e21ec0c9145f40ba6";
 export const OTHER_MARKET_ID = "0xfea47428981f70110c64dd678889826c3627245b";
 export const OTHER_TOKEN_ID = "0x63a4f76ef5846f68d069054c271465b7118e8ed9";

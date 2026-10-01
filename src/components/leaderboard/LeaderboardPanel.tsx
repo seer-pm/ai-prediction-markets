@@ -21,7 +21,7 @@ import {
   type LeaderboardSortDir,
 } from "@/hooks/useLeaderboard";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
-import { DEEP_CONTESTS, getContest } from "@/utils/contests";
+import { getContest, LEADERBOARD_CONTESTS } from "@/utils/contests";
 import { pluralize } from "@/utils/format";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LeaderboardTable } from "./LeaderboardTable";
@@ -45,7 +45,7 @@ const SORT_LABELS: Record<LeaderboardSort, string> = {
 
 const SCOPE_OPTIONS: Option[] = [
   { id: "global", text: "All deep markets" },
-  ...DEEP_CONTESTS.map(({ id, label }) => ({ id, text: label })),
+  ...LEADERBOARD_CONTESTS.map(({ id, label }) => ({ id, text: label })),
 ];
 
 function scopeLabel(scope: LeaderboardScope): string {
