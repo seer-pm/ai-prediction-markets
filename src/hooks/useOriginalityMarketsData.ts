@@ -23,6 +23,10 @@ interface GetOriginalityMarketsDataApiResult {
     marketStatus: MarketStatus;
   }[];
   parentWrappedTokens: Address[];
+  /** Absent from a snapshot persisted before the field existed; treat that as not settled. */
+  parentMarketStatus?: MarketStatus;
+  /** Only for a round with a middle level: whether each of those markets has settled. */
+  middleMarkets?: { id: Address; payoutReported: boolean }[];
 }
 
 export const useOriginalityMarketsData = (round: OriginalityRound = ORIGINALITY_ROUND_2) => {

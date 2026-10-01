@@ -118,9 +118,37 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     () => originalityMarketData?.parentWrappedTokens ?? [],
     [originalityMarketData?.parentWrappedTokens],
   );
+  // Only once the parent itself has settled. Minting leaves parent tokens in the wallet — the
+  // Invalid leg is never traded — so before that a balance here is an open position, not a claim,
+  // and redeeming it reverts.
+  const isParentClosed = originalityMarketData?.parentMarketStatus === MarketStatus.CLOSED;
+  const redeemableParentTokens = useMemo(
+    () => (isParentClosed ? parentTokens : []),
+    [isParentClosed, parentTokens],
+  );
   const { data: parentBalances, isLoading: isLoadingParentBalances } = useTokensBalances(
     tradeExecutor as Address,
-    parentTokens,
+    redeemableParentTokens,
+  );
+
+  // The settled markets of the middle level, where the round has one. Their tokens are held
+  // outright as well as paid out by a closed repo market: a mint leaves each middle market's
+  // Invalid token, and any repo token a trade did not spend.
+  const settledMiddleMarkets = useMemo(() => {
+    const settled = new Set(
+      (originalityMarketData?.middleMarkets ?? [])
+        .filter((market) => market.payoutReported)
+        .map((market) => market.id.toLowerCase()),
+    );
+    return (round.middleMarkets ?? []).filter((market) => settled.has(market.marketId.toLowerCase()));
+  }, [originalityMarketData?.middleMarkets, round.middleMarkets]);
+  const middleTokens = useMemo(
+    () => settledMiddleMarkets.flatMap((market) => [...market.wrappedTokens]),
+    [settledMiddleMarkets],
+  );
+  const { data: middleBalances, isLoading: isLoadingMiddleBalances } = useTokensBalances(
+    tradeExecutor as Address,
+    middleTokens,
   );
 
   const collateralTokens = useMemo(() => tableData?.map((x) => x.collateralToken), [tableData]);
@@ -184,8 +212,11 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
   );
 
   const hasRedeemable = useMemo(
-    () => (closedBalances ?? []).some((b) => b > 0n) || (parentBalances ?? []).some((b) => b > 0n),
-    [closedBalances, parentBalances],
+    () =>
+      (closedBalances ?? []).some((b) => b > 0n) ||
+      (middleBalances ?? []).some((b) => b > 0n) ||
+      (parentBalances ?? []).some((b) => b > 0n),
+    [closedBalances, middleBalances, parentBalances],
   );
 
   // Only a *confident* "nothing to claim" hides the button — see `@/utils/redeem`.
@@ -196,7 +227,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       !isLoadingBalances &&
       !!originalityMarketData &&
       balancesResolved(closedBalances, closedTokens) &&
-      balancesResolved(parentBalances, parentTokens),
+      balancesResolved(middleBalances, middleTokens) &&
+      balancesResolved(parentBalances, redeemableParentTokens),
   });
 
   const tradableCount = useMemo(
@@ -406,7 +438,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
             tradeExecutor,
             closedMarkets,
             parentMarketId: round.parentMarketId,
-            parentTokens,
+            parentTokens: redeemableParentTokens,
+            middleMarkets: settledMiddleMarkets,
             isOldWallet: isUseOldWallet,
           })
         }
@@ -415,6 +448,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           isLoading ||
           isLoadingBalances ||
           isLoadingClosedBalances ||
+          isLoadingMiddleBalances ||
           isLoadingParentBalances
         }
         hasRedeemable={hasRedeemable}

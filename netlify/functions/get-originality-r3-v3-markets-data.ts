@@ -2,6 +2,7 @@ import { ORIGINALITY_R3_V3_MARKETS } from "@/utils/originalityR3V3Markets";
 import { serveOriginalityOnChainData } from "./utils/originalityOnChainData";
 import {
   fetchOriginalityR3V3MarketsOnChain,
+  fetchOriginalityR3V3MiddleMarketsOnChain,
   fetchOriginalityR3V3ParentOnChain,
 } from "./utils/originalityR3OnChain";
 
@@ -11,4 +12,5 @@ export default (req: Request) =>
     marketList: ORIGINALITY_R3_V3_MARKETS,
     fetchParent: fetchOriginalityR3V3ParentOnChain,
     fetchMarkets: fetchOriginalityR3V3MarketsOnChain,
+    fetchMiddleMarkets: fetchOriginalityR3V3MiddleMarketsOnChain,
   });

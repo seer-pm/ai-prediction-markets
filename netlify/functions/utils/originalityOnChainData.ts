@@ -6,12 +6,15 @@ import { Address } from "viem";
 import { EDGE_CACHE_HEADERS } from "./cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./cors";
 import type { MarketOnChain } from "./marketView";
+import type { MiddleMarketOnChain } from "./originalityR3OnChain";
 
 interface OriginalityOnChainSet {
   /** Repo and address of each market, in the order `fetchMarkets` returns them. */
   marketList: readonly { repo: string; address: Address }[];
   fetchParent: () => Promise<MarketOnChain>;
   fetchMarkets: () => Promise<MarketOnChain[]>;
+  /** The level between the parent and the repo markets, for a set that has one. */
+  fetchMiddleMarkets?: () => Promise<MiddleMarketOnChain[]>;
 }
 
 /**
@@ -29,13 +32,17 @@ interface OriginalityOnChainSet {
  */
 export async function serveOriginalityOnChainData(
   req: Request,
-  { marketList, fetchParent, fetchMarkets }: OriginalityOnChainSet,
+  { marketList, fetchParent, fetchMarkets, fetchMiddleMarkets }: OriginalityOnChainSet,
 ): Promise<Response> {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
   const corsHeaders = getCorsHeaders(req);
   try {
-    const [parent, markets] = await Promise.all([fetchParent(), fetchMarkets()]);
+    const [parent, markets, middleMarkets] = await Promise.all([
+      fetchParent(),
+      fetchMarkets(),
+      fetchMiddleMarkets?.(),
+    ]);
 
     const queryResult = await UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
       query: GetPoolsDocument,
@@ -124,6 +131,9 @@ export async function serveOriginalityOnChainData(
           marketStatus,
         })),
         parentWrappedTokens: parent.wrappedTokens,
+        parentMarketStatus: parent.marketStatus,
+        // Tokens are static in the round's market list; only whether each has settled is live.
+        middleMarkets: middleMarkets?.map(({ id, payoutReported }) => ({ id, payoutReported })),
       }),
       {
         status: 200,

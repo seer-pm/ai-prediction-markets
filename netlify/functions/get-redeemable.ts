@@ -21,6 +21,7 @@ import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 import { EXECUTOR_BYTECODES, mapPool, predictExecutorAddress } from "./utils/executorAddress";
 import { getMarketStatus, type MarketStatusInput } from "./utils/marketStatus";
 import { fetchMarketsOnChain, publicClient } from "./utils/marketView";
+import { fetchOriginalityR3V3MiddleMarketsOnChain } from "./utils/originalityR3OnChain";
 
 /**
  * "Does this participant still have anything to claim, anywhere?" — `?account=<EOA>`.
@@ -115,27 +116,36 @@ async function selectChildren(parentId: string, nameFilter?: string): Promise<Cl
  * Supabase at all. See `./marketView`.
  */
 async function fetchClosedTokensByContest(): Promise<Record<string, ClosedTokens>> {
-  const [round1, octant, originalityParent, originalityChildren, l2Parent, l2Children, onChain] =
-    await Promise.all([
-      selectMarket(AI_PREDICTION_MARKET_ID),
-      selectMarket(OCTANT_MARKET_ID),
-      selectMarket(ORIGINALITY_PARENT_MARKET_ID),
-      selectChildren(ORIGINALITY_PARENT_MARKET_ID),
-      selectMarket(L2_PARENT_MARKET_ID),
-      selectChildren(L2_PARENT_MARKET_ID, "%What will be the average weight of%"),
-      fetchMarketsOnChain([
-        L1_MARKET_ID,
-        OTHER_MARKET_ID,
-        ...ZCASH_MARKET_IDS,
-        ...ZCASH_NU7_MARKET_IDS,
-        ORIGINALITY_R3_PARENT_MARKET_ID,
-        ...ORIGINALITY_R3_MARKET_IDS,
-        // Not the corrected set's three middle markets: MarketView reverts for them, which would
-        // fail this whole multicall. See `utils/originalityR3OnChain`.
-        ORIGINALITY_R3_V3_PARENT_MARKET_ID,
-        ...ORIGINALITY_R3_V3_MARKET_IDS,
-      ] as Address[]),
-    ]);
+  const [
+    round1,
+    octant,
+    originalityParent,
+    originalityChildren,
+    l2Parent,
+    l2Children,
+    onChain,
+    round3Middle,
+  ] = await Promise.all([
+    selectMarket(AI_PREDICTION_MARKET_ID),
+    selectMarket(OCTANT_MARKET_ID),
+    selectMarket(ORIGINALITY_PARENT_MARKET_ID),
+    selectChildren(ORIGINALITY_PARENT_MARKET_ID),
+    selectMarket(L2_PARENT_MARKET_ID),
+    selectChildren(L2_PARENT_MARKET_ID, "%What will be the average weight of%"),
+    fetchMarketsOnChain([
+      L1_MARKET_ID,
+      OTHER_MARKET_ID,
+      ...ZCASH_MARKET_IDS,
+      ...ZCASH_NU7_MARKET_IDS,
+      ORIGINALITY_R3_PARENT_MARKET_ID,
+      ...ORIGINALITY_R3_MARKET_IDS,
+      // Not the corrected set's three middle markets: MarketView reverts for them, which would
+      // fail this whole multicall. They are read separately — see `utils/originalityR3OnChain`.
+      ORIGINALITY_R3_V3_PARENT_MARKET_ID,
+      ...ORIGINALITY_R3_V3_MARKET_IDS,
+    ] as Address[]),
+    fetchOriginalityR3V3MiddleMarketsOnChain(),
+  ]);
 
   const closedOnChain = onChain.filter((market) => market.marketStatus === MarketStatus.CLOSED);
   const tokensOf = (ids: readonly string[]) =>
@@ -152,7 +162,10 @@ async function fetchClosedTokensByContest(): Promise<Record<string, ClosedTokens
     zcash: tokensOf(ZCASH_MARKET_IDS),
     "zcash-nu7": tokensOf(ZCASH_NU7_MARKET_IDS),
     // Not in Supabase: created 2026-09-22, after Seer's Optimism indexer stalled.
-    round3: tokensOf([ORIGINALITY_R3_V3_PARENT_MARKET_ID, ...ORIGINALITY_R3_V3_MARKET_IDS]),
+    round3: [
+      ...tokensOf([ORIGINALITY_R3_V3_PARENT_MARKET_ID, ...ORIGINALITY_R3_V3_MARKET_IDS]),
+      ...round3Middle.filter((market) => market.payoutReported).flatMap((market) => market.wrappedTokens),
+    ],
     "round3-incorrect": tokensOf([ORIGINALITY_R3_PARENT_MARKET_ID, ...ORIGINALITY_R3_MARKET_IDS]),
   };
 }
