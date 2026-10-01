@@ -3,12 +3,13 @@ import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxOwner, toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { CallBatchesInput, TxStateChange } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS, ROUTER_ADDRESSES } from "@/utils/constants";
+import { OriginalityMiddleMarket } from "@/utils/originalityRounds";
 import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { chunkRedeemFromRouter, redeemFromRouter } from "./useExecuteL2Strategy";
-import { fetchTokensBalances } from "./useTokensBalances";
+import { fetchTokensBalances, fetchTokensBalancesOrThrow } from "./useTokensBalances";
 import { REDEEMABLE_SCAN_KEY } from "./useRedeemableScan";
 
 interface RedeemOriginalityProps {
@@ -17,8 +18,13 @@ interface RedeemOriginalityProps {
   closedMarkets: { id: Address; collateralToken: Address; wrappedTokens: Address[] }[];
   /** The Originality parent market — round 2's or round 3's. */
   parentMarketId: Address;
-  /** The Originality parent market's outcome tokens */
+  /** The Originality parent market's outcome tokens — empty until the parent has settled. */
   parentTokens: Address[];
+  /**
+   * The SETTLED markets between the parent and the repo markets. A repo market pays out in its
+   * repo token, which only becomes a parent outcome token again by redeeming its middle market.
+   */
+  middleMarkets?: readonly OriginalityMiddleMarket[];
   /**
    * True when redeeming from the deprecated trade executor, which has no session-key
    * mechanism (OldTradeExecutor is onlyOwner). Batches are then signed by the connected
@@ -32,6 +38,7 @@ async function redeemOriginality({
   closedMarkets,
   parentMarketId,
   parentTokens: parentTokensInput,
+  middleMarkets,
   isOldWallet,
   onStateChange,
 }: RedeemOriginalityProps & { onStateChange: TxStateChange }) {
@@ -110,6 +117,53 @@ async function redeemOriginality({
     if (!phase1Result.status) {
       if (!isOldWallet) await withdrawFundSessionKey();
       throw phase1Result.error;
+    }
+  }
+
+  // ── Middle level: redeem repo tokens → receive bundle tokens ──
+  // Balances are read here, after phase 1, so they include the repo tokens it just paid out.
+  if (middleMarkets?.length) {
+    onStateChange({ phase: "redeem", label: "Reading repository token balances" });
+    const middleBatches: Execution[][] = [];
+    for (const middle of middleMarkets) {
+      const tokens = [...middle.wrappedTokens];
+      // A failed read must stop the run: read as empty it would skip this level and leave what
+      // phase 1 paid out sitting in repo tokens, with the run reporting success.
+      const balances = await fetchTokensBalancesOrThrow(tradeExecutor, tokens).catch(async (error) => {
+        if (!isOldWallet) await withdrawFundSessionKey();
+        throw error;
+      });
+      const held = tokens
+        .map((token, index) => ({ token, index: BigInt(index), amount: balances[index] }))
+        .filter(({ amount }) => amount > 0n);
+      if (!held.length) continue;
+      // ~34 outcomes to a middle market, so it is chunked like the parent below.
+      middleBatches.push(
+        ...chunkRedeemFromRouter(
+          router,
+          collateral.address,
+          middle.marketId,
+          held.map(({ token }) => token),
+          held.map(({ index }) => index),
+          held.map(({ amount }) => amount),
+          MAX_OUTCOMES_PER_BATCH,
+        ),
+      );
+    }
+    if (middleBatches.length > 0) {
+      const middleInput: CallBatchesInput = middleBatches.map((calls, i) => ({
+        calls,
+        message: "Redeeming repository tokens to bundle tokens",
+        phase: "redeem",
+        step: i + 1,
+        of: middleBatches.length,
+        skipFailCalls: false,
+      }));
+      const middleResult = await submitBatches(tradeExecutor, middleInput, onStateChange);
+      if (!middleResult.status) {
+        if (!isOldWallet) await withdrawFundSessionKey();
+        throw middleResult.error;
+      }
     }
   }
 

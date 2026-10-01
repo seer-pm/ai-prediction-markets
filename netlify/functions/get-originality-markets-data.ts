@@ -32,7 +32,9 @@ export default async (req: Request) => {
     ] = await Promise.all([
       supabase
         .from("markets")
-        .select("subgraph_data->wrappedTokens,subgraph_data->outcomes")
+        .select(
+          "subgraph_data->wrappedTokens,subgraph_data->outcomes,subgraph_data->payoutReported,subgraph_data->questions",
+        )
         .eq("id", ORIGINALITY_PARENT_MARKET_ID)
         .eq("chain_id", CHAIN_ID)
         .single(),
@@ -149,6 +151,7 @@ export default async (req: Request) => {
         marketsData: repoToPriceMapping,
         markets,
         parentWrappedTokens: parentMarket.wrappedTokens,
+        parentMarketStatus: getMarketStatus(parentMarket as unknown as MarketStatusInput),
       }),
       {
         status: 200,
