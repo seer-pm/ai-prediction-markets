@@ -14,7 +14,6 @@ import {
   ORIGINALITY_R3_MARKET_IDS,
   ORIGINALITY_R3_PARENT_MARKET_ID,
   ORIGINALITY_R3_V3_MARKET_IDS,
-  ORIGINALITY_R3_V3_PARENT_MARKET_ID,
   ZCASH_MARKET_IDS,
   ZCASH_NU7_MARKET_IDS,
 } from "./constants";
@@ -66,9 +65,11 @@ export const DEEP_CONTESTS = [
   {
     id: "round3",
     label: "Round 3 · Originality",
-    marketId: ORIGINALITY_R3_V3_PARENT_MARKET_ID,
-    // Listed rather than expanded from the parent: the repo markets sit two levels below it, under
-    // the three middle markets. See `originalityR3V3Markets.ts`.
+    // No `marketId`, on purpose. Seer's leaderboard expands a parent to its DIRECT children only
+    // (`expandMarketIdsWithChildren`), and here those are the three middle markets, which nobody
+    // trades; the repo markets sit one level further down. Registered with the parent, the board
+    // would stay empty. So the 98 repo markets are listed as the contest's own roots. The parent
+    // is `ORIGINALITY_R3_V3_PARENT_MARKET_ID` — see `originalityR3V3Markets.ts`.
     marketIds: ORIGINALITY_R3_V3_MARKET_IDS,
     finished: false,
   },
