@@ -5,6 +5,7 @@ import { collateral } from "@/utils/constants";
 import { formatWeight } from "@/utils/format";
 import React, { useMemo } from "react";
 import { Address } from "viem";
+import { OriginalityMiddleMarket } from "@/utils/originalityRounds";
 import { StrategyDialog } from "./StrategyDialog";
 
 interface TradingInterfaceProps {
@@ -15,6 +16,8 @@ interface TradingInterfaceProps {
   isLoadingBalances: boolean;
   /** The parent market the sUSDS is split on. */
   parentMarketId: Address;
+  /** Markets the mint is split on after the parent — see `OriginalityRound.middleMarkets`. */
+  middleMarkets?: readonly OriginalityMiddleMarket[];
 }
 
 export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -24,6 +27,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   markets,
   isLoadingBalances,
   parentMarketId,
+  middleMarkets,
 }) => {
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -81,7 +85,13 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
             }
       }
       onSubmit={(value) =>
-        executeTradeMutation.mutate({ amount: value, tableData: markets, tradeExecutor, parentMarketId })
+        executeTradeMutation.mutate({
+          amount: value,
+          tableData: markets,
+          tradeExecutor,
+          parentMarketId,
+          middleMarkets,
+        })
       }
       howItWorks={
         <>

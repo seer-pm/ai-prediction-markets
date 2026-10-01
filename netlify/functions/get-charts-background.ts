@@ -13,7 +13,10 @@ import { Address } from "viem";
 import { buildChartSeries, getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { getChartData, getPoolIds } from "./utils/getChartData";
 import type { MarketOnChain } from "./utils/marketView";
-import { fetchOriginalityR3MarketsOnChain } from "./utils/originalityR3OnChain";
+import {
+  fetchOriginalityR3MarketsOnChain,
+  fetchOriginalityR3V3MarketsOnChain,
+} from "./utils/originalityR3OnChain";
 import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
 import {
@@ -600,6 +603,7 @@ export default async () => {
     ["zcash", fetchZcashMarketsOnChain],
     ["zcash-nu7", fetchZcashNu7MarketsOnChain],
     ["originality-r3", fetchOriginalityR3MarketsOnChain],
+    ["originality-r3-v3", fetchOriginalityR3V3MarketsOnChain],
   ] as const) {
     try {
       const contestMarkets = await fetchMarkets();

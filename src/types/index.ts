@@ -214,6 +214,11 @@ export interface OriginalityTradeProps {
   tableData: OriginalityTableData[];
   /** The parent market the sUSDS is split on — round 2's or round 3's. */
   parentMarketId: Address;
+  /**
+   * Markets between the parent and the repo markets. A mint is split on each of them in turn, so
+   * the parent's outcome tokens become the repo tokens the rows actually spend.
+   */
+  middleMarkets?: readonly { marketId: Address; collateralToken: Address }[];
 }
 
 export interface L2TradeProps {

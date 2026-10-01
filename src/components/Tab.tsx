@@ -12,7 +12,11 @@ import { AiMarkets } from "./tabs/AiMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
-import { OriginalityMarkets, OriginalityR3Markets } from "./tabs/OriginalityMarkets";
+import {
+  OriginalityMarkets,
+  OriginalityR3IncorrectMarkets,
+  OriginalityR3Markets,
+} from "./tabs/OriginalityMarkets";
 import { ZcashMarkets } from "./tabs/ZcashMarkets";
 import { ZcashNu7Markets } from "./tabs/ZcashNu7Markets";
 import { SeerPromo } from "./SeerPromo";
@@ -24,6 +28,7 @@ import { SeerPromo } from "./SeerPromo";
  */
 const CONTEST_COMPONENTS: Record<string, ComponentType> = {
   round3: OriginalityR3Markets,
+  "round3-incorrect": OriginalityR3IncorrectMarkets,
   "zcash-nu7": ZcashNu7Markets,
   zcash: ZcashMarkets,
   octant: OctantMarkets,
@@ -35,6 +40,7 @@ const CONTEST_COMPONENTS: Record<string, ComponentType> = {
 
 const TABS = DEEP_CONTESTS.filter((contest) => !(contest as Contest).hidden).map((contest) => ({
   ...contest,
+  incorrect: !!(contest as Contest).incorrect,
   Component: CONTEST_COMPONENTS[contest.id],
 }));
 
@@ -89,7 +95,9 @@ export const Tab = () => {
 
   return (
     <div className="w-full">
-      <div className="flex items-center gap-1 border-b border-rule-strong">
+      {/* Three live tabs and the archive no longer fit a phone: scroll the bar there rather than
+          squeeze the labels. Desktop keeps the overlapping underline, which clipping would shave. */}
+      <div className="flex items-center gap-1 border-b border-rule-strong max-sm:overflow-x-auto max-sm:overflow-y-hidden">
         {LIVE_TABS.map((tab) => {
           const active = activeTab === tab.id;
           return (
@@ -97,13 +105,20 @@ export const Tab = () => {
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
               className={cn(
-                "-mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-lede font-semibold transition-colors",
+                "-mb-px inline-flex shrink-0 cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-lede font-semibold whitespace-nowrap transition-colors",
                 active ? "border-primary text-primary" : "border-transparent text-ink-3 hover:text-ink",
               )}
             >
-              <StatusDot tone="long" pulse />
+              {/* An incorrect set is open only for getting out of, so it must not read as live. */}
+              <StatusDot tone={tab.incorrect ? "short" : "long"} pulse={!tab.incorrect} />
               {tab.label}
-              <span className="text-label font-semibold tracking-wider text-long uppercase">Live</span>
+              {tab.incorrect ? (
+                <span className="text-label font-semibold tracking-wider text-short uppercase">
+                  Withdraw only
+                </span>
+              ) : (
+                <span className="text-label font-semibold tracking-wider text-long uppercase">Live</span>
+              )}
             </button>
           );
         })}
@@ -112,7 +127,7 @@ export const Tab = () => {
         <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger
             className={cn(
-              "-mb-px inline-flex cursor-pointer items-center gap-1.5 border-b-2 px-4 py-3 text-lede font-semibold transition-colors",
+              "-mb-px inline-flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-4 py-3 text-lede font-semibold whitespace-nowrap transition-colors",
               activeArchived
                 ? "border-primary text-primary"
                 : "border-transparent text-ink-3 hover:text-ink",
@@ -155,7 +170,7 @@ export const Tab = () => {
 
       {/* Tab content — lazy-mount on first visit, then keep alive hidden */}
       <div>
-        {TABS.map(({ id, Component, finished }) =>
+        {TABS.map(({ id, Component, finished, incorrect }) =>
           visited.has(id) ? (
             <div
               key={id}
@@ -183,7 +198,7 @@ export const Tab = () => {
 
               {/* Outside the boundary, so a crashing contest still leaves the way out to Seer.
                   A finished contest has no trading left to send anyone to. */}
-              {!finished && <SeerPromo />}
+              {!finished && !incorrect && <SeerPromo />}
             </div>
           ) : null,
         )}
