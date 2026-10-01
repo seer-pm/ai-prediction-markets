@@ -54,9 +54,10 @@ export interface Contest {
    */
   hidden?: boolean;
   /**
-   * The market set was built wrongly and replaced by another contest. It stays in the bar, marked,
-   * so the people holding positions in it can sell back and withdraw; it takes no new trades.
-   * It has no leaderboard — see `LEADERBOARD_CONTESTS`.
+   * The market set was built wrongly and replaced by another contest. It takes no new trades and
+   * is not shown anywhere in the app's own navigation — see `TAB_CONTESTS`. The people holding
+   * positions in it reach it by a link of its own (`ROUND3_WITHDRAW_PATH` in `./views`) to sell
+   * back and withdraw. It has no leaderboard — see `LEADERBOARD_CONTESTS`.
    */
   incorrect?: boolean;
 }
@@ -75,7 +76,7 @@ export const DEEP_CONTESTS = [
   },
   {
     // The first round-3 set, created 2026-09-22 without its middle level and replaced by the
-    // contest above. Not `finished`: that would close "Sell all positions", which is the way out.
+    // contest above. Not in the tab bar: it has a page of its own, reached only by its link.
     id: "round3-incorrect",
     label: "Round 3 · Incorrect market",
     marketId: ORIGINALITY_R3_PARENT_MARKET_ID,
@@ -110,6 +111,15 @@ export const DEEP_CONTESTS = [
 ] as const satisfies readonly Contest[];
 
 export type ContestId = (typeof DEEP_CONTESTS)[number]["id"];
+
+/**
+ * The contests the app itself offers: the tab bar, and the unclaimed-payouts board that opens a
+ * tab. A `hidden` contest is out of it for now; an `incorrect` one is out of it for good, and is
+ * never named in the main UI.
+ */
+export const TAB_CONTESTS = DEEP_CONTESTS.filter(
+  (contest) => !(contest as Contest).hidden && !(contest as Contest).incorrect,
+);
 
 /**
  * The contests that are ranked. An incorrect market set is left out: trades in it were made

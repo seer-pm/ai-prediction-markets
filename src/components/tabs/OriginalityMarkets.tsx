@@ -19,7 +19,6 @@ import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
 import { parseOriginalityCSV } from "@/utils/csvParser";
-import { OriginalityRoundNotice } from "@/components/contest/OriginalityRoundNotice";
 import {
   ORIGINALITY_ROUND_2,
   ORIGINALITY_ROUND_3,
@@ -307,8 +306,6 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 
   return (
     <>
-      <OriginalityRoundNotice round={round} />
-
       <ContestChart
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
@@ -465,7 +462,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 /** Round 3: same view, over the bundled multi-scalar parent. The bundles never surface here. */
 export const OriginalityR3Markets = () => <OriginalityMarkets round={ORIGINALITY_ROUND_3} />;
 
-/** The first round-3 set, built without its middle level. Withdraw-only. */
+/** The first round-3 set, built without its middle level. Withdraw-only — see `Round3Withdraw`. */
 export const OriginalityR3IncorrectMarkets = () => (
   <OriginalityMarkets round={ORIGINALITY_ROUND_3_INCORRECT} />
 );

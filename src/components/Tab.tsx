@@ -6,17 +6,13 @@ import ErrorBoundary from "./ErrorBoundary";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useContestTabStore } from "@/stores/contestTabStore";
 import { cn } from "@/utils/cn";
-import { DEEP_CONTESTS, type Contest } from "@/utils/contests";
+import { TAB_CONTESTS } from "@/utils/contests";
 import { startTransition, useCallback, useEffect, useState, type ComponentType } from "react";
 import { AiMarkets } from "./tabs/AiMarkets";
 import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
-import {
-  OriginalityMarkets,
-  OriginalityR3IncorrectMarkets,
-  OriginalityR3Markets,
-} from "./tabs/OriginalityMarkets";
+import { OriginalityMarkets, OriginalityR3Markets } from "./tabs/OriginalityMarkets";
 import { ZcashMarkets } from "./tabs/ZcashMarkets";
 import { ZcashNu7Markets } from "./tabs/ZcashNu7Markets";
 import { SeerPromo } from "./SeerPromo";
@@ -28,7 +24,6 @@ import { SeerPromo } from "./SeerPromo";
  */
 const CONTEST_COMPONENTS: Record<string, ComponentType> = {
   round3: OriginalityR3Markets,
-  "round3-incorrect": OriginalityR3IncorrectMarkets,
   "zcash-nu7": ZcashNu7Markets,
   zcash: ZcashMarkets,
   octant: OctantMarkets,
@@ -38,9 +33,8 @@ const CONTEST_COMPONENTS: Record<string, ComponentType> = {
   round1: AiMarkets,
 };
 
-const TABS = DEEP_CONTESTS.filter((contest) => !(contest as Contest).hidden).map((contest) => ({
+const TABS = TAB_CONTESTS.map((contest) => ({
   ...contest,
-  incorrect: !!(contest as Contest).incorrect,
   Component: CONTEST_COMPONENTS[contest.id],
 }));
 
@@ -109,16 +103,9 @@ export const Tab = () => {
                 active ? "border-primary text-primary" : "border-transparent text-ink-3 hover:text-ink",
               )}
             >
-              {/* An incorrect set is open only for getting out of, so it must not read as live. */}
-              <StatusDot tone={tab.incorrect ? "short" : "long"} pulse={!tab.incorrect} />
+              <StatusDot tone="long" pulse />
               {tab.label}
-              {tab.incorrect ? (
-                <span className="text-label font-semibold tracking-wider text-short uppercase">
-                  Withdraw only
-                </span>
-              ) : (
-                <span className="text-label font-semibold tracking-wider text-long uppercase">Live</span>
-              )}
+              <span className="text-label font-semibold tracking-wider text-long uppercase">Live</span>
             </button>
           );
         })}
@@ -170,7 +157,7 @@ export const Tab = () => {
 
       {/* Tab content — lazy-mount on first visit, then keep alive hidden */}
       <div>
-        {TABS.map(({ id, Component, finished, incorrect }) =>
+        {TABS.map(({ id, Component, finished }) =>
           visited.has(id) ? (
             <div
               key={id}
@@ -198,7 +185,7 @@ export const Tab = () => {
 
               {/* Outside the boundary, so a crashing contest still leaves the way out to Seer.
                   A finished contest has no trading left to send anyone to. */}
-              {!finished && !incorrect && <SeerPromo />}
+              {!finished && <SeerPromo />}
             </div>
           ) : null,
         )}

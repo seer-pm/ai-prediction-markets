@@ -6,7 +6,7 @@ import {
 import { useRedeemableScan } from "@/hooks/useRedeemableScan";
 import { useContestTabStore } from "@/stores/contestTabStore";
 import { useWalletStore } from "@/stores/walletStore";
-import { DEEP_CONTESTS, type Contest } from "@/utils/contests";
+import { TAB_CONTESTS } from "@/utils/contests";
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useAccount } from "wagmi";
@@ -23,8 +23,8 @@ import { useAccount } from "wagmi";
  */
 const DEPRECATED_REDEEMABLE = new Set(["round1", "round2"]);
 
-/** Contests in tab-bar order, skipping any hidden from the bar — those have no panel to open. */
-const CONTESTS = DEEP_CONTESTS.filter((contest) => !(contest as Contest).hidden);
+/** Contests in tab-bar order. One that is not in the bar has no panel to open, so it gets no row. */
+const CONTESTS = TAB_CONTESTS;
 
 interface UnclaimedPayoutsProps {
   /** Bring the markets view forward — a claim opened from the leaderboard has nowhere to land. */
