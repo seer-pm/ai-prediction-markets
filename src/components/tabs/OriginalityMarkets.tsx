@@ -7,7 +7,7 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
-import { Button, EmptyState, ErrorPanel } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { chartLiquidity, chartVolume, liveSeries, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
@@ -82,11 +82,12 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
   // One chart, one line per repository — so every child market is needed at once, and the batch
   // endpoint fetches them in a single request rather than one per repository.
   const chartMarketIds = useMemo(() => Object.keys(marketIdToRepo), [marketIdToRepo]);
+  // The withdraw-only view draws no chart, so it asks for none.
   const {
     data: charts,
     isLoading: isLoadingCharts,
     error: chartsError,
-  } = useMarketCharts(chartMarketIds);
+  } = useMarketCharts(round.incorrect ? undefined : chartMarketIds);
 
   // Raw market data for withdraw (React Query will deduplicate with useProcessOriginalityPredictions)
   const { data: originalityMarketData } = useOriginalityMarketsData(round);
@@ -304,6 +305,98 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     </Button>
   );
 
+  const sellAllButton = (
+    <Button
+      size="sm"
+      onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
+      disabled={!hasSellTokens}
+      disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
+    >
+      Sell all positions
+    </Button>
+  );
+
+  const sellAllDialog = (
+    <SellAllTokensInterface
+      open={isSellAllDialogOpen}
+      onOpenChange={setIsSellAllDialogOpen}
+      isError={sellAll.isError}
+      error={sellAll.error}
+      isPending={sellAll.isPending}
+      isSuccess={sellAll.isSuccess}
+      progress={sellAll.progress}
+      reset={sellAll.reset}
+      onSellAll={handleSellAll}
+      isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
+      hasTokens={hasSellTokens}
+    />
+  );
+
+  const redeemDialog = (
+    <RedeemL2Interface
+      open={isRedeemDialogOpen}
+      onOpenChange={setIsRedeemDialogOpen}
+      isError={redeem.isError}
+      error={redeem.error}
+      isPending={redeem.isPending}
+      isSuccess={redeem.isSuccess}
+      progress={redeem.progress}
+      reset={redeem.reset}
+      onRedeem={() =>
+        tradeExecutor &&
+        redeem.mutate({
+          tradeExecutor,
+          closedMarkets,
+          parentMarketId: round.parentMarketId,
+          parentTokens: redeemableParentTokens,
+          middleMarkets: settledMiddleMarkets,
+          isOldWallet: isUseOldWallet,
+        })
+      }
+      isLoading={
+        isLoadingSellBalances ||
+        isLoading ||
+        isLoadingBalances ||
+        isLoadingClosedBalances ||
+        isLoadingMiddleBalances ||
+        isLoadingParentBalances
+      }
+      hasRedeemable={hasRedeemable}
+    />
+  );
+
+  // An incorrect set is only for getting out of: the two ways out and nothing else. No chart, no
+  // predictions, no table — and no Withdraw tokens, which would move outcome tokens to the owner
+  // wallet, out of reach of the Sell all and Redeem buttons that act on the trade wallet.
+  if (round.incorrect) {
+    const isReadingPositions = isLoading || isLoadingBalances || isLoadingSellBalances;
+    const status = !account
+      ? "Connect the wallet you traded with to see your positions."
+      : !isCreated
+        ? "This wallet has no trade wallet, so it holds no positions in these markets."
+        : isReadingPositions
+          ? "Reading your positions…"
+          : hasSellTokens
+            ? "You hold positions in these markets."
+            : redeemState === "some"
+              ? "You hold a payout from these markets."
+              : "You hold no positions in these markets.";
+
+    return (
+      <>
+        <Card className="flex flex-col gap-4 !px-6 !py-4 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-body text-ink-3">{status}</span>
+          <div className="flex flex-wrap items-center gap-3 empty:hidden">
+            {canTrade && sellAllButton}
+            {(canTrade || (isCreated && isUseOldWallet)) && redeemButton}
+          </div>
+        </Card>
+        {sellAllDialog}
+        {redeemDialog}
+      </>
+    );
+  }
+
   return (
     <>
       <ContestChart
@@ -326,32 +419,17 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           <>
             {canTrade && (
               <>
-                {/* Not on an incorrect set: the way out is Sell all, then withdrawing the sUSDS.
-                    Moving its outcome tokens to the owner wallet would only take them away from
-                    the Sell all and Redeem buttons, which act on the trade wallet. */}
-                {!round.incorrect && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
-                  >
-                    Withdraw tokens
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
+                >
+                  Withdraw tokens
+                </Button>
                 {/* Trading stops with the contest; claiming what you already hold does not. */}
-                {!finished && (
-                  <Button
-                    size="sm"
-                    onClick={() => startTransition(() => setIsSellAllDialogOpen(true))}
-                    disabled={!hasSellTokens}
-                    disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
-                  >
-                    Sell all positions
-                  </Button>
-                )}
+                {!finished && sellAllButton}
                 {redeemButton}
-                {/* An incorrect set takes no new trades; selling out of it stays open above. */}
-                {!finished && !round.incorrect && (
+                {!finished && (
                   <Button
                     size="sm"
                     variant="primary"
@@ -411,50 +489,9 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
         />
       )}
 
-      <SellAllTokensInterface
-        open={isSellAllDialogOpen}
-        onOpenChange={setIsSellAllDialogOpen}
-        isError={sellAll.isError}
-        error={sellAll.error}
-        isPending={sellAll.isPending}
-        isSuccess={sellAll.isSuccess}
-        progress={sellAll.progress}
-        reset={sellAll.reset}
-        onSellAll={handleSellAll}
-        isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
-        hasTokens={hasSellTokens}
-      />
+      {sellAllDialog}
 
-      <RedeemL2Interface
-        open={isRedeemDialogOpen}
-        onOpenChange={setIsRedeemDialogOpen}
-        isError={redeem.isError}
-        error={redeem.error}
-        isPending={redeem.isPending}
-        isSuccess={redeem.isSuccess}
-        progress={redeem.progress}
-        reset={redeem.reset}
-        onRedeem={() =>
-          tradeExecutor &&
-          redeem.mutate({
-            tradeExecutor,
-            closedMarkets,
-            parentMarketId: round.parentMarketId,
-            parentTokens: redeemableParentTokens,
-            middleMarkets: settledMiddleMarkets,
-            isOldWallet: isUseOldWallet,
-          })
-        }
-        isLoading={
-          isLoadingSellBalances ||
-          isLoading ||
-          isLoadingBalances ||
-          isLoadingClosedBalances ||
-          isLoadingMiddleBalances ||
-          isLoadingParentBalances
-        }
-        hasRedeemable={hasRedeemable}
-      />
+      {redeemDialog}
     </>
   );
 };
