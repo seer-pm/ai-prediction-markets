@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { isAddress } from "viem";
 import { getMarketChartSeriesKey } from "./utils/buildChartSeries";
 import { CHART_CACHE_HEADERS } from "./utils/cacheHeaders";
+import { getChartStart, trimSeriesToStart } from "./utils/chartStart";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
 
 /**
@@ -91,8 +92,11 @@ export default async (req: Request) => {
       >
     >((acc, row) => {
       const value = row.value as ChartRow;
+      // A market whose chart is meant to begin later than its stored history is cut here rather
+      // than in the blob — see `./utils/chartStart`.
+      const chartStart = getChartStart(value.marketId);
       acc[value.marketId.toLowerCase()] = {
-        series: value.series ?? [],
+        series: (value.series ?? []).map((series) => trimSeriesToStart(series, chartStart)),
         totalVolumeMarket: value.totalVolumeMarket ?? "",
         totalVolumeTokens: value.totalVolumeTokens ?? "",
         // Empty, not zero, on a blob the cron has not rewritten since liquidity was stored — the
