@@ -11,12 +11,14 @@ import { ORIGINALITY_R3_V3_MARKET_IDS } from "@/utils/originalityR3V3Markets";
  * full history, and the pools are the same pools. So the history is kept as it is and cut here, on
  * the way out — which also makes the cut one constant to move, or to remove.
  *
- * Unix seconds. `undefined` cuts nothing.
+ * Unix seconds, on the 30-minute grid the series are drawn on. `undefined` cuts nothing.
  *
- * Set it to the first full hour after the re-seed has finished: a candle carries its hour's CLOSING
- * price, so by then the value in effect at the cut is already the re-seeded price.
+ * 2026-10-01 13:00 UTC: the start of the hour the re-seed finished in (its last transaction landed
+ * at 13:11:45). Not the hour after: an hourly candle carries its hour's CLOSING price, and a pool's
+ * last swap in that hour was its re-seed, so the 13:00 candle already reads the re-seeded price.
+ * Pools re-seeded in earlier hours have no later candle at all, and carry theirs in.
  */
-export const ORIGINALITY_R3_V3_CHART_START: number | undefined = undefined;
+export const ORIGINALITY_R3_V3_CHART_START: number | undefined = 1790859600;
 
 const CHART_START_BY_MARKET = new Map<string, number>(
   ORIGINALITY_R3_V3_CHART_START === undefined
