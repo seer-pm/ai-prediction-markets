@@ -329,13 +329,18 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           <>
             {canTrade && (
               <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
-                >
-                  Withdraw tokens
-                </Button>
+                {/* Not on an incorrect set: the way out is Sell all, then withdrawing the sUSDS.
+                    Moving its outcome tokens to the owner wallet would only take them away from
+                    the Sell all and Redeem buttons, which act on the trade wallet. */}
+                {!round.incorrect && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
+                  >
+                    Withdraw tokens
+                  </Button>
+                )}
                 {/* Trading stops with the contest; claiming what you already hold does not. */}
                 {!finished && (
                   <Button
