@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "npm run codegen && tsc -b && vite build",
     "lint": "eslint .",
+    "test": "vitest run",
     "typecheck:functions": "tsc --noEmit -p tsconfig.netlifycheck.json",
     "preview": "vite preview",
     "codegen": "graphql-codegen --config codegen.ts",
@@ -53,6 +54,8 @@
     "@eslint/js": "^9.33.0",
     "@graphql-codegen/cli": "6.0.0",
     "@graphql-codegen/client-preset": "5.0.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.3.1",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
@@ -61,10 +64,12 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.13",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.1",
     "vite": "^7.1.2",
-    "vite-plugin-node-polyfills": "^0.24.0"
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vitest": "^3.2.7"
   }
 }

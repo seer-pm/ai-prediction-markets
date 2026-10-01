@@ -8,6 +8,7 @@ import Footer from "./components/Footer";
 import { LeaderboardPanel } from "./components/leaderboard/LeaderboardPanel";
 import { ProfileDialog } from "./components/profile/ProfileDialog";
 import { ReadinessRail } from "./components/ReadinessRail";
+import { Round3Withdraw } from "./components/Round3Withdraw";
 import { Tab } from "./components/Tab";
 import { UnclaimedPayouts } from "./components/trade/UnclaimedPayouts";
 import { TradeWalletMenu } from "./components/trade/TradeWalletMenu";
@@ -22,32 +23,17 @@ import {
 } from "./config/queryClient";
 import { config } from "./config/wagmi";
 import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
+import { useContestTabStore } from "./stores/contestTabStore";
 import { cn } from "./utils/cn";
+import { ORIGINALITY_ROUND_3_INCORRECT } from "./utils/originalityRounds";
+import { PATHS, viewFromPath, type View } from "./utils/views";
 
 const CONTAINER = "mx-auto w-full max-w-[86rem] px-4 sm:px-6 lg:px-8";
-
-/**
- * Top-level views. The leaderboard is not a contest — it spans all of them — so it is a page of
- * its own reached from the header rather than a sixth entry in the contest tab bar.
- *
- * The URL is the source of truth, so a view is linkable and survives a reload. This needs the
- * SPA redirect in `netlify.toml`; without it a direct hit on `/leaderboard` 404s.
- */
-type View = "markets" | "leaderboard";
-
-const PATHS: Record<View, string> = {
-  markets: "/",
-  leaderboard: "/leaderboard",
-};
-
-function viewFromPath(pathname: string): View {
-  // Tolerate a trailing slash so `/leaderboard/` is not silently the markets page.
-  return pathname.replace(/\/+$/, "").toLowerCase() === "/leaderboard" ? "leaderboard" : "markets";
-}
 
 const AppContent: React.FC = () => {
   const { address, isConnected } = useAccount();
   const [profileOpen, setProfileOpen] = useState(false);
+  const requestTab = useContestTabStore((state) => state.requestTab);
 
   const [view, setView] = useState<View>(() => viewFromPath(window.location.pathname));
   /**
@@ -171,6 +157,18 @@ const AppContent: React.FC = () => {
                   each live contest panel (Tab.tsx), since it invites trading and a finished
                   contest has none left to do. */}
               <Tab />
+            </div>
+          )}
+
+          {/* The first Round 3 market set. No link in the app leads here — see `@/utils/views`. */}
+          {mounted.has("round3-withdraw") && (
+            <div style={{ display: view === "round3-withdraw" ? "block" : "none" }}>
+              <Round3Withdraw
+                onOpenRound3={() => {
+                  requestTab(ORIGINALITY_ROUND_3_INCORRECT.incorrect!.replacedBy);
+                  goTo("markets");
+                }}
+              />
             </div>
           )}
 

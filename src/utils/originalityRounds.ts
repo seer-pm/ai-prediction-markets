@@ -36,8 +36,8 @@ export interface OriginalityMiddleMarket {
  * the UI lists the 98 repos flat either way.
  *
  * The first round-3 set (`ORIGINALITY_ROUND_3_INCORRECT`) was created without that middle level:
- * its repo markets hang directly off the bundle tokens, ~33 to a token. It is kept, withdraw-only,
- * so the people who traded it can sell back and merge out. That sharing is why the trade budget
+ * its repo markets hang directly off the bundle tokens, ~33 to a token. It is kept, withdraw-only
+ * and on a page of its own, so the people who traded it can sell back and merge out. That sharing is why the trade budget
  * (`useExecuteOriginalityStrategy`) and the merge (`useSellToCollateral`) group rows by collateral
  * token — a no-op wherever every token is unique.
  */
@@ -66,8 +66,6 @@ export interface OriginalityRound {
    * stay available. `replacedBy` is the contest tab holding the corrected set.
    */
   incorrect?: { replacedBy: string };
-  /** The contest tab holding an earlier, incorrect build of this round, for the notice pointing at it. */
-  replaces?: string;
 }
 
 export const ORIGINALITY_ROUND_2: OriginalityRound = {
@@ -96,7 +94,6 @@ export const ORIGINALITY_ROUND_3: OriginalityRound = {
   // Shared with the incorrect set on purpose: same repos, same question, so a CSV already loaded
   // there carries over.
   predictionsStorageKey: "originality-r3",
-  replaces: "round3-incorrect",
 };
 
 /** The first round-3 set, missing its middle level. Withdraw-only — see the interface comment. */
