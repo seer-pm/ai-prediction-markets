@@ -25,6 +25,13 @@ export function OriginalityRoundNotice({ round }: { round: OriginalityRound }) {
           here is closed. If you hold positions, use <strong>Sell all positions</strong> below to
           convert them back to sUSDS, then withdraw from your trade wallet.
         </p>
+        {/* Measured on a real sell-all (2026-10-01): 0.4228 of 0.50 sUSDS came back. The merge
+            needs equal amounts of every bundle token, so it stops at the scarcest one. */}
+        <p className="mt-2">
+          Selling returns most of your funds now. A remainder can stay behind as unmatched tokens;
+          it is not lost, and becomes redeemable here when this market resolves at the end of
+          Round 3.
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <Button size="sm" variant="primary" onClick={() => requestTab(round.incorrect!.replacedBy)}>
             Go to the corrected Round 3
