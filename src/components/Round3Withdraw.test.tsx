@@ -16,8 +16,8 @@ describe("Round3WithdrawNotice", () => {
     render(<Round3WithdrawNotice onOpenRound3={() => {}} />);
     const notice = screen.getByRole("alert");
     expect(notice.textContent).toContain("This market set is incorrect — withdraw your funds");
-    expect(notice.textContent).toContain("Sell all positions");
-    expect(notice.textContent).toContain("withdraw from your trade wallet");
+    expect(notice.textContent).toContain("use Withdraw below");
+    expect(notice.textContent).toContain("move the sUSDS out of your trade wallet");
   });
 
   it("says a loss is reimbursed and a profit is kept", () => {
@@ -27,11 +27,11 @@ describe("Round3WithdrawNotice", () => {
     expect(text).toContain("If you made a profit, it is yours to keep, for the inconvenience.");
   });
 
-  it("says the remainder a sell-all leaves is redeemable later", () => {
+  it("says pairs are merged at full value, and the remainder is redeemable later", () => {
     render(<Round3WithdrawNotice onOpenRound3={() => {}} />);
-    expect(screen.getByRole("alert").textContent).toContain(
-      "becomes redeemable here when this market resolves",
-    );
+    const text = screen.getByRole("alert").textContent;
+    expect(text).toContain("merged back at full value and only the rest is sold");
+    expect(text).toContain("becomes redeemable here when this market resolves");
   });
 
   it("sends people on to the corrected Round 3", () => {

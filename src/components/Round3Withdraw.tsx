@@ -9,7 +9,7 @@ const seerMarketUrl = (marketId: string) => `https://app.seer.pm/markets/10/${ma
 
 /**
  * What the people who traded the first Round 3 set need to know: how to get out, what happens to
- * the part a sell-all leaves behind, and what happens to their profit or loss.
+ * the part a withdraw leaves behind, and what happens to their profit or loss.
  *
  * The button sits under the text rather than in `Panel`'s `actions` slot: beside it, on a phone,
  * it squeezes the message into a column a few words wide.
@@ -19,15 +19,16 @@ export function Round3WithdrawNotice({ onOpenRound3 }: { onOpenRound3: () => voi
     <Panel tone="error" title="This market set is incorrect — withdraw your funds">
       <p>
         These Round 3 markets were created with a level missing and have been replaced. Trading
-        here is closed. If you hold positions, use <strong>Sell all positions</strong> below to
-        convert them back to sUSDS, then withdraw from your trade wallet.
+        here is closed. If you hold positions, use <strong>Withdraw</strong> below to convert
+        them back to sUSDS, then move the sUSDS out of your trade wallet.
       </p>
-      {/* Measured on a real sell-all (2026-10-01): 0.4228 of 0.50 sUSDS came back. The merge
-          needs equal amounts of every bundle token, so it stops at the scarcest one. */}
+      {/* Simulated over the four wallets still holding (2026-10-02): 58-99% comes back at once,
+          depending on who goes first. The last merge needs equal amounts of every bundle token,
+          so it stops at the scarcest one. */}
       <p className="mt-2">
-        Selling returns most of your funds now. A remainder can stay behind as unmatched tokens;
-        it is not lost, and becomes redeemable here when this market resolves at the end of
-        Round 3.
+        Matched UP and DOWN tokens are merged back at full value and only the rest is sold, so
+        most of your funds return now. A remainder can stay behind as unmatched tokens; it is not
+        lost, and becomes redeemable here when this market resolves at the end of Round 3.
       </p>
       <p className="mt-2">
         <strong>If you made a loss trading these markets, it will be reimbursed.</strong> If you
@@ -74,7 +75,7 @@ export function Round3Withdraw({ onOpenRound3 }: { onOpenRound3: () => void }) {
           </Card>
         )}
       >
-        {/* Not `finished`: that would close "Sell all positions", which is the way out. */}
+        {/* Not `finished`: that would close "Withdraw", which is the way out. */}
         <ContestProvider finished={false}>
           <OriginalityR3IncorrectMarkets />
         </ContestProvider>

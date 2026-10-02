@@ -9,8 +9,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { mergeFromRouter } from "./useExecuteL2Strategy";
-import { fetchTokensBalances } from "./useTokensBalances";
+import { fetchTokensBalances, fetchTokensBalancesOrThrow } from "./useTokensBalances";
 import { getQuoteTradeCalls } from "@/utils/trade";
+import { planCompleteSetMerges } from "@/utils/completeSets";
 import { OriginalityMiddleMarket } from "@/utils/originalityRounds";
 
 interface SellAllProps {
@@ -24,7 +25,16 @@ interface SellAllProps {
    * only becomes a parent outcome token again by merging its middle market.
    */
   middleMarkets?: readonly OriginalityMiddleMarket[];
+  /**
+   * Merge each repo market's complete sets (DOWN + UP + Invalid) back into its collateral token
+   * before anything is sold, and sell only what is left unmatched — see `planCompleteSetMerges`.
+   */
+  mergeChildSets?: boolean;
 }
+
+// A merge unwraps each of a repo market's three outcome tokens; the redeem path keeps a batch to
+// 30 outcomes for Optimism's per-transaction gas cap, and this is the same budget.
+const CHILD_MERGES_PER_BATCH = 10;
 
 async function sellToCollateral({
   tradeExecutor,
@@ -32,13 +42,48 @@ async function sellToCollateral({
   parentMarketId,
   parentInvalidToken,
   middleMarkets,
+  mergeChildSets,
   onStateChange,
 }: SellAllProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
+  let rows = tableData;
+  if (mergeChildSets) {
+    // No progress event for this read: it runs before the session key is authorised. A failed
+    // read must stop the run — read as empty, every pair would be sold instead of merged.
+    const balances = await fetchTokensBalancesOrThrow(
+      tradeExecutor,
+      tableData.flatMap((row) => row.wrappedTokens),
+    );
+    const plan = planCompleteSetMerges(tableData, balances);
+    // What is left to sell, from balances read just now rather than the table's.
+    rows = plan.rows;
+    if (plan.merges.length) {
+      const childInput: CallBatchesInput = [];
+      for (let i = 0; i < plan.merges.length; i += CHILD_MERGES_PER_BATCH) {
+        childInput.push({
+          calls: plan.merges
+            .slice(i, i + CHILD_MERGES_PER_BATCH)
+            .flatMap(({ marketId, tokens, amount }) => mergeFromRouter(router, amount, marketId, tokens)),
+          message: "Merging matched UP and DOWN tokens back at full value",
+          phase: "unwind",
+          step: i / CHILD_MERGES_PER_BATCH + 1,
+          of: Math.ceil(plan.merges.length / CHILD_MERGES_PER_BATCH),
+          skipFailCalls: false,
+        });
+      }
+      const result = await toastifyBatchTxSessionKey(tradeExecutor, childInput, onStateChange);
+      if (!result.status) {
+        await withdrawFundSessionKey();
+        throw result.error;
+      }
+    } else {
+      onStateChange({ phase: "unwind", label: "No matched UP and DOWN tokens to merge", skipped: true });
+    }
+  }
   onStateChange({ phase: "requote", label: "Pricing your positions" });
   const sellAllQuotes = await getSellAllQuotes({
     account: tradeExecutor,
-    tableData,
+    tableData: rows,
   });
   const swapCalls = getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const BATCH_SIZE = 100;

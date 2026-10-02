@@ -34,6 +34,10 @@ export const STRATEGY_PHASES: TxPhase[] = [
 // for a signature, and that read is the slowest part of the run.
 export const SELL_ALL_PHASES: TxPhase[] = ["requote", "authorize", "sell", "merge", "settle"];
 
+// A withdraw merges complete sets before it prices anything, so the signature comes first and the
+// quotes cover only what the merges left over.
+export const WITHDRAW_PHASES: TxPhase[] = ["authorize", "unwind", "requote", "sell", "merge", "settle"];
+
 export const REDEEM_PHASES: TxPhase[] = ["authorize", "redeem", "settle"];
 
 export const SIMPLE_PHASES: TxPhase[] = ["authorize", "work", "settle"];

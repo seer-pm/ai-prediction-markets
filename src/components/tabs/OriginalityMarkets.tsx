@@ -3,6 +3,7 @@ import { FigureLabel } from "@/components/contest/FigureLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
+import { WITHDRAW_PHASES } from "@/utils/txPhases";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
@@ -244,6 +245,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       parentMarketId: round.parentMarketId,
       parentInvalidToken: round.parentInvalidToken,
       middleMarkets: round.middleMarkets,
+      mergeChildSets: !!round.incorrect,
     });
   }, [tableData, sellAll, tradeExecutor, round]);
 
@@ -305,6 +307,9 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     </Button>
   );
 
+  // On an incorrect set the way out is a withdraw: it merges matched UP and DOWN tokens back at
+  // full value and sells only the rest. A plain sell-all there puts both sides of every pair into
+  // the pools, which returned about a third as much.
   const sellAllButton = (
     <Button
       size="sm"
@@ -312,7 +317,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       disabled={!hasSellTokens}
       disabledReason={!hasSellTokens ? "You hold no outcome tokens here." : undefined}
     >
-      Sell all positions
+      {round.incorrect ? "Withdraw" : "Sell all positions"}
     </Button>
   );
 
@@ -320,6 +325,15 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     <SellAllTokensInterface
       open={isSellAllDialogOpen}
       onOpenChange={setIsSellAllDialogOpen}
+      {...(round.incorrect && {
+        title: "Withdraw",
+        description:
+          "Merges your matched UP and DOWN tokens back at full value, sells what is left over, and returns the sUSDS to your trade wallet.",
+        confirmLabel: "Withdraw",
+        warning:
+          "Matched tokens come back in full. Only unmatched tokens are sold, and selling them all at once can still move the price against you.",
+        phases: WITHDRAW_PHASES,
+      })}
       isError={sellAll.isError}
       error={sellAll.error}
       isPending={sellAll.isPending}
@@ -367,7 +381,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 
   // An incorrect set is only for getting out of: the two ways out and nothing else. No chart, no
   // predictions, no table — and no Withdraw tokens, which would move outcome tokens to the owner
-  // wallet, out of reach of the Sell all and Redeem buttons that act on the trade wallet.
+  // wallet, out of reach of the Withdraw and Redeem buttons that act on the trade wallet.
   if (round.incorrect) {
     const isReadingPositions = isLoading || isLoadingBalances || isLoadingSellBalances;
     const status = !account
