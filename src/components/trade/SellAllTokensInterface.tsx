@@ -1,5 +1,6 @@
 import { Button, Dialog, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import type { TxProgressState } from "@/hooks/useTxProgress";
+import type { TxPhase } from "@/types";
 import { SELL_ALL_PHASES, runStatus } from "@/utils/txPhases";
 import React, { useEffect } from "react";
 import { RunLedger } from "./RunLedger";
@@ -7,7 +8,14 @@ import { RunLedger } from "./RunLedger";
 export interface SellAllTokensInterfaceProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** The dialog's name. */
+  title?: string;
   description?: string;
+  confirmLabel?: string;
+  /** What the "Be careful" panel says before the run starts. */
+  warning?: string;
+  /** The stages the run walks through, when it is not a plain sell-all. */
+  phases?: TxPhase[];
   isError: boolean;
   error: unknown;
   isPending: boolean;
@@ -24,7 +32,11 @@ export interface SellAllTokensInterfaceProps {
 export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   open,
   onOpenChange,
+  title = "Sell all positions",
   description = "Swaps every outcome token you hold in this contest back to sUSDS.",
+  confirmLabel = "Sell everything",
+  warning = "Selling everything at once may result in significant slippage, causing you to receive much less than expected. Proceed with caution.",
+  phases = SELL_ALL_PHASES,
   isError,
   error,
   isPending,
@@ -51,7 +63,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Sell all positions"
+      title={title}
       description={description}
       size="sm"
       dismissible={!isPending}
@@ -74,7 +86,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
               disabled={isPending}
               fullWidth
             >
-              Sell everything
+              {confirmLabel}
             </Button>
           </>
           )
@@ -86,7 +98,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
 
         {status !== "idle" && (
           <RunLedger
-            phases={SELL_ALL_PHASES}
+            phases={phases}
             current={progress.current}
             completed={progress.completed}
             skipped={progress.skipped}
@@ -106,8 +118,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
         ) : (
           status === "idle" && (
             <Panel tone="error" title="Be careful">
-              Selling everything at once may result in significant slippage, causing you to receive
-              much less than expected. Proceed with caution.
+              {warning}
             </Panel>
           )
         )}

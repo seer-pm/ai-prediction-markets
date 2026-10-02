@@ -68,8 +68,20 @@ vi.mock("../trade/WithdrawOutcomeTokensInterface", () => ({
 }));
 vi.mock("../trade/RedeemL2Interface", () => ({ RedeemL2Interface: () => null }));
 vi.mock("../trade/SellAllTokensInterface", () => ({
-  SellAllTokensInterface: ({ open, onSellAll }: { open: boolean; onSellAll: () => void }) =>
-    open ? <button onClick={onSellAll}>confirm sell all</button> : null,
+  SellAllTokensInterface: ({
+    open,
+    onSellAll,
+    title = "Sell all positions",
+  }: {
+    open: boolean;
+    onSellAll: () => void;
+    title?: string;
+  }) =>
+    open ? (
+      <button onClick={onSellAll} data-title={title}>
+        confirm sell all
+      </button>
+    ) : null,
 }));
 
 import { TooltipProvider } from "@/components/ui";
@@ -104,9 +116,9 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the incorrect Round 3 set (withdraw page)", () => {
-  it("shows only the Sell all button to someone holding positions", () => {
+  it("shows only the Withdraw button to someone holding positions", () => {
     render(<OriginalityR3IncorrectMarkets />);
-    expect(buttons()).toEqual(["Sell all positions"]);
+    expect(buttons()).toEqual(["Withdraw"]);
     expect(screen.getByText("You hold positions in these markets.")).toBeTruthy();
   });
 
@@ -122,24 +134,27 @@ describe("the incorrect Round 3 set (withdraw page)", () => {
     expect(state.chartIds.every((ids) => ids === undefined)).toBe(true);
   });
 
-  it("sells against the incorrect set's own parent", () => {
+  it("withdraws against the incorrect set's own parent, merging matched pairs first", () => {
     render(<OriginalityR3IncorrectMarkets />);
-    fireEvent.click(screen.getByRole("button", { name: "Sell all positions" }));
-    fireEvent.click(screen.getByRole("button", { name: "confirm sell all" }));
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+    const confirm = screen.getByRole("button", { name: "confirm sell all" });
+    expect(confirm.getAttribute("data-title")).toBe("Withdraw");
+    fireEvent.click(confirm);
     expect(state.sellAll).toHaveBeenCalledTimes(1);
     expect(state.sellAll.mock.calls[0][0]).toMatchObject({
       tradeExecutor: EXECUTOR,
       parentMarketId: ORIGINALITY_ROUND_3_INCORRECT.parentMarketId,
       parentInvalidToken: ORIGINALITY_ROUND_3_INCORRECT.parentInvalidToken,
       middleMarkets: undefined,
+      mergeChildSets: true,
     });
   });
 
-  it("disables Sell all and says so when the wallet holds nothing", () => {
+  it("disables Withdraw and says so when the wallet holds nothing", () => {
     state.rows = [{ ...HELD_ROW, upBalance: 0n }];
     render(<OriginalityR3IncorrectMarkets />);
     // Soft-disabled, so its reason stays reachable: `aria-disabled`, and a click does nothing.
-    const sell = screen.getByRole("button", { name: "Sell all positions" });
+    const sell = screen.getByRole("button", { name: "Withdraw" });
     expect(sell.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(sell);
     expect(screen.queryByRole("button", { name: "confirm sell all" })).toBeNull();
@@ -151,7 +166,7 @@ describe("the incorrect Round 3 set (withdraw page)", () => {
     state.marketData = { markets: [], parentWrappedTokens: ["0xp1", "0xp2"], parentMarketStatus: "closed" };
     state.balances = [3n, 0n];
     render(<OriginalityR3IncorrectMarkets />);
-    expect(buttons()).toEqual(["Sell all positions", "Redeem to sUSDS"]);
+    expect(buttons()).toEqual(["Withdraw", "Redeem to sUSDS"]);
     expect(screen.getByText("You hold a payout from these markets.")).toBeTruthy();
   });
 
@@ -159,7 +174,7 @@ describe("the incorrect Round 3 set (withdraw page)", () => {
     state.marketData = { markets: [], parentWrappedTokens: ["0xp1", "0xp2"], parentMarketStatus: "open" };
     state.balances = [3n, 0n];
     render(<OriginalityR3IncorrectMarkets />);
-    expect(buttons()).toEqual(["Sell all positions"]);
+    expect(buttons()).toEqual(["Withdraw"]);
   });
 
   it("asks a visitor with no wallet to connect, and offers no buttons", () => {
@@ -196,6 +211,15 @@ describe("the corrected Round 3 tab", () => {
       "Sell all positions",
       "Start trading",
     ]);
+  });
+
+  it("still sells everything as held, without merging pairs first", () => {
+    render(<OriginalityR3Markets />);
+    fireEvent.click(screen.getByRole("button", { name: "Sell all positions" }));
+    const confirm = screen.getByRole("button", { name: "confirm sell all" });
+    expect(confirm.getAttribute("data-title")).toBe("Sell all positions");
+    fireEvent.click(confirm);
+    expect(state.sellAll.mock.calls[0][0]).toMatchObject({ mergeChildSets: false });
   });
 
   it("asks for its chart history", () => {
