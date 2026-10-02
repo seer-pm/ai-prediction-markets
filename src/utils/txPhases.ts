@@ -38,6 +38,20 @@ export const SELL_ALL_PHASES: TxPhase[] = ["requote", "authorize", "sell", "merg
 // quotes cover only what the merges left over.
 export const WITHDRAW_PHASES: TxPhase[] = ["authorize", "unwind", "requote", "sell", "merge", "settle"];
 
+// The same run where a market is collateralised in sUSDS itself: the first merge already pays
+// sUSDS, so there is no parent level left to merge afterwards.
+export const TOP_LEVEL_WITHDRAW_PHASES: TxPhase[] = ["authorize", "unwind", "requote", "sell", "settle"];
+
+/**
+ * What a sell-all dialog says when the run merges complete sets before it sells. `sides` names
+ * the two traded outcomes, e.g. "UP and DOWN".
+ */
+export const mergeFirstSellCopy = (sides: string) => ({
+  description: `Merges your matched ${sides} tokens back at full value, sells what is left over, and returns the sUSDS to your trade wallet.`,
+  warning:
+    "Matched tokens come back in full. Only unmatched tokens are sold, and selling them all at once can still move the price against you.",
+});
+
 export const REDEEM_PHASES: TxPhase[] = ["authorize", "redeem", "settle"];
 
 export const SIMPLE_PHASES: TxPhase[] = ["authorize", "work", "settle"];

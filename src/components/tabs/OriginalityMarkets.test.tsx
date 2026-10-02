@@ -72,20 +72,29 @@ vi.mock("../trade/SellAllTokensInterface", () => ({
     open,
     onSellAll,
     title = "Sell all positions",
+    description,
+    phases,
   }: {
     open: boolean;
     onSellAll: () => void;
     title?: string;
+    description?: string;
+    phases?: string[];
   }) =>
     open ? (
-      <button onClick={onSellAll} data-title={title}>
+      <button
+        onClick={onSellAll}
+        data-title={title}
+        data-description={description}
+        data-phases={phases?.join(",")}
+      >
         confirm sell all
       </button>
     ) : null,
 }));
 
 import { TooltipProvider } from "@/components/ui";
-import { ORIGINALITY_ROUND_3_INCORRECT } from "@/utils/originalityRounds";
+import { ORIGINALITY_ROUND_3, ORIGINALITY_ROUND_3_INCORRECT } from "@/utils/originalityRounds";
 import { OriginalityR3IncorrectMarkets, OriginalityR3Markets } from "./OriginalityMarkets";
 
 const ACCOUNT = "0x00000000000000000000000000000000000000a1";
@@ -146,7 +155,6 @@ describe("the incorrect Round 3 set (withdraw page)", () => {
       parentMarketId: ORIGINALITY_ROUND_3_INCORRECT.parentMarketId,
       parentInvalidToken: ORIGINALITY_ROUND_3_INCORRECT.parentInvalidToken,
       middleMarkets: undefined,
-      mergeChildSets: true,
     });
   });
 
@@ -213,13 +221,20 @@ describe("the corrected Round 3 tab", () => {
     ]);
   });
 
-  it("still sells everything as held, without merging pairs first", () => {
+  it("keeps its Sell all name, and says matched pairs are merged before the rest is sold", () => {
     render(<OriginalityR3Markets />);
     fireEvent.click(screen.getByRole("button", { name: "Sell all positions" }));
     const confirm = screen.getByRole("button", { name: "confirm sell all" });
     expect(confirm.getAttribute("data-title")).toBe("Sell all positions");
+    expect(confirm.getAttribute("data-description")).toMatch(/^Merges your matched UP and DOWN tokens/);
+    // The ledger lists the merge ahead of the quotes, the order the run takes.
+    expect(confirm.getAttribute("data-phases")).toBe("authorize,unwind,requote,sell,merge,settle");
     fireEvent.click(confirm);
-    expect(state.sellAll.mock.calls[0][0]).toMatchObject({ mergeChildSets: false });
+    expect(state.sellAll.mock.calls[0][0]).toMatchObject({
+      tradeExecutor: EXECUTOR,
+      parentMarketId: ORIGINALITY_ROUND_3.parentMarketId,
+      middleMarkets: ORIGINALITY_ROUND_3.middleMarkets,
+    });
   });
 
   it("asks for its chart history", () => {

@@ -3,7 +3,7 @@ import { FigureLabel } from "@/components/contest/FigureLabel";
 import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
-import { WITHDRAW_PHASES } from "@/utils/txPhases";
+import { WITHDRAW_PHASES, mergeFirstSellCopy } from "@/utils/txPhases";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
@@ -245,7 +245,6 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       parentMarketId: round.parentMarketId,
       parentInvalidToken: round.parentInvalidToken,
       middleMarkets: round.middleMarkets,
-      mergeChildSets: !!round.incorrect,
     });
   }, [tableData, sellAll, tradeExecutor, round]);
 
@@ -307,9 +306,9 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     </Button>
   );
 
-  // On an incorrect set the way out is a withdraw: it merges matched UP and DOWN tokens back at
-  // full value and sells only the rest. A plain sell-all there puts both sides of every pair into
-  // the pools, which returned about a third as much.
+  // Every round's way out merges matched UP and DOWN tokens back at full value and sells only the
+  // rest: putting both sides of every pair into the pools returned about a third as much on the
+  // incorrect set. There it is the only action left, so it is named for what it is, a withdraw.
   const sellAllButton = (
     <Button
       size="sm"
@@ -325,15 +324,9 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     <SellAllTokensInterface
       open={isSellAllDialogOpen}
       onOpenChange={setIsSellAllDialogOpen}
-      {...(round.incorrect && {
-        title: "Withdraw",
-        description:
-          "Merges your matched UP and DOWN tokens back at full value, sells what is left over, and returns the sUSDS to your trade wallet.",
-        confirmLabel: "Withdraw",
-        warning:
-          "Matched tokens come back in full. Only unmatched tokens are sold, and selling them all at once can still move the price against you.",
-        phases: WITHDRAW_PHASES,
-      })}
+      {...(round.incorrect && { title: "Withdraw", confirmLabel: "Withdraw" })}
+      {...mergeFirstSellCopy("UP and DOWN")}
+      phases={WITHDRAW_PHASES}
       isError={sellAll.isError}
       error={sellAll.error}
       isPending={sellAll.isPending}
