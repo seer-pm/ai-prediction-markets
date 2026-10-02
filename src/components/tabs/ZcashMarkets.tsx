@@ -20,6 +20,7 @@ import { tradeDisabledReason } from "@/utils/contest";
 import { parseZcashCSV } from "@/utils/csvParser";
 
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
+import { TOP_LEVEL_WITHDRAW_PHASES, mergeFirstSellCopy } from "@/utils/txPhases";
 import { isZcashRowFundable } from "@/utils/zcashBudget";
 import { sampleZcashPredictions } from "@/utils/sampleZcashPredictions";
 import { YES_INDEX } from "@/utils/zcashMarkets";
@@ -329,6 +330,8 @@ export const ZcashMarkets = () => {
       <SellAllTokensInterface
         open={isSellAllDialogOpen}
         onOpenChange={setIsSellAllDialogOpen}
+        {...mergeFirstSellCopy("YES and NO")}
+        phases={TOP_LEVEL_WITHDRAW_PHASES}
         isError={sellAll.isError}
         error={sellAll.error}
         isPending={sellAll.isPending}
