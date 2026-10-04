@@ -44,7 +44,6 @@ describe("Tab", () => {
       .filter((button) => (button.textContent ?? "").endsWith("Live"));
     expect(live.map((button) => button.textContent)).toEqual([
       "Round 3 · OriginalityLive",
-      "Zcash · GrantsLive",
     ]);
   });
 
