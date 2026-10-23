@@ -42,19 +42,23 @@ export function TradeWalletMenu() {
   return (
     <>
       <Popover.Root>
-        <Popover.Trigger className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-rule-strong bg-surface pr-2.5 pl-2 text-body transition-colors hover:border-ink-4">
+        <Popover.Trigger
+          className="seer-button seer-button-outline gap-2 pr-2.5 pl-2 font-normal"
+        >
           <Avatar address={account} src={profile?.avatarUrl} size={22} />
           {isCreated ? (
             isBalanceLoading ? (
               <Skeleton width={64} height={14} />
             ) : (
-              <span className="font-semibold text-ink">
+              // On a phone only the avatar shows; the balance stays the button's name and is in
+              // full inside the menu.
+              <span className="font-semibold text-ink max-sm:sr-only">
                 {formatTokenAmount(balance, collateral.decimals)}
                 <span className="ml-1 text-ink-3">{collateral.symbol}</span>
               </span>
             )
           ) : (
-            <span className="text-ink-2">{formatAddress(account)}</span>
+            <span className="text-ink-2 max-sm:sr-only">{formatAddress(account)}</span>
           )}
           <ChevronDownIcon className="text-ink-4" />
         </Popover.Trigger>
@@ -64,7 +68,7 @@ export function TradeWalletMenu() {
             align="end"
             sideOffset={6}
             collisionPadding={12}
-            className="z-50 w-80 overflow-hidden rounded-lg bg-surface shadow-pop"
+            className="z-50 w-80 overflow-hidden rounded-lg border border-rule bg-surface shadow-pop"
           >
             <div className="border-b border-rule px-4 py-3">
               <p className="text-label font-semibold tracking-wider text-ink-3 uppercase">

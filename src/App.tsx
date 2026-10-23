@@ -1,9 +1,9 @@
-import { ThemeToggle } from "@seer-pm/ui-kit/react";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import React, { useCallback, useEffect, useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount, WagmiProvider } from "wagmi";
+import { AppHeader } from "./components/AppHeader";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Footer from "./components/Footer";
 import { LeaderboardPanel } from "./components/leaderboard/LeaderboardPanel";
@@ -12,10 +12,7 @@ import { ReadinessRail } from "./components/ReadinessRail";
 import { Round3Withdraw } from "./components/Round3Withdraw";
 import { Tab } from "./components/Tab";
 import { UnclaimedPayouts } from "./components/trade/UnclaimedPayouts";
-import { TradeWalletMenu } from "./components/trade/TradeWalletMenu";
 import { Button, Card, EmptyState, TooltipProvider } from "./components/ui";
-import { BookIcon } from "./components/ui/icons";
-import { WalletConnect } from "./components/WalletConnect";
 import {
   queryPersister,
   PERSIST_BUSTER,
@@ -25,19 +22,15 @@ import {
 import { config } from "./config/wagmi";
 import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
 import { useContestTabStore } from "./stores/contestTabStore";
-import { useTheme, useThemeStore } from "./stores/themeStore";
-import { cn } from "./utils/cn";
 import { ORIGINALITY_ROUND_3_INCORRECT } from "./utils/originalityRounds";
 import { PATHS, viewFromPath, type View } from "./utils/views";
 
 const CONTAINER = "mx-auto w-full max-w-[86rem] px-4 sm:px-6 lg:px-8";
 
 const AppContent: React.FC = () => {
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const [profileOpen, setProfileOpen] = useState(false);
   const requestTab = useContestTabStore((state) => state.requestTab);
-  const theme = useTheme();
-  const toggleTheme = useThemeStore((state) => state.toggle);
 
   const [view, setView] = useState<View>(() => viewFromPath(window.location.pathname));
   /**
@@ -81,69 +74,12 @@ const AppContent: React.FC = () => {
     // The app scrolls here rather than on the document — see the note in
     // index.css. `mt-auto` on the footer still pins it when content is short.
     <div className="flex h-dvh flex-col overflow-y-auto bg-paper">
-      {/* Opaque, not frosted — a persistent backdrop-filter re-composites the
-          page beneath it on every scroll and reflow. */}
-      <header className="sticky top-0 z-30 border-b border-rule bg-surface">
-        <div className={`${CONTAINER} flex h-16 items-center justify-between gap-4`}>
-          <div className="flex min-w-0 items-baseline gap-3">
-            {/* The title doubles as the way home, so the markets need no nav item of their own. */}
-            <h1 className="truncate text-title font-bold">
-              <button
-                onClick={() => goTo("markets")}
-                aria-current={view === "markets" ? "page" : undefined}
-                className="cursor-pointer text-ink transition-colors hover:text-primary-text"
-              >
-                AI Prediction Markets
-              </button>
-            </h1>
-            <span className="hidden text-label font-semibold tracking-wider text-ink-4 uppercase sm:inline">
-              Optimism
-            </span>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            {/* Ahead of the external Guide link so internal and outbound navigation do not read
-                as the same kind of thing. */}
-            <button
-              onClick={() => goTo("leaderboard")}
-              aria-current={view === "leaderboard" ? "page" : undefined}
-              className={cn(
-                "cursor-pointer rounded-md px-2.5 py-1.5 text-body font-semibold transition-colors",
-                // Same selected-chip vocabulary as the leaderboard's market selector, so
-                // "current page" reads at a glance against the primary-coloured Guide link.
-                view === "leaderboard"
-                  ? "bg-primary-bg text-primary-text"
-                  : "text-ink-3 hover:text-ink",
-              )}
-            >
-              Leaderboard
-            </button>
-
-            {/* Only once there is an account to attach a profile to. It opens a dialog rather
-                than navigating, so it never takes the `aria-current` treatment above. */}
-            {isConnected && address && (
-              <button
-                onClick={() => setProfileOpen(true)}
-                className="cursor-pointer rounded-md px-2.5 py-1.5 text-body font-semibold text-ink-3 transition-colors hover:text-ink"
-              >
-                Profile
-              </button>
-            )}
-
-            <a
-              className="hidden items-center gap-1.5 rounded-md px-2 py-1.5 text-body font-semibold text-primary-text transition-colors hover:text-primary-text-hover sm:inline-flex"
-              href="https://deep-pm.gitbook.io/seer-docs"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <BookIcon />
-              Guide
-            </a>
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
-            {isConnected ? <TradeWalletMenu /> : <WalletConnect />}
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        view={view}
+        onNavigate={goTo}
+        onOpenProfile={() => setProfileOpen(true)}
+        container={CONTAINER}
+      />
 
       <main className={`${CONTAINER} flex-1 py-8`}>
         <div className="space-y-6 pb-16">

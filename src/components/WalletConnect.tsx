@@ -10,12 +10,19 @@ export const WalletConnect = () => {
   return (
     <Button
       variant="primary"
-      size="sm"
       loading={isConnecting}
       onClick={() => open({ view: "Connect" })}
-      iconLeft={isConnecting ? undefined : <WalletIcon />}
+      iconLeft={<WalletIcon />}
     >
-      {isConnecting ? "Connecting" : "Connect wallet"}
+      {isConnecting ? (
+        "Connecting"
+      ) : (
+        // One node, so the button's gap does not land inside the label. A phone's header holds
+        // the lockup, this and the menu, and nothing wider.
+        <span>
+          Connect<span className="max-sm:sr-only"> wallet</span>
+        </span>
+      )}
     </Button>
   );
 };

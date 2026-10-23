@@ -23,7 +23,7 @@ function Trigger({ label, muted }: { label: string; muted: boolean }) {
   return (
     <Popover.Trigger
       className={cn(
-        "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-rule-strong bg-surface px-3 text-body transition-colors hover:border-ink-4",
+        "seer-input flex min-h-10 cursor-pointer items-center justify-between gap-2 py-0 text-left text-body",
         muted ? "text-ink-4" : "text-ink",
       )}
     >

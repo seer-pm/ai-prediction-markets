@@ -93,6 +93,28 @@
   /* Surfaces sit on hairlines, not shadows. Only what floats over the page
      (menus, popovers, tooltips, toasts) casts one. */
   --shadow-pop: 0 12px 32px rgb(20 18 35 / 0.16), 0 2px 6px rgb(20 18 35 / 0.08);
+
+  /* The kit dialog's entrance: a short rise on desktop, a sheet from the bottom edge on a phone. */
+  --animate-dialog-in: dialog-in 240ms var(--seer-ease-out);
+  --animate-sheet-in: sheet-in 240ms var(--seer-ease-out);
+  --animate-backdrop-in: backdrop-in 240ms var(--seer-ease-out);
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes backdrop-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 @layer base {
