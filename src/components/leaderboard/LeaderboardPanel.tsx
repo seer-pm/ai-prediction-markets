@@ -140,6 +140,7 @@ export function LeaderboardPanel() {
   return (
     <Card flush>
       <CardHeader
+        as="h1"
         title={`Leaderboard · ${scopeLabel(scope)}`}
         description={
           scope === "global"

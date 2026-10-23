@@ -20,6 +20,7 @@ import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
+import { formatShare } from "@/utils/format";
 import { defaultPins, togglePin, type Pins } from "@/utils/pins";
 import { parseOriginalityCSV } from "@/utils/csvParser";
 import {
@@ -446,7 +447,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
         live={!finished}
         facts={[
           { label: "Asked by", value: "Deep Funding" },
-          { label: "Resolved by", value: "The Deep Funding jury's evaluation" },
+          { label: "Resolved by", value: "The Deep Funding jury's evaluation", wide: true },
           {
             label: "Repositories",
             value: tableData ? tableData.filter((row) => row.repo !== "Invalid result").length : "…",
@@ -455,6 +456,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       />
 
       <ContestBar
+        bare
         predictionCount={predictions.length}
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
@@ -512,6 +514,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
         refreshMarketIds={chartMarketIds}
         pins={pins}
         onPinsChange={setChosenPins}
+        formatValue={formatShare}
       />
 
       <GenericCSVUpload<OriginalityRow>

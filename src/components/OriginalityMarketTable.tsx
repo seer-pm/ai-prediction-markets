@@ -23,6 +23,7 @@ import { DECIMALS } from "@/utils/constants";
 import { useTableSort, type SortDir } from "@/hooks/useTableSort";
 import {
   compareNullsLast,
+  formatShare,
   formatSignedWeight,
   formatTokenAmount,
   formatWeight,
@@ -30,7 +31,7 @@ import {
   preciseValue,
 } from "@/utils/format";
 import { MAX_PINS, pinCount, pinSlot, type Pins } from "@/utils/pins";
-import React, { useMemo, type ReactNode } from "react";
+import React, { useMemo, useState, type ReactNode } from "react";
 
 // Written in the table's own column names, so the equation points at what is on screen.
 const DIFFERENCE_HELP = {
@@ -39,6 +40,9 @@ const DIFFERENCE_HELP = {
 } as const;
 
 type SortColumn = "repo" | "upPrice" | "upDifference" | "downPrice" | "downDifference";
+
+/** Rows a phone lists before "Show all". */
+const PHONE_ROWS = 10;
 
 /** Bars share one width down the column, so they compare. */
 const BAR_TRACK = 120;
@@ -198,6 +202,11 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
     });
   }, [visibleRows, sort]);
 
+  // A phone shows the leaders and lets the reader ask for the rest, rather than nesting a scroll
+  // box inside the page that traps the thumb and hides how long the list is.
+  const [showAll, setShowAll] = useState(false);
+  const phoneRows = showAll ? sortedRows : sortedRows.slice(0, PHONE_ROWS);
+
   const follow = (repo: string) =>
     pins && onTogglePin ? <FollowToggle repo={repo} pins={pins} onToggle={onTogglePin} /> : null;
 
@@ -223,11 +232,8 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
       ) : (
         <>
           {/* A phone reads the field as a list: name, bar, then where your prediction differs. */}
-          <ol
-            aria-label="Repositories"
-            className="max-h-[min(72vh,46rem)] divide-y divide-rule overflow-auto overscroll-contain sm:hidden"
-          >
-            {sortedRows.map((market) => (
+          <ol aria-label="Repositories" className="divide-y divide-rule sm:hidden">
+            {phoneRows.map((market) => (
               <li key={market.marketId} className="flex items-start gap-1 px-4 py-3">
                 <span className="pt-1 pl-2">{follow(market.repo)}</span>
                 <div className="min-w-0 flex-1">
@@ -239,7 +245,7 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
                     first={market.upPrice}
                     second={market.downPrice}
                     marker={market.predictedOriginality}
-                    format={formatWeight}
+                    format={formatShare}
                     track={150}
                   />
                   {market.predictedOriginality !== null && (
@@ -254,6 +260,17 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
               </li>
             ))}
           </ol>
+          {sortedRows.length > PHONE_ROWS && (
+            <div className="border-t border-rule p-4 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setShowAll((value) => !value)}
+                className="seer-button seer-button-outline seer-button-block"
+              >
+                {showAll ? `Show the top ${PHONE_ROWS}` : `Show all ${sortedRows.length} repositories`}
+              </button>
+            </div>
+          )}
 
           <TableScroller className="max-sm:hidden">
             <Table minWidth={900}>
@@ -304,7 +321,7 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
                         first={market.upPrice}
                         second={market.downPrice}
                         marker={market.predictedOriginality}
-                        format={formatWeight}
+                        format={formatShare}
                         track={BAR_TRACK}
                       />
                     </Td>
@@ -336,6 +353,9 @@ const OriginalityMarketTableInner: React.FC<MarketTableProps> = ({
               </Tbody>
             </Table>
           </TableScroller>
+          <p className="border-t border-rule px-6 py-3 text-micro text-ink-3 max-sm:hidden">
+            {sortedRows.length} repositories, ranked by the market's estimate.
+          </p>
         </>
       )}
     </Card>

@@ -44,7 +44,7 @@ export function AppHeader({ view, onNavigate, onOpenProfile, container }: AppHea
     // Opaque, not frosted: a persistent backdrop-filter re-composites the page beneath it on
     // every scroll and reflow.
     <header className="sticky top-0 z-30 border-b border-rule bg-paper text-ink">
-      <div className={cn(container, "flex h-16 items-center gap-2")}>
+      <div className={cn(container, "flex h-16 items-center gap-3 lg:gap-2")}>
         <button
           type="button"
           onClick={() => onNavigate("markets")}

@@ -1,5 +1,6 @@
 import { Button, Card } from "@/components/ui";
 import { TrashIcon, UploadIcon } from "@/components/ui/icons";
+import { cn } from "@/utils/cn";
 import type { ReactNode } from "react";
 
 interface ContestBarProps {
@@ -8,6 +9,11 @@ interface ContestBarProps {
   onClear?: () => void;
   /** Contest-specific trade actions, already gated by wallet readiness. */
   actions?: ReactNode;
+  /**
+   * A toolbar on the page between a contest's brief and its field, rather than a card of its own.
+   * It costs one line instead of a padded box, which keeps the field's first rows in view.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -20,13 +26,16 @@ export function ContestBar({
   onUpload,
   onClear,
   actions,
+  bare = false,
 }: ContestBarProps) {
   const hasPredictions = predictionCount > 0;
+  const layout = "flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between";
 
-  return (
-    <Card className="flex flex-col gap-4 !px-6 !py-4 lg:flex-row lg:items-center lg:justify-between">
+  const content = (
+    <>
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-body text-ink-3">
+        {/* Its own line on a phone, so the file actions after it stay together on one row. */}
+        <span className="text-body text-ink-3 max-sm:basis-full">
           {hasPredictions ? (
             <>
               <span className="font-bold text-ink">{predictionCount}</span>{" "}
@@ -54,6 +63,9 @@ export function ContestBar({
       {actions && (
         <div className="flex flex-wrap items-center gap-3 empty:hidden">{actions}</div>
       )}
-    </Card>
+    </>
   );
+
+  if (bare) return <div className={cn(layout, "border-y border-rule py-3")}>{content}</div>;
+  return <Card className={cn(layout, "!px-6 !py-4")}>{content}</Card>;
 }

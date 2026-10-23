@@ -7,6 +7,7 @@ import { EMPTY_PINS, defaultPins, pinSlot, togglePin, type Pins } from "@/utils/
 import { useTheme } from "@/stores/themeStore";
 import {
   createChart,
+  type AutoscaleInfoProvider,
   type DeepPartial,
   type ChartOptions,
   IChartApi,
@@ -14,6 +15,7 @@ import {
   LineData,
   LineSeries,
   LineStyle,
+  TickMarkType,
   UTCTimestamp,
 } from "lightweight-charts";
 import React, {
@@ -66,9 +68,44 @@ function chromeOptions(): DeepPartial<ChartOptions> {
       vertLine: { color: muted, labelBackgroundColor: token("--seer-text") },
       horzLine: { color: muted, labelBackgroundColor: token("--seer-text") },
     },
-    timeScale: { timeVisible: true, rightOffset: 12, borderColor: border },
+    timeScale: {
+      timeVisible: true,
+      rightOffset: 12,
+      borderColor: border,
+      tickMarkFormatter: formatTick,
+    },
   };
 }
+
+const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const month = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
+const clock = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
+
+/**
+ * Days carry their month ("Oct 2"), so a range inside one month still says which month it is.
+ * The chart's own default prints a bare day number and names the month only where one starts.
+ */
+function formatTick(time: unknown, type: TickMarkType): string {
+  const date = new Date((time as number) * 1000);
+  if (type === TickMarkType.Year) return String(date.getUTCFullYear());
+  if (type === TickMarkType.Month) return month.format(date);
+  if (type === TickMarkType.DayOfMonth) return monthDay.format(date);
+  return clock.format(date);
+}
+
+/** Every series here is a price between 0 and 1, so the scale never runs past either end. */
+const clampToUnit: AutoscaleInfoProvider = (original) => {
+  const info = original();
+  if (!info) return info;
+  if (!info.priceRange) return info;
+  return {
+    ...info,
+    priceRange: {
+      minValue: Math.max(0, info.priceRange.minValue),
+      maxValue: Math.min(1, info.priceRange.maxValue),
+    },
+  };
+};
 
 type Props = {
   /** Already resampled by the background job — see `ChartSeries`. Draw it, don't rebuild it. */
@@ -256,7 +293,7 @@ const MarketChart = React.memo(function MarketChart({
       width: container.clientWidth,
       height: container.clientHeight,
       ...chromeOptions(),
-      rightPriceScale: { borderVisible: false },
+      rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.08 } },
     });
 
     chartRef.current = chart;
@@ -270,11 +307,9 @@ const MarketChart = React.memo(function MarketChart({
         title: "",
         lastValueVisible: false,
         priceLineVisible: false,
-        priceFormat: {
-          type: "price",
-          precision: 4,
-          minMove: 0.0001, // should match precision
-        },
+        // The axis and the line-end labels read like the legend.
+        priceFormat: { type: "custom", formatter: formatValue, minMove: 0.0001 },
+        autoscaleInfoProvider: clampToUnit,
       });
 
       seriesRef.current.push(series);
@@ -319,7 +354,7 @@ const MarketChart = React.memo(function MarketChart({
       seriesRef.current = [];
       seriesTitles.current = [];
     };
-  }, [data, applyHighlightNow]);
+  }, [data, applyHighlightNow, formatValue]);
 
   // `data-theme` is already on <html> when this runs, so the tokens read are the new theme's.
   useEffect(() => {

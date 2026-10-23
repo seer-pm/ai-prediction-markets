@@ -89,20 +89,27 @@ export function ReadinessRail() {
   return (
     <>
       <Card flush>
-        <ol className="flex flex-col divide-y divide-rule sm:flex-row sm:divide-x sm:divide-y-0">
+        <ol className="flex flex-col sm:flex-row sm:divide-x sm:divide-rule">
           {STEPS.map((item, index) => {
             const state = index < activeIndex ? "done" : index === activeIndex ? "current" : "todo";
             return (
+              // A phone shows only the step to take now: the three side by side take a whole screen
+              // before the contest itself, and the counter says how many remain.
               <li
                 key={item.id}
                 className={cn(
                   "flex min-w-0 flex-1 items-start gap-3 px-6 py-5",
-                  state === "todo" && "opacity-55",
+                  state !== "current" && "max-sm:hidden",
                 )}
                 aria-current={state === "current" ? "step" : undefined}
               >
                 <Marker state={state} index={index} />
                 <div className="min-w-0 flex-1">
+                  {state === "current" && (
+                    <p className="mb-0.5 text-micro text-ink-3 sm:hidden">
+                      Step {index + 1} of {STEPS.length}
+                    </p>
+                  )}
                   <p
                     className={cn(
                       "text-body font-semibold",
