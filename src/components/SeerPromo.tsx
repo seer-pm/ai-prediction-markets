@@ -19,12 +19,13 @@ export function SeerPromo() {
       data-theme="dark"
       className="relative isolate flex flex-col gap-4 overflow-hidden rounded-lg bg-seer-ink px-6 py-6 sm:flex-row sm:items-center sm:justify-between"
     >
-      {/* Faded out toward the left, where the copy sits, so the lines never run behind text. */}
+      {/* Faded out where the copy sits. From sm the lines end short of the button and converge on
+          it, so they lead to the action without running behind it. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_right,transparent_45%,black_90%)]"
+        className="pointer-events-none absolute inset-0 -z-10 [mask-image:linear-gradient(to_right,transparent_45%,black_90%)] sm:[mask-image:linear-gradient(to_right,transparent_50%,black_72%)]"
       >
-        <BrandStreak className="absolute top-1/2 right-0 h-[220%] -translate-y-1/2 text-seer-purple-on-ink opacity-40" />
+        <BrandStreak className="absolute top-1/2 right-0 h-[220%] -translate-y-1/2 text-seer-purple-on-ink opacity-40 sm:right-52" />
       </div>
       <div>
         <p className="text-lede font-semibold text-seer-on-ink">Trading one market at a time?</p>

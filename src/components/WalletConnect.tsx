@@ -17,11 +17,9 @@ export const WalletConnect = () => {
       {isConnecting ? (
         "Connecting"
       ) : (
-        // One node, so the button's gap does not land inside the label. A phone's header holds
-        // the lockup, this and the menu, and nothing wider.
-        <span>
-          Connect<span className="max-sm:sr-only"> wallet</span>
-        </span>
+        // A phone's header holds the full lockup, this and the menu: there the button is its icon,
+        // with the label kept for screen readers, and the onboarding rail below it spells it out.
+        <span className="max-sm:sr-only">Connect wallet</span>
       )}
     </Button>
   );

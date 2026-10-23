@@ -49,7 +49,7 @@ export function AppHeader({ view, onNavigate, onOpenProfile, container }: AppHea
           type="button"
           onClick={() => onNavigate("markets")}
           aria-label="Seer Deep, markets"
-          className="mr-auto flex min-w-0 cursor-pointer items-center gap-3 rounded-control"
+          className="mr-auto flex shrink-0 cursor-pointer items-center gap-3 rounded-control"
         >
           <BrandLockup appName="Deep" />
           <span className="hidden text-label font-semibold tracking-wider text-ink-3 uppercase sm:inline">

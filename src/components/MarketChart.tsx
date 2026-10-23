@@ -70,12 +70,15 @@ function chromeOptions(): DeepPartial<ChartOptions> {
     },
     timeScale: {
       timeVisible: true,
-      rightOffset: 12,
+      rightOffset: RIGHT_OFFSET,
       borderColor: border,
       tickMarkFormatter: formatTick,
     },
   };
 }
+
+/** Bars of space after the last point, where the followed series' labels sit. */
+const RIGHT_OFFSET = 12;
 
 const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const month = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
@@ -293,7 +296,12 @@ const MarketChart = React.memo(function MarketChart({
       width: container.clientWidth,
       height: container.clientHeight,
       ...chromeOptions(),
-      rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.08 } },
+      // Whole labels only: a price cut at the pane's top edge reads as a different number.
+      rightPriceScale: {
+        borderVisible: false,
+        entireTextOnly: true,
+        scaleMargins: { top: 0.08, bottom: 0.08 },
+      },
     });
 
     chartRef.current = chart;
@@ -323,7 +331,11 @@ const MarketChart = React.memo(function MarketChart({
       series.setData(lineData);
     });
 
-    chart.timeScale().fitContent();
+    // The whole history, with half a bar of room before the first point so the first date label
+    // is not cut at the pane's edge. Set from the data rather than read back after `fitContent`,
+    // which applies on the next paint. Logical indices run over every distinct time in any series.
+    const bars = new Set(data.flatMap((series) => series.points.map(([time]) => time))).size;
+    chart.timeScale().setVisibleLogicalRange({ from: -0.6, to: bars - 1 + RIGHT_OFFSET });
     // Restore whatever the legend had selected before this rebuild.
     appliedHighlight.current = undefined;
     applyHighlightNow(hoveredRef.current);

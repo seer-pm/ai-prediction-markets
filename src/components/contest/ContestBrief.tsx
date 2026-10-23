@@ -39,29 +39,38 @@ export function ContestBrief({ question, answer, facts, live }: ContestBriefProp
         <p className="mt-4 max-w-[68ch] text-lede text-ink-2">{answer}</p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-rule pt-4 lg:grid-cols-1 lg:content-start lg:border-t-0 lg:border-l lg:pt-1 lg:pl-6">
-        {facts.map((fact) => (
-          <div key={fact.label} className={cn("min-w-0", fact.wide && "col-span-2 lg:col-span-1")}>
-            <dt className="text-micro text-ink-3">{fact.label}</dt>
-            <dd className="mt-0.5 text-body font-semibold text-ink">{fact.value}</dd>
+      {/* On a phone the facts run as one line of small text, so the field starts sooner; from sm they
+          are a grid, and beside the question from lg. */}
+      <dl className="border-t border-rule pt-3 text-micro text-ink-3 sm:grid sm:grid-cols-4 sm:gap-x-6 sm:gap-y-3 sm:pt-4 sm:text-body lg:grid-cols-1 lg:content-start lg:border-t-0 lg:border-l lg:pt-1 lg:pl-6">
+        {[...facts, { label: "Status", value: null as ReactNode }].map((fact, index) => (
+          <div
+            key={fact.label}
+            className={cn(
+              "inline sm:block sm:min-w-0",
+              fact.wide && "sm:col-span-2 lg:col-span-1",
+              index > 0 && "before:mx-1.5 before:content-['·'] sm:before:content-none",
+            )}
+          >
+            <dt className="inline sm:block sm:text-micro">{fact.label}</dt>{" "}
+            <dd className="inline font-semibold text-ink sm:mt-0.5 sm:flex sm:items-center sm:gap-2">
+              {fact.label === "Status" ? (
+                live ? (
+                  <>
+                    <StatusDot tone="long" pulse className="max-sm:hidden" />
+                    Trading
+                  </>
+                ) : (
+                  <>
+                    <StatusDot tone="muted" className="max-sm:hidden" />
+                    Ended, redeem only
+                  </>
+                )
+              ) : (
+                fact.value
+              )}
+            </dd>
           </div>
         ))}
-        <div className="min-w-0">
-          <dt className="text-micro text-ink-3">Status</dt>
-          <dd className="mt-0.5 flex items-center gap-2 text-body font-semibold text-ink">
-            {live ? (
-              <>
-                <StatusDot tone="long" pulse />
-                Trading
-              </>
-            ) : (
-              <>
-                <StatusDot tone="muted" />
-                Ended, redeem only
-              </>
-            )}
-          </dd>
-        </div>
       </dl>
     </section>
   );
