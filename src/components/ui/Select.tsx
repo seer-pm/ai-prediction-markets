@@ -226,7 +226,7 @@ export function MultiSelect({
               >
                 <span
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-[3px] border",
+                    "flex size-4 shrink-0 items-center justify-center rounded-sm border",
                     isChecked ? "border-primary bg-primary text-white" : "border-rule-strong",
                   )}
                 >

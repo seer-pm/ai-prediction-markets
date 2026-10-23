@@ -1,5 +1,5 @@
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useAccount, WagmiProvider } from "wagmi";
@@ -56,10 +56,16 @@ const AppContent: React.FC = () => {
    * intercepted, which turns an in-app view switch into a full page load; `pushState` keeps the
    * URL linkable without ever handing the click back to the browser.
    */
+  /** The page's scroll container (see index.css), which every view shares. */
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
   const goTo = (next: View) => {
     if (window.location.pathname !== PATHS[next]) {
       window.history.pushState(null, "", PATHS[next]);
     }
+    // A new page opens at its top. All views share one scroller, so without this the leaderboard
+    // would open at whatever depth the markets page was read to.
+    if (next !== view) scrollerRef.current?.scrollTo({ top: 0 });
     show(next);
   };
 
@@ -73,7 +79,7 @@ const AppContent: React.FC = () => {
   return (
     // The app scrolls here rather than on the document — see the note in
     // index.css. `mt-auto` on the footer still pins it when content is short.
-    <div className="flex h-dvh flex-col overflow-y-auto bg-paper">
+    <div ref={scrollerRef} className="flex h-dvh flex-col overflow-y-auto bg-paper">
       <AppHeader
         view={view}
         onNavigate={goTo}

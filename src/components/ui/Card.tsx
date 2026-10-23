@@ -25,13 +25,12 @@ export function Card({ children, className, flush = false }: CardProps) {
 
 interface CardHeaderProps {
   title: ReactNode;
-  eyebrow?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
 
-export function CardHeader({ title, eyebrow, description, actions, className }: CardHeaderProps) {
+export function CardHeader({ title, description, actions, className }: CardHeaderProps) {
   return (
     <div
       className={cn(
@@ -40,11 +39,6 @@ export function CardHeader({ title, eyebrow, description, actions, className }: 
       )}
     >
       <div className="min-w-0">
-        {eyebrow && (
-          <p className="mb-1 text-label font-semibold tracking-wider text-ink-3 uppercase">
-            {eyebrow}
-          </p>
-        )}
         <h2 className="text-title font-bold">{title}</h2>
         {description && <p className="mt-1 text-body text-ink-3">{description}</p>}
       </div>

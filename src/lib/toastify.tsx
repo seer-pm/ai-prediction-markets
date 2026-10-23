@@ -27,7 +27,8 @@ import {
   createWalletClient,
 } from "viem";
 import { optimism } from "viem/chains";
-import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
+import { Spinner } from "@/components/ui/Spinner";
+import { AlertIcon, CheckIcon } from "@/components/ui/icons";
 import { authorizeSessionKey, fundSessionKey } from "./on-chain/sessionKey";
 
 export const DEFAULT_TOAST_OPTIONS = {
@@ -105,8 +106,8 @@ interface ToastContentType {
 function toastContent(title: string, subtitle: string) {
   return (
     <div>
-      <div className="text-[16px] font-semibold">{title}</div>
-      {subtitle && <div className="text-[14px] font-normal">{subtitle}</div>}
+      <div className="text-body font-semibold text-ink">{title}</div>
+      {subtitle && <div className="mt-0.5 text-body text-ink-3">{subtitle}</div>}
     </div>
   );
 }
@@ -114,21 +115,21 @@ function toastContent(title: string, subtitle: string) {
 export function toastInfo({ title, subtitle = "", options }: ToastContentType) {
   toast.info(toastContent(title, subtitle), {
     ...{ ...DEFAULT_TOAST_OPTIONS, ...options },
-    icon: <LoadingIcon />,
+    icon: <Spinner size={18} label="In progress" />,
   });
 }
 
 export function toastSuccess({ title, subtitle = "", options }: ToastContentType) {
   toast.success(toastContent(title, subtitle), {
     ...{ ...DEFAULT_TOAST_OPTIONS, ...options },
-    icon: <CheckCircleIcon width={32} height={32} />,
+    icon: <CheckIcon width={18} height={18} />,
   });
 }
 
 export function toastError({ title, subtitle = "", options }: ToastContentType) {
   toast.error(toastContent(title, subtitle), {
     ...{ ...DEFAULT_TOAST_OPTIONS, ...options },
-    icon: <CloseCircleIcon />,
+    icon: <AlertIcon width={18} height={18} />,
   });
 }
 
@@ -144,7 +145,7 @@ export function createRunToast(title: string, subtitle = "") {
     ...DEFAULT_TOAST_OPTIONS,
     autoClose: false,
     closeOnClick: false,
-    icon: <LoadingIcon />,
+    icon: <Spinner size={18} label="In progress" />,
   });
 
   return {
@@ -155,7 +156,7 @@ export function createRunToast(title: string, subtitle = "") {
       toast.update(id, {
         render: toastContent(nextTitle, nextSubtitle),
         type: "success",
-        icon: <CheckCircleIcon width={16} height={16} />,
+        icon: <CheckIcon width={18} height={18} />,
         autoClose: 5000,
         closeOnClick: true,
       });
@@ -164,7 +165,7 @@ export function createRunToast(title: string, subtitle = "") {
       toast.update(id, {
         render: toastContent(nextTitle, nextSubtitle),
         type: "error",
-        icon: <CloseCircleIcon />,
+        icon: <AlertIcon width={18} height={18} />,
         autoClose: 8000,
         closeOnClick: true,
       });

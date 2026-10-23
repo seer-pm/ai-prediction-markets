@@ -44,7 +44,6 @@ describe("the corrected Round 3", () => {
   it("carries nothing that points at the incorrect set", () => {
     expect(ORIGINALITY_ROUND_3.incorrect).toBeUndefined();
     expect(JSON.stringify(ORIGINALITY_ROUND_3)).not.toMatch(/incorrect/i);
-    expect(ORIGINALITY_ROUND_3.eyebrow).toBe("Round 3 · Originality");
   });
 
   it("is where the withdraw page sends people back to", () => {

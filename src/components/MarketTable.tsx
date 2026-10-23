@@ -36,7 +36,6 @@ const MarketTableInner: React.FC<MarketTableProps> = ({ rows, isLoading, isLoadi
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Round 1 · Settled"
         title="Repository contribution to Ethereum"
         description="Final resolved weights. Any balances you still hold can be redeemed."
       />

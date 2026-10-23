@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "@/lib/icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import ReactPaginate from "react-paginate";
 
 const cell =
@@ -16,11 +16,11 @@ function MarketsPagination({
   return (
     <ReactPaginate
       breakLabel="…"
-      nextLabel={<ChevronRight fill="currentColor" />}
+      nextLabel={<ChevronRightIcon aria-label="Next page" />}
       onPageChange={handlePageClick}
       forcePage={page - 1}
       pageCount={pageCount}
-      previousLabel={<ChevronLeft fill="currentColor" />}
+      previousLabel={<ChevronLeftIcon aria-label="Previous page" />}
       renderOnZeroPageCount={null}
       className="flex items-center justify-center gap-1.5"
       activeClassName="!border-primary !bg-primary !text-white"

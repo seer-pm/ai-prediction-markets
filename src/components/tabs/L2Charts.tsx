@@ -64,7 +64,6 @@ export default function L2Charts({
       data={liveSeries(chart)}
       isLoading={isLoading || isLoadingChart}
       error={chartError}
-      eyebrow="Round 2 · L2"
       title="Dependency prices over time"
       description="One repository at a time — each has its own set of dependency markets."
       volume={volumeLabel}

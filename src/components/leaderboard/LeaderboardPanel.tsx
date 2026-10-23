@@ -140,8 +140,7 @@ export function LeaderboardPanel() {
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Leaderboard"
-        title={scopeLabel(scope)}
+        title={`Leaderboard · ${scopeLabel(scope)}`}
         description={
           scope === "global"
             ? `Every wallet across all deep markets, ranked by ${SORT_LABELS[sortBy]}. Profit is realised and marked-to-market, in USD.`

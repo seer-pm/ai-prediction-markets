@@ -68,7 +68,6 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Zcash · NU7"
         title="Predicted outcome prices"
         description="One row per outcome, grouped by ballot question. Your number sits beside the market's, and the difference is what a run would trade."
         actions={

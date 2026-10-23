@@ -237,8 +237,7 @@ export const ZcashMarkets = () => {
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
         error={chartsError}
-        eyebrow="Zcash · Q3 2026"
-        title="Approval odds over time"
+        title="Q3 2026 grant approval odds over time"
         description="Each line is one proposal's YES price — the market's estimate of its chance of being approved."
         volume={volumeLabel}
         liquidity={liquidityLabel}
