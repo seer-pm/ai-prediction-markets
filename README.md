@@ -1,69 +1,48 @@
-# React + TypeScript + Vite
+# Deep
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Contests of markets with many outcomes, priced together on Optimism: deep.seer.pm. Traders load a
+CSV of predictions, see it beside the market price, and execute one run from a trade wallet that
+trades every market where they disagree. What the product is for, and who it serves, is in
+[PRODUCT.md](PRODUCT.md).
 
-Currently, two official plugins are available:
+Vite + React 19 + Tailwind 4, deployed on Netlify with functions under `netlify/functions`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Develop
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app reads its data from the Netlify functions, so run `netlify dev` instead when you need them
+locally.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Environment (`.env`):
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Variable | Used by |
+| --- | --- |
+| `VITE_WC_PROJECT_ID` | Reown AppKit (wallet connect) |
+| `VITE_WEBSITE_URL` | Base URL for the app's own API calls; defaults to the production site |
+| `SUPABASE_PROJECT_URL`, `SUPABASE_API_KEY` | Functions: market data, chart series, profiles, predictions |
+
+The functions also read `PRIVATE_RPC_*`, `SEER_API_HOST` and `API_HOST` when set.
+
+## Check
+
+```bash
+npm test                     # vitest
+npm run lint
+npm run build                # codegen, tsc -b, vite build
+npm run typecheck:functions
 ```
+
+## Contests
+
+Every contest is one entry in `src/utils/contests.ts`; `src/components/Tab.tsx` maps it to its view.
+After adding or editing a contest, run `npm run sync:seer` so Seer's leaderboard registry picks it up
+(`--dry-run` shows the diff first).
+
+## Scripts
+
+`npm run export:l1-pnl`, `export:l2-pnl` and `rebuild:chart-series` are maintenance jobs in
+`scripts/`; each explains what it does at the top of its file.
