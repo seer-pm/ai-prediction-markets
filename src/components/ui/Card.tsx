@@ -8,7 +8,7 @@ interface CardProps {
   flush?: boolean;
 }
 
-/** A white surface lifted off the grey page — depth carries the hierarchy. */
+/** A surface on a hairline over the page. Elevation is kept for what floats (menus, dialogs). */
 export function Card({ children, className, flush = false }: CardProps) {
   return (
     <section
@@ -42,7 +42,7 @@ export function CardHeader({ title, as: Heading = "h2", description, actions, cl
     >
       <div className="min-w-0">
         {/* A step under a page heading on a phone, where the page heading is 32px. */}
-        <Heading className="text-xl font-bold sm:text-title">{title}</Heading>
+        <Heading className="text-subtitle font-bold sm:text-title">{title}</Heading>
         {description && <p className="mt-1 text-body text-ink-3">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
