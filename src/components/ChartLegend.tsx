@@ -1,25 +1,24 @@
 import { ScrollFade } from "@/components/ui/ScrollFade";
 import { SearchIcon } from "@/components/ui/icons";
 import { cn } from "@/utils/cn";
-import { readableTextColor } from "@/utils/color";
+import { MAX_PINS } from "@/utils/pins";
 import { useMemo, useState } from "react";
 
 export interface LegendEntry {
-  /** Index into the chart's series array — the toggle key. */
+  /** Index into the chart's series array, which the hover highlight keys on. */
   index: number;
   name: string;
-  color: string;
+  /** The colour slot (0 to 3) of a followed series, or null for one drawn as context. */
+  slot: number | null;
   /** Latest price for this outcome, or null if it never traded. */
   value: number | null;
 }
 
 interface ChartLegendProps {
   entries: LegendEntry[];
-  /** Indices currently drawn on the chart. */
-  visible: Set<number>;
   hovered: number | null;
-  onToggle: (index: number) => void;
-  onToggleAll: (nextVisible: boolean) => void;
+  onToggle: (name: string) => void;
+  onClear: () => void;
   onHover: (index: number | null) => void;
   formatValue: (value: number) => string;
 }
@@ -27,17 +26,16 @@ interface ChartLegendProps {
 /**
  * The series list, beside the chart rather than above it.
  *
- * These contests run 40+ outcomes at once, which a wrapped row of chips can't
- * hold. A bounded column with its own search gives every series a stable
- * position, sorted by current price so the leaders are always at the top, and
- * hovering one dims the rest so a single line can be picked out of the tangle.
+ * These contests run dozens of outcomes at once, more than any palette can tell apart, so every
+ * series is drawn as muted context and the reader follows up to four in colour. The list is sorted
+ * by current price so the leaders stay on top, searchable, and hovering a row lifts its line out of
+ * the field. Values stay in text colours; the swatch carries the series' identity.
  */
 export function ChartLegend({
   entries,
-  visible,
   hovered,
   onToggle,
-  onToggleAll,
+  onClear,
   onHover,
   formatValue,
 }: ChartLegendProps) {
@@ -60,68 +58,90 @@ export function ChartLegend({
     return sorted.filter((entry) => entry.name.toLowerCase().includes(needle));
   }, [sorted, query]);
 
-  const anyVisible = visible.size > 0;
+  const following = entries.filter((entry) => entry.slot !== null).length;
+  const full = following >= MAX_PINS;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden rounded-lg border border-rule bg-sunken p-3">
-      <div className="flex shrink-0 items-center gap-2 rounded-md border border-rule-strong bg-surface px-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-rule">
-        <SearchIcon className="shrink-0 text-ink-4" width={15} height={15} />
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <label className="seer-input-group shrink-0 min-h-10">
+        <SearchIcon className="shrink-0 text-ink-3" width={15} height={15} />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search outcomes"
           aria-label="Search outcomes"
-          className="w-full bg-transparent py-2 text-body text-ink outline-none placeholder:text-ink-4"
+          className="seer-input text-body"
         />
-      </div>
+      </label>
 
       <div className="min-h-0 flex-1 overflow-hidden" onMouseLeave={() => onHover(null)}>
         <ScrollFade className="h-full min-h-0">
-          <div className="grid grid-cols-2 gap-1 pr-0.5 sm:grid-cols-3 md:grid-cols-1">
+          <ul className="grid grid-cols-1 gap-px pr-0.5 sm:grid-cols-2 md:grid-cols-1">
             {filtered.length === 0 && (
-              <p className="px-1 py-1 text-body text-ink-4">No outcomes match.</p>
+              <li className="px-2 py-1.5 text-body text-ink-3">No outcomes match.</li>
             )}
 
             {filtered.map((entry) => {
-              const isVisible = visible.has(entry.index);
-              const isHovered = hovered === entry.index;
+              const followed = entry.slot !== null;
+              const blocked = full && !followed;
               const label = entry.value === null ? "—" : formatValue(entry.value);
 
               return (
-                <button
-                  key={entry.index}
-                  type="button"
-                  title={`${entry.name} · ${label}`}
-                  aria-pressed={isVisible}
-                  onClick={() => onToggle(entry.index)}
-                  onMouseEnter={() => onHover(entry.index)}
-                  onFocus={() => onHover(entry.index)}
-                  className={cn(
-                    "flex w-full min-w-0 cursor-pointer items-baseline gap-2 overflow-hidden rounded px-2 py-1.5 text-left transition-opacity",
-                    isVisible ? "opacity-100" : "opacity-35",
-                    isHovered && "ring-2 ring-ink ring-offset-1 ring-offset-sunken",
-                  )}
-                  style={{
-                    backgroundColor: entry.color,
-                    color: readableTextColor(entry.color),
-                  }}
-                >
-                  <span className="min-w-0 flex-1 truncate text-micro font-medium">{entry.name}</span>
-                  <span className="shrink-0 text-micro font-semibold tabular-nums">{label}</span>
-                </button>
+                <li key={entry.index}>
+                  <button
+                    type="button"
+                    title={blocked ? "Follow up to four at once" : entry.name}
+                    aria-pressed={followed}
+                    aria-disabled={blocked || undefined}
+                    onClick={() => !blocked && onToggle(entry.name)}
+                    onMouseEnter={() => onHover(entry.index)}
+                    onFocus={() => onHover(entry.index)}
+                    onBlur={() => onHover(null)}
+                    className={cn(
+                      "flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors",
+                      hovered === entry.index ? "bg-sunken" : "hover:bg-sunken",
+                      blocked && "cursor-not-allowed",
+                    )}
+                  >
+                    {/* A filled bar in the series colour when followed, a hairline ring when not. */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "h-2.5 w-2.5 shrink-0 rounded-full",
+                        !followed && "border border-rule-strong",
+                      )}
+                      style={followed ? { background: `var(--seer-series-${entry.slot! + 1})` } : undefined}
+                    />
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-data",
+                        followed ? "font-semibold text-ink" : "text-ink-2",
+                      )}
+                    >
+                      {entry.name}
+                    </span>
+                    <span className="shrink-0 text-data text-ink-3">{label}</span>
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </ScrollFade>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onToggleAll(!anyVisible)}
-        className="shrink-0 cursor-pointer text-left text-body font-medium text-primary-text transition-colors hover:text-primary-text-hover"
-      >
-        {anyVisible ? "Hide all" : "Show all"}
-      </button>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-rule pt-2">
+        <span className="text-micro text-ink-3">
+          Following {following} of {MAX_PINS}
+        </span>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={following === 0}
+          className="seer-button seer-button-ghost seer-button-sm text-primary-text"
+        >
+          Clear
+        </button>
+      </div>
     </div>
   );
 }

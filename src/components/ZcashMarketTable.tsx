@@ -75,8 +75,7 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Zcash · Q3 2026"
-        title="Predicted approval odds"
+        title="Grant approval odds, Q3 2026"
         description={
           <>
             One row per proposal on the Q3 grants ballot.{" "}
@@ -154,7 +153,7 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
                     </a>
                   </Td>
                   <Td>
-                    <OutcomeBar yes={market.yesPrice} no={market.noPrice} />
+                    <OutcomeBar first={market.yesPrice} second={market.noPrice} />
                   </Td>
                   <Td numeric>
                     {isLoadingBalances ? (

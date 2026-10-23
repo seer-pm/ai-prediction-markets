@@ -2,6 +2,7 @@ import { RefreshVolumeButton } from "@/components/contest/RefreshVolumeButton";
 import MarketChart from "@/components/MarketChart";
 import { Card, CardHeader, EmptyState, Skeleton } from "@/components/ui";
 import type { ChartSeries } from "@/types";
+import type { Pins } from "@/utils/pins";
 import type { ReactElement, ReactNode } from "react";
 
 interface ContestChartProps {
@@ -16,7 +17,6 @@ interface ContestChartProps {
    * from one still in flight — both have no data — and the card would skeleton forever.
    */
   error?: Error | null;
-  eyebrow?: string;
   title: string;
   description?: string;
   volume?: string | ReactElement;
@@ -35,6 +35,9 @@ interface ContestChartProps {
   actions?: ReactNode;
   /** How the legend reads each series' latest price. Weights by default. */
   formatValue?: (value: number) => string;
+  /** The series followed in colour, when the tab shares them with its table. See `MarketChart`. */
+  pins?: Pins;
+  onPinsChange?: (pins: Pins) => void;
 }
 
 /** Chart card with real loading and empty states, shared by every contest tab. */
@@ -42,7 +45,6 @@ export function ContestChart({
   data,
   isLoading,
   error,
-  eyebrow,
   title,
   description,
   volume,
@@ -50,6 +52,8 @@ export function ContestChart({
   refreshMarketIds,
   actions,
   formatValue,
+  pins,
+  onPinsChange,
 }: ContestChartProps) {
   const volumeWithRefresh =
     volume && refreshMarketIds?.length ? (
@@ -67,18 +71,19 @@ export function ContestChart({
         data={data}
         totalVolumeMarket={volumeWithRefresh}
         liquidity={liquidity}
-        eyebrow={eyebrow}
         title={title}
         description={description}
         actions={actions}
         formatValue={formatValue}
+        pins={pins}
+        onPinsChange={onPinsChange}
       />
     );
   }
 
   return (
     <Card flush>
-      <CardHeader eyebrow={eyebrow} title={title} description={description} actions={actions} />
+      <CardHeader title={title} description={description} actions={actions} />
       {error ? (
         <EmptyState title="The chart could not be loaded" description={error.message} />
       ) : /*
