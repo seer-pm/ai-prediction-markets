@@ -177,7 +177,7 @@ export function Td({ numeric, pinned, className, children, ...rest }: TdProps) {
     <td
       className={cn(
         "border-b border-rule px-3 py-4 whitespace-nowrap text-ink-2 sm:px-6",
-        numeric && "text-right font-mono",
+        numeric && "text-right",
         pinned &&
           "sticky left-0 z-[1] bg-surface transition-colors group-hover:bg-sunken after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-rule",
         className,

@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight } from "@/lib/icons";
 import ReactPaginate from "react-paginate";
 
 const cell =
-  "h-9 min-w-9 px-1 flex items-center justify-center rounded-md border border-rule-strong bg-surface text-body text-ink-2 cursor-pointer shadow-raised transition-colors hover:bg-sunken";
+  "h-9 min-w-9 px-1 flex items-center justify-center rounded-md border border-rule-strong bg-surface text-body text-ink-2 cursor-pointer transition-colors hover:bg-sunken";
 
 function MarketsPagination({
   pageCount,

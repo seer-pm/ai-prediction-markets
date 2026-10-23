@@ -183,7 +183,7 @@ export const ConvertInterface: React.FC<ConvertInterfaceProps> = ({
               amount && !isQuoting ? (
                 <>
                   You receive{" "}
-                  <span className="font-mono text-ink-2">
+                  <span className="text-ink-2">
                     {receive} {outputSymbol}
                   </span>{" "}
                   at current rates.

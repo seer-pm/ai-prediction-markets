@@ -29,7 +29,7 @@ export function ContestBar({
         <span className="text-body text-ink-3">
           {hasPredictions ? (
             <>
-              <span className="font-mono font-bold text-ink">{predictionCount}</span>{" "}
+              <span className="font-bold text-ink">{predictionCount}</span>{" "}
               {predictionCount === 1 ? "prediction" : "predictions"} loaded
             </>
           ) : (

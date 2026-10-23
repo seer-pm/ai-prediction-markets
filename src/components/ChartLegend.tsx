@@ -97,7 +97,7 @@ export function ChartLegend({
                   onMouseEnter={() => onHover(entry.index)}
                   onFocus={() => onHover(entry.index)}
                   className={cn(
-                    "flex w-full min-w-0 cursor-pointer items-baseline gap-2 overflow-hidden rounded px-2 py-1.5 text-left shadow-raised transition-opacity",
+                    "flex w-full min-w-0 cursor-pointer items-baseline gap-2 overflow-hidden rounded px-2 py-1.5 text-left transition-opacity",
                     isVisible ? "opacity-100" : "opacity-35",
                     isHovered && "ring-2 ring-ink ring-offset-1 ring-offset-sunken",
                   )}
@@ -107,7 +107,7 @@ export function ChartLegend({
                   }}
                 >
                   <span className="min-w-0 flex-1 truncate text-micro font-medium">{entry.name}</span>
-                  <span className="shrink-0 font-mono text-micro font-semibold tabular-nums">{label}</span>
+                  <span className="shrink-0 text-micro font-semibold tabular-nums">{label}</span>
                 </button>
               );
             })}
@@ -118,7 +118,7 @@ export function ChartLegend({
       <button
         type="button"
         onClick={() => onToggleAll(!anyVisible)}
-        className="shrink-0 cursor-pointer text-left text-body font-medium text-primary transition-colors hover:text-primary-hover"
+        className="shrink-0 cursor-pointer text-left text-body font-medium text-primary-text transition-colors hover:text-primary-text-hover"
       >
         {anyVisible ? "Hide all" : "Show all"}
       </button>

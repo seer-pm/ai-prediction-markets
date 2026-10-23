@@ -35,7 +35,7 @@ export function OutcomeBar({ yes, no, className }: OutcomeBarProps) {
 
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <span className="w-9 shrink-0 text-right font-mono text-body font-semibold text-long">
+      <span className="w-9 shrink-0 text-right text-body font-semibold text-long">
         {pct(yes)}
       </span>
       <span
@@ -49,7 +49,7 @@ export function OutcomeBar({ yes, no, className }: OutcomeBarProps) {
         />
         <span className="h-full flex-1 bg-short" />
       </span>
-      <span className="w-9 shrink-0 font-mono text-body font-semibold text-short">{pct(no)}</span>
+      <span className="w-9 shrink-0 text-body font-semibold text-short">{pct(no)}</span>
     </div>
   );
 }

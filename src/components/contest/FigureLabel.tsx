@@ -54,7 +54,7 @@ export function FigureLabel({ label, cash, tokens, unitPrice = 1, suffix }: Figu
   if (tokens === undefined) {
     return (
       <span>
-        {label} <span className="font-mono text-ink">{visible}</span>
+        {label} <span className="text-ink">{visible}</span>
         {suffix}
       </span>
     );
@@ -64,13 +64,13 @@ export function FigureLabel({ label, cash, tokens, unitPrice = 1, suffix }: Figu
     <Tooltip
       content={
         <div>
-          Notional volume: <span className="font-mono">{format(tokens)}</span>
+          Notional volume: <span>{format(tokens)}</span>
         </div>
       }
     >
       <span className="cursor-help">
         {label}{" "}
-        <span className="font-mono text-ink underline decoration-dotted decoration-ink-4 underline-offset-4">
+        <span className="text-ink underline decoration-dotted decoration-ink-4 underline-offset-4">
           {visible}
         </span>
         {suffix}

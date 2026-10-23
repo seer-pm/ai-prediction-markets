@@ -26,7 +26,7 @@ export function Switch({ checked, onCheckedChange, disabled, className, ...rest 
       <span
         aria-hidden
         className={cn(
-          "inline-block size-4 rounded-full bg-surface shadow-raised transition-transform",
+          "inline-block size-4 rounded-full bg-white transition-transform",
           checked ? "translate-x-[1.125rem]" : "translate-x-0.5",
         )}
       />

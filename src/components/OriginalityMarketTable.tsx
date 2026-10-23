@@ -76,7 +76,7 @@ const DifferenceHeader = ({
         )}
       />
     </button>
-    <Tooltip content={<span className="font-mono">{DIFFERENCE_HELP[side]}</span>}>
+    <Tooltip content={<span>{DIFFERENCE_HELP[side]}</span>}>
       <button
         type="button"
         aria-label={`How the ${side} difference is calculated`}

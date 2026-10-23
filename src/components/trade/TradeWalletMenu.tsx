@@ -42,13 +42,13 @@ export function TradeWalletMenu() {
   return (
     <>
       <Popover.Root>
-        <Popover.Trigger className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-rule-strong bg-surface pr-2.5 pl-2 text-body shadow-raised transition-colors hover:border-ink-4">
+        <Popover.Trigger className="flex h-10 cursor-pointer items-center gap-2 rounded-md border border-rule-strong bg-surface pr-2.5 pl-2 text-body transition-colors hover:border-ink-4">
           <Avatar address={account} src={profile?.avatarUrl} size={22} />
           {isCreated ? (
             isBalanceLoading ? (
               <Skeleton width={64} height={14} />
             ) : (
-              <span className="font-mono font-semibold text-ink">
+              <span className="font-semibold text-ink">
                 {formatTokenAmount(balance, collateral.decimals)}
                 <span className="ml-1 text-ink-3">{collateral.symbol}</span>
               </span>
@@ -96,7 +96,7 @@ export function TradeWalletMenu() {
                   href={explorer ? `${explorer}/address/${tradeExecutor}` : undefined}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-1 inline-flex items-center gap-1 font-mono text-body text-primary transition-colors hover:text-primary-hover"
+                  className="mt-1 inline-flex items-center gap-1 font-mono text-body text-primary-text transition-colors hover:text-primary-text-hover"
                 >
                   {formatAddress(tradeExecutor, 10, 8)}
                   <ExternalIcon width={12} height={12} />
@@ -114,7 +114,7 @@ export function TradeWalletMenu() {
                   {isBalanceLoading ? (
                     <Skeleton width={80} height={16} />
                   ) : (
-                    <span className="font-mono text-lede font-bold text-ink">
+                    <span className="text-lede font-bold text-ink">
                       {formatTokenAmount(balance, collateral.decimals)}
                     </span>
                   )}

@@ -24,13 +24,13 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-primary text-white border border-primary shadow-raised hover:bg-primary-hover hover:border-primary-hover",
+    "bg-primary text-white border border-primary hover:bg-primary-hover hover:border-primary-hover",
   secondary:
-    "bg-surface text-ink border border-rule-strong shadow-raised hover:bg-sunken hover:border-ink-4",
+    "bg-surface text-ink border border-rule-strong hover:bg-sunken hover:border-ink-4",
   ghost: "bg-transparent text-ink-2 border border-transparent hover:bg-sunken hover:text-ink",
-  danger: "bg-surface text-short border border-short-rule shadow-raised hover:bg-short-bg",
+  danger: "bg-surface text-short border border-short-rule hover:bg-short-bg",
   success:
-    "bg-long text-white border border-long shadow-raised hover:bg-long-hover hover:border-long-hover",
+    "bg-long text-paper border border-long hover:bg-long-hover hover:border-long-hover",
 };
 
 const SIZES: Record<Size, string> = {
@@ -79,7 +79,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       }}
       className={cn(
         "inline-flex cursor-pointer items-center justify-center rounded-md font-medium whitespace-nowrap transition-colors",
-        "disabled:shadow-none aria-disabled:shadow-none",
         "disabled:cursor-not-allowed disabled:opacity-45 aria-disabled:cursor-not-allowed aria-disabled:opacity-45",
         VARIANTS[variant],
         SIZES[size],

@@ -120,7 +120,7 @@ export const RedeemL2Interface: React.FC<RedeemL2InterfaceProps> = ({
               <p className="text-label font-semibold tracking-wider text-ink-3 uppercase">
                 You will receive
               </p>
-              <p className="mt-1 font-mono text-display font-semibold tabular-nums text-long">
+              <p className="mt-1 text-display font-semibold tabular-nums text-long">
                 {formatAmount(payout.amount)}{" "}
                 <span className="text-title">{payout.symbol ?? "sUSDS"}</span>
               </p>

@@ -40,7 +40,7 @@ export function AccountLabel({
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "truncate text-data text-ink transition-colors hover:text-primary",
+          "truncate text-data text-ink transition-colors hover:text-primary-text",
           // Hex needs the tabular face to stay scannable down a column; a name reads better set in
           // the body face.
           !label && "font-mono",

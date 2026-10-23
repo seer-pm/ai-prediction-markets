@@ -65,7 +65,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
               {balanceLoading ? (
                 <Skeleton className="ml-1 inline-block align-middle" width={60} height={13} />
               ) : (
-                <span className="font-mono text-ink-2">
+                <span className="text-ink-2">
                   {balance}
                   {unit ? ` ${unit}` : ""}
                 </span>
@@ -76,7 +76,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
                 type="button"
                 onClick={onMax}
                 disabled={disabled || balanceLoading}
-                className="cursor-pointer text-body font-semibold text-primary transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+                className="cursor-pointer text-body font-semibold text-primary-text transition-colors hover:text-primary-text-hover disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Max
               </button>
@@ -87,7 +87,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
     >
       <div
         className={cn(
-          "flex items-center rounded-md border bg-surface transition-colors",
+          "flex items-center rounded-lg border bg-surface transition-colors",
           error
             ? "border-short ring-2 ring-short-rule"
             : "border-rule-strong focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-rule",
@@ -103,7 +103,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
           disabled={disabled}
           aria-invalid={!!error}
           className={cn(
-            "min-w-0 flex-1 bg-transparent p-4 font-mono text-lede text-ink outline-none placeholder:font-sans placeholder:text-ink-4 disabled:cursor-not-allowed",
+            "min-w-0 flex-1 bg-transparent p-4 text-lede text-ink outline-none placeholder:text-ink-4 disabled:cursor-not-allowed",
             className,
           )}
           {...rest}
@@ -125,7 +125,7 @@ export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
       <input
         ref={ref}
         className={cn(
-          "w-full rounded-md border border-rule-strong bg-surface px-3 py-2.5 text-body text-ink transition-colors outline-none placeholder:text-ink-4 focus:border-primary focus:ring-2 focus:ring-primary-rule disabled:cursor-not-allowed disabled:bg-sunken",
+          "w-full rounded-lg border border-rule-strong bg-surface px-3 py-2.5 text-body text-ink transition-colors outline-none placeholder:text-ink-4 focus:border-primary focus:ring-2 focus:ring-primary-rule disabled:cursor-not-allowed disabled:bg-sunken",
           className,
         )}
         {...rest}

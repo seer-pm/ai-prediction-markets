@@ -58,7 +58,7 @@ export const DepositInterface: React.FC<DepositInterfaceProps> = ({
             <button
               type="button"
               onClick={() => setIsConvertOpen(true)}
-              className="cursor-pointer font-semibold text-primary underline underline-offset-2 hover:text-primary-hover"
+              className="cursor-pointer font-semibold text-primary-text underline underline-offset-2 hover:text-primary-text-hover"
             >
               Convert USDS or USDC
             </button>{" "}

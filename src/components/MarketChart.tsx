@@ -3,8 +3,11 @@ import { Card, CardHeader, EmptyState } from "@/components/ui";
 import { ChartSeries } from "@/types";
 import { withAlpha } from "@/utils/color";
 import { formatWeight } from "@/utils/format";
+import { useTheme } from "@/stores/themeStore";
 import {
   createChart,
+  type DeepPartial,
+  type ChartOptions,
   IChartApi,
   ISeriesApi,
   LineData,
@@ -45,8 +48,33 @@ const SERIES_COLORS = [
   "#BE123C",
 ];
 
-const AXIS_COLOR = "#6B7280";
-const GRID_COLOR = "#E5E7EB";
+/**
+ * The axis, grid and crosshair, read from the kit's tokens on `<html>` so the chart follows the
+ * theme. The canvas cannot use CSS variables itself, so these are re-read on every theme change.
+ */
+function chromeOptions(): DeepPartial<ChartOptions> {
+  const tokens = getComputedStyle(document.documentElement);
+  const token = (name: string) => tokens.getPropertyValue(name).trim();
+  const muted = token("--seer-muted");
+  const border = token("--seer-border");
+  return {
+    layout: {
+      background: { color: "transparent" },
+      textColor: muted,
+      fontFamily: token("--seer-font-sans"),
+      fontSize: 12,
+    },
+    grid: {
+      vertLines: { color: border, style: LineStyle.SparseDotted },
+      horzLines: { color: border, style: LineStyle.SparseDotted },
+    },
+    crosshair: {
+      vertLine: { color: muted, labelBackgroundColor: token("--seer-text") },
+      horzLine: { color: muted, labelBackgroundColor: token("--seer-text") },
+    },
+    timeScale: { timeVisible: true, rightOffset: 12, borderColor: border },
+  };
+}
 
 type Props = {
   /** Already resampled by the background job — see `ChartSeries`. Draw it, don't rebuild it. */
@@ -85,6 +113,7 @@ const MarketChart = React.memo(function MarketChart({
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const theme = useTheme();
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const seriesTitles = useRef<string[]>([]);
 
@@ -225,22 +254,7 @@ const MarketChart = React.memo(function MarketChart({
     const chart = createChart(container, {
       width: container.clientWidth,
       height: container.clientHeight,
-      layout: {
-        background: { color: "transparent" },
-        textColor: AXIS_COLOR,
-        fontFamily:
-          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
-        fontSize: 12,
-      },
-      grid: {
-        vertLines: { color: GRID_COLOR, style: LineStyle.SparseDotted },
-        horzLines: { color: GRID_COLOR, style: LineStyle.SparseDotted },
-      },
-      crosshair: {
-        vertLine: { color: "#9CA3AF", labelBackgroundColor: "#111827" },
-        horzLine: { color: "#9CA3AF", labelBackgroundColor: "#111827" },
-      },
-      timeScale: { timeVisible: true, rightOffset: 12, borderColor: GRID_COLOR },
+      ...chromeOptions(),
       rightPriceScale: { borderVisible: false },
     });
 
@@ -306,6 +320,11 @@ const MarketChart = React.memo(function MarketChart({
       seriesTitles.current = [];
     };
   }, [data, applyHighlightNow]);
+
+  // `data-theme` is already on <html> when this runs, so the tokens read are the new theme's.
+  useEffect(() => {
+    chartRef.current?.applyOptions(chromeOptions());
+  }, [theme]);
 
   return (
     <Card flush>

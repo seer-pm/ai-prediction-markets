@@ -281,7 +281,7 @@ export function StrategyDialog({
               <dt className="text-label font-semibold tracking-wider text-ink-3 uppercase">
                 {stat.label}
               </dt>
-              <dd className={cn("mt-1 font-mono text-title font-bold", TONES[stat.tone ?? "neutral"])}>
+              <dd className={cn("mt-1 text-title font-bold", TONES[stat.tone ?? "neutral"])}>
                 {stat.value}
               </dd>
             </div>
@@ -335,7 +335,7 @@ export function StrategyDialog({
                     <button
                       type="button"
                       onClick={() => setDepositOpen(true)}
-                      className="cursor-pointer font-semibold text-primary underline underline-offset-2 hover:text-primary-hover"
+                      className="cursor-pointer font-semibold text-primary-text underline underline-offset-2 hover:text-primary-text-hover"
                     >
                       Deposit more {collateral.symbol}
                     </button>

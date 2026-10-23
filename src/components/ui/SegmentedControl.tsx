@@ -43,9 +43,9 @@ export function SegmentedControl({
             aria-selected={active}
             onClick={() => onChange(segment.id)}
             className={cn(
-              "cursor-pointer rounded-[3px] font-medium transition-colors",
+              "cursor-pointer rounded-sm font-medium transition-colors",
               size === "sm" ? "px-3 py-1.5 text-body" : "px-4 py-2 text-body",
-              active ? "bg-surface text-primary shadow-raised" : "text-ink-3 hover:text-ink",
+              active ? "bg-primary-bg text-primary-text" : "text-ink-3 hover:text-ink",
             )}
           >
             {segment.label}

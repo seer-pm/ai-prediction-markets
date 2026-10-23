@@ -13,7 +13,7 @@ export function Card({ children, className, flush = false }: CardProps) {
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-lg bg-surface shadow-card",
+        "overflow-hidden rounded-lg border border-rule bg-surface",
         !flush && "p-6",
         className,
       )}

@@ -84,7 +84,7 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
               href={ZCASH_FORUM_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-semibold text-primary transition-colors hover:text-primary-hover"
+              className="inline-flex items-center gap-1.5 font-semibold text-primary-text transition-colors hover:text-primary-text-hover"
             >
               Review thread
               <ExternalIcon width={13} height={13} />
@@ -140,7 +140,7 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
                       href={getSeerMarketUrl(market.marketId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group/link inline-flex max-w-[220px] items-center gap-1.5 text-ink transition-colors hover:text-primary sm:max-w-sm"
+                      className="group/link inline-flex max-w-[220px] items-center gap-1.5 text-ink transition-colors hover:text-primary-text sm:max-w-sm"
                       title={
                         market.applicant ? `${market.project} — ${market.applicant}` : market.project
                       }
@@ -149,7 +149,7 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
                       <ExternalIcon
                         width={13}
                         height={13}
-                        className="shrink-0 text-ink-4 transition-colors group-hover/link:text-primary"
+                        className="shrink-0 text-ink-4 transition-colors group-hover/link:text-primary-text"
                       />
                     </a>
                   </Td>

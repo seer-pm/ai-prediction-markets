@@ -32,7 +32,7 @@ function Marker({ state, index }: { state: "done" | "current" | "todo"; index: n
       aria-hidden
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-full border text-micro font-bold leading-none",
-        state === "done" && "border-long bg-long text-white",
+        state === "done" && "border-long bg-long text-paper",
         state === "current" && "border-primary bg-primary text-white",
         state === "todo" && "border-rule-strong bg-surface text-ink-4",
       )}
