@@ -35,7 +35,6 @@ import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
-import { WithdrawOutcomeTokensInterface } from "../trade/WithdrawOutcomeTokensInterface";
 
 const ORIGINALITY_CSV_FORMAT: CSVFormatInfo = {
   headers: "repo,originality",
@@ -66,7 +65,6 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
   const { finished } = useContest();
   const { account, tradeExecutor, canTrade, isCreated, isUseOldWallet } = useTradeWalletStatus();
 
-  const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
   const [isSellAllDialogOpen, setIsSellAllDialogOpen] = useState(false);
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
@@ -156,11 +154,6 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
   const { data: balances, isLoading: isLoadingSellBalances } = useTokensBalances(
     tradeExecutor as Address,
     collateralTokens,
-  );
-
-  const withdrawTokens = useMemo(
-    () => originalityMarketData?.markets?.map((market) => market.wrappedTokens)?.flat(),
-    [originalityMarketData?.markets],
   );
 
   const chartData = useMemo(() => {
@@ -373,8 +366,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
   );
 
   // An incorrect set is only for getting out of: the two ways out and nothing else. No chart, no
-  // predictions, no table — and no Withdraw tokens, which would move outcome tokens to the owner
-  // wallet, out of reach of the Withdraw and Redeem buttons that act on the trade wallet.
+  // predictions, no table.
   if (round.incorrect) {
     const isReadingPositions = isLoading || isLoadingBalances || isLoadingSellBalances;
     const status = !account
@@ -426,13 +418,6 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           <>
             {canTrade && (
               <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
-                >
-                  Withdraw tokens
-                </Button>
                 {/* Trading stops with the contest; claiming what you already hold does not. */}
                 {!finished && sellAllButton}
                 {redeemButton}
@@ -482,17 +467,8 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           markets={tableData}
           isLoadingBalances={isLoadingBalances}
           parentMarketId={round.parentMarketId}
+          parentInvalidToken={round.parentInvalidToken}
           middleMarkets={round.middleMarkets}
-        />
-      )}
-
-      {account && tradeExecutor && (
-        <WithdrawOutcomeTokensInterface
-          open={isWithdrawTokensDialogOpen}
-          onOpenChange={setIsWithdrawTokensDialogOpen}
-          account={account}
-          tradeExecutor={tradeExecutor}
-          tokens={withdrawTokens}
         />
       )}
 

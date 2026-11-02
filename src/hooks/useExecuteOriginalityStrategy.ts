@@ -1,10 +1,12 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
-import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
+import { toastifyBatchTxSessionKey, toastSuccess, UNWIND_MIN_PERMISSION_SECONDS } from "@/lib/toastify";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
-import { CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps, TxStateChange } from "@/types";
+import { BatchTxError, CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps, TxStateChange } from "@/types";
+import { TradeError } from "@/utils/errors";
+import { getUnwindMintCalls } from "./useExecuteL2Strategy";
 import { CHAIN_ID, COLLATERAL_TOKENS, DECIMALS, ROUTER_ADDRESSES, VOLUME_MIN } from "@/utils/constants";
 import { safeParseUnits } from "@/utils/format";
 import { getQuoteTradeCalls } from "@/utils/trade";
@@ -155,6 +157,7 @@ const executeOriginalityStrategy = async ({
   tableData,
   tradeExecutor,
   parentMarketId,
+  parentInvalidToken,
   middleMarkets,
   onStateChange,
 }: OriginalityTradeProps & { onStateChange: TxStateChange }) => {
@@ -274,6 +277,70 @@ const executeOriginalityStrategy = async ({
     quoteResults: tradeableQuoteResults,
     tradeExecutor,
   });
+  const router = ROUTER_ADDRESSES[CHAIN_ID];
+
+  // Merges the run's complete sets back to sUSDS when it stops after minting, so a failed run never
+  // leaves the user's sUSDS as tokens they did not ask for. Middle markets first: merging one yields
+  // the bundle token the parent merge then needs. Amounts come from live balances, so whatever the
+  // trades did not spend is what comes back. Tried twice; if both fail, the error says where the
+  // money is and which button returns it.
+  const abortAfterMint = async (reason: string, tradesRan: boolean): Promise<Error> => {
+    const parentOutcomeTokens = middleMarkets?.length
+      ? middleMarkets.map((middle) => middle.collateralToken)
+      : [...new Map(tableData.map((x) => [x.collateralToken.toLowerCase(), x.collateralToken])).values()];
+    const levels = [
+      ...(middleMarkets ?? []).map((middle) => ({
+        marketId: middle.marketId,
+        tokens: [...middle.wrappedTokens],
+        producesToken: middle.collateralToken,
+      })),
+      { marketId: parentMarketId, tokens: [...parentOutcomeTokens, parentInvalidToken] },
+    ];
+
+    let mergedBack = false;
+    for (let attempt = 0; attempt < 2 && !mergedBack; attempt++) {
+      try {
+        onStateChange({ phase: "unwind", label: "Returning your minted tokens to sUSDS" });
+        const unwindInput = await getUnwindMintCalls(tradeExecutor, router, levels);
+        if (!unwindInput.length) {
+          // The mint landed, so with no trades there must be sets to merge: an empty read is a
+          // lagging node, not an empty wallet. After trades, empty can be real — they spent it.
+          if (tradesRan) {
+            mergedBack = true;
+          } else {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+          continue;
+        }
+        const unwindResult = await toastifyBatchTxSessionKey(
+          tradeExecutor,
+          unwindInput,
+          onStateChange,
+          15_000_000n,
+          { minPermissionSeconds: UNWIND_MIN_PERMISSION_SECONDS },
+        );
+        mergedBack = unwindResult.status;
+      } catch (e) {
+        console.log("Cannot unwind mint ", e);
+      }
+    }
+    await withdrawFundSessionKey();
+
+    const traded = tradesRan ? "Some trades may have gone through. " : "No trades were made. ";
+    if (mergedBack) {
+      return new TradeError(
+        `${reason} ${traded}Your sUSDS was not lost: everything minted for this run and not traded was merged back to sUSDS in your trade wallet.`,
+      );
+    }
+    return new TradeError(
+      `${reason} ${traded}Your ${amount} sUSDS is safe in your trade wallet, held as this contest's tokens.`,
+      'Use "Sell all positions" to merge them back to sUSDS.',
+    );
+  };
+
+  const reasonOf = (error: BatchTxError) =>
+    `The run stopped: ${error?.shortMessage ?? error?.message ?? "unknown error"}.`;
+
   const input: CallBatchesInput = [];
   if (didMint) {
     input.push({
@@ -309,10 +376,25 @@ const executeOriginalityStrategy = async ({
       skipFailCalls: true,
     });
   }
+  // One submission for mint and trades, so the session key is funded once — a second funding is a
+  // second wallet prompt. The mint batches lead and are all-or-nothing, so `completedBatches` says
+  // whether any of the mint landed.
+  const mintBatches = didMint ? 1 + (middleMarkets?.length ?? 0) : 0;
+  const tradeCalls = tradeExecutorCalls.length;
   const result = await toastifyBatchTxSessionKey(tradeExecutor, input, onStateChange, 15_000_000n);
   if (!result.status) {
+    if (result.completedBatches > 0 && didMint) {
+      throw await abortAfterMint(reasonOf(result.error), result.completedBatches > mintBatches);
+    }
     await withdrawFundSessionKey();
     throw result.error;
+  }
+  // Every trade pruned in simulation: the run "succeeded" having only minted.
+  if (didMint && tradeCalls > 0 && result.executedCalls <= mintBatches * 2) {
+    throw await abortAfterMint(
+      "None of the trades could be executed: every one failed its check, usually because prices moved since the quote.",
+      false,
+    );
   }
 
   onStateChange({ phase: "settle", label: "Returning unused gas" });
@@ -325,11 +407,11 @@ export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
     mutationKey: TRADE_RUN_MUTATION_KEY,
-    mutationFn: (tradeProps: OriginalityTradeProps) =>
+    mutationFn: withRunLock((tradeProps: OriginalityTradeProps) =>
       executeOriginalityStrategy({
         ...tradeProps,
         onStateChange: progress.onStateChange,
-      }),
+      })),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

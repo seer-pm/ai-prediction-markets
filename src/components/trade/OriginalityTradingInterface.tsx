@@ -16,6 +16,8 @@ interface TradingInterfaceProps {
   isLoadingBalances: boolean;
   /** The parent market the sUSDS is split on. */
   parentMarketId: Address;
+  /** The parent's Invalid outcome token, for undoing a mint when a run stops part-way. */
+  parentInvalidToken: Address;
   /** Markets the mint is split on after the parent — see `OriginalityRound.middleMarkets`. */
   middleMarkets?: readonly OriginalityMiddleMarket[];
 }
@@ -27,6 +29,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   markets,
   isLoadingBalances,
   parentMarketId,
+  parentInvalidToken,
   middleMarkets,
 }) => {
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
@@ -90,6 +93,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
           tableData: markets,
           tradeExecutor,
           parentMarketId,
+          parentInvalidToken,
           middleMarkets,
         })
       }

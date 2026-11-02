@@ -12,8 +12,9 @@ import {
 } from "@wagmi/core";
 import { Address, createWalletClient } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { handleTx } from "../toastify";
+import { handleTx, nextNonce, noteNonce, noteSentBlock, waitForSentBlock } from "../toastify";
 import { CHAIN_ID } from "@/utils/constants";
+import { TradeError } from "@/utils/errors";
 import { optimism } from "viem/chains";
 
 type SessionKeyData = {
@@ -144,6 +145,8 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: TxStateChan
     SessionKeyManager.clear();
     throw new Error("Failed to fund session key");
   }
+  // A node that has not seen the top-up refuses the next batch as unfunded.
+  noteSentBlock(result.receipt);
 
   return sessionAccount!;
 };
@@ -151,6 +154,8 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: TxStateChan
 export const withdrawFundSessionKey = async () => {
   try {
     const sessionAccount = getSessionAccount(() => {});
+    // Swept from a balance that predates the last batch, the transfer asks for more than is left.
+    await waitForSentBlock();
     const data = await getBalance(config, {
       address: sessionAccount.address,
     });
@@ -163,12 +168,17 @@ export const withdrawFundSessionKey = async () => {
         chain: optimism,
         transport: OPTIMISM_TRANSPORT,
       });
-      await handleTx(() =>
+      // On the batches' nonce sequence: a nonce read from a lagging node could otherwise be the
+      // one a still-pending batch holds.
+      const nonce = await nextNonce(sessionAccount.address);
+      const result = await handleTx(() =>
         sessionWallet.sendTransaction({
           to: getAccount(config).address,
           value: balance - sendTxGasCost,
+          nonce,
         }),
       );
+      if (result.status) noteNonce(sessionAccount.address, nonce);
     }
   } catch (e) {
     console.log("Cannot refund session key ", e);
@@ -178,6 +188,8 @@ export const withdrawFundSessionKey = async () => {
 export const authorizeSessionKey = async (
   tradeExecutor: Address,
   onStateChange: TxStateChange,
+  // How long the permission must still run to be reused; see `toastifyBatchTxSessionKey`.
+  minPermissionSeconds = 60 * 30,
 ) => {
   const sessionAccount = getSessionAccount(onStateChange);
   // Set session key in contract
@@ -193,8 +205,8 @@ export const authorizeSessionKey = async (
       functionName: "expire",
     }),
   ]);
-  // make sure the permission is at least 30 minutes from now
-  const atLeastFromNow = Number(currentExpiry) > Math.floor(new Date().getTime() / 1000) + 60 * 30;
+  const atLeastFromNow =
+    Number(currentExpiry) > Math.floor(new Date().getTime() / 1000) + minPermissionSeconds;
   const isPermitted =
     isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) && atLeastFromNow;
   if (!isPermitted) {
@@ -215,7 +227,37 @@ export const authorizeSessionKey = async (
     if (!result.status) {
       throw new Error("Failed to authorize session key");
     }
+    // The first batch is simulated as the session key; it must run on a node that has seen this.
+    noteSentBlock(result.receipt);
   }
 
   return sessionAccount;
 };
+
+const RUN_LOCK = "trade-executor-session-key-run";
+
+/**
+ * Wraps a run so it holds the one lock every session-key run takes, across every tab of the app.
+ *
+ * The session key lives in localStorage, so every tab signs with the same key and funds and sweeps
+ * the same balance. Two runs at once share a nonce sequence each tab tracks on its own, and one
+ * run's closing sweep drains the gas the other is still spending — either can stop the other
+ * half-way, minted and not traded. Web Locks are held per origin and released when the holding tab
+ * closes or crashes, so the lock cannot outlive its run. A second run is refused, not queued:
+ * queued, it would execute quotes taken before the first one moved the pools.
+ */
+export const withRunLock =
+  <Args extends unknown[], T>(run: (...args: Args) => Promise<T>) =>
+  (...args: Args): Promise<T> => {
+    // No Web Locks (an old browser, or an insecure origin): unguarded, as before.
+    if (typeof navigator === "undefined" || !navigator.locks) return run(...args);
+    return navigator.locks.request(RUN_LOCK, { ifAvailable: true }, (lock) => {
+      if (!lock) {
+        throw new TradeError(
+          "Another trade is already running in this browser, in this tab or another one.",
+          "Wait for it to finish, then try again.",
+        );
+      }
+      return run(...args);
+    });
+  };

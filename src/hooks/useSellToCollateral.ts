@@ -1,6 +1,6 @@
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
-import { toastifyBatchTxSessionKey } from "@/lib/toastify";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
+import { toastifyBatchTxSessionKey, waitForSentBlock } from "@/lib/toastify";
 import { getSellAllQuotes } from "@/lib/trade/getQuote";
 import { CallBatchesInput, OriginalityTableData, TxStateChange } from "@/types";
 import { minBigIntArray } from "@/utils/common";
@@ -9,7 +9,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { mergeFromRouter } from "./useExecuteL2Strategy";
-import { fetchTokensBalances, fetchTokensBalancesOrThrow } from "./useTokensBalances";
+import { fetchTokensBalancesOrThrow } from "./useTokensBalances";
+import { TradeError } from "@/utils/errors";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { CompleteSetMerge, planCompleteSetMerges } from "@/utils/completeSets";
 import { OriginalityMiddleMarket } from "@/utils/originalityRounds";
@@ -50,6 +51,23 @@ export function completeSetMergeBatches(merges: CompleteSetMerge[], message: str
   return input;
 }
 
+/**
+ * Balances for the merges after the sells. The plain read returns [] on an RPC error, which merges
+ * 0 and reports success with the position still in tokens; this stops instead, and says how to
+ * finish — a second Sell all picks up exactly the sets this one left.
+ */
+async function readForMerge(tradeExecutor: Address, tokens: Address[]) {
+  try {
+    return await fetchTokensBalancesOrThrow(tradeExecutor, tokens);
+  } catch {
+    await withdrawFundSessionKey();
+    throw new TradeError(
+      "Your positions were sold, but the last step — merging them back to sUSDS — could not read your balances.",
+      "Nothing is lost. Run \"Sell all positions\" again to finish the merge.",
+    );
+  }
+}
+
 async function sellToCollateral({
   tradeExecutor,
   tableData,
@@ -65,6 +83,7 @@ async function sellToCollateral({
   //
   // No progress event for this read: it runs before the session key is authorised. A failed
   // read must stop the run — read as empty, every pair would be sold instead of merged.
+  await waitForSentBlock();
   const heldBalances = await fetchTokensBalancesOrThrow(
     tradeExecutor,
     tableData.flatMap((row) => row.wrappedTokens),
@@ -121,6 +140,9 @@ async function sellToCollateral({
     throw sellResult.error;
   }
   onStateChange({ phase: "merge", label: "Reading collateral balances" });
+  // The merges below are sized from balances the sells just changed; read on a lagging node they
+  // come back short and part of the position is left unmerged.
+  await waitForSentBlock();
   // With a middle level the sells came back as repo tokens. Merge each middle market first — a
   // complete set of its outcome tokens, Invalid included — to get the parent's outcome tokens
   // back; the parent merge below then reads balances that include what these produced.
@@ -128,7 +150,7 @@ async function sellToCollateral({
     const middleInput: CallBatchesInput = [];
     for (const [index, middle] of middleMarkets.entries()) {
       const tokens = [...middle.wrappedTokens];
-      const amount = minBigIntArray(await fetchTokensBalances(tradeExecutor, tokens));
+      const amount = minBigIntArray(await readForMerge(tradeExecutor, tokens));
       if (amount <= 0n) continue;
       middleInput.push({
         // One market per batch: a merge unwraps every outcome token, ~34 of them here.
@@ -155,9 +177,13 @@ async function sellToCollateral({
   const parentOutcomeTokens = middleMarkets?.length
     ? middleMarkets.map((middle) => middle.collateralToken)
     : [...new Map(tableData.map((x) => [x.collateralToken.toLowerCase(), x.collateralToken])).values()];
+  await waitForSentBlock();
   // The Invalid leg is never traded, so it only holds what was minted; once every outcome token has
   // grown past that through profitable sells, merging the outcome-token minimum would revert.
-  const balances = await fetchTokensBalances(tradeExecutor, [...parentOutcomeTokens, parentInvalidToken]);
+  const balances = await readForMerge(tradeExecutor, [
+    ...parentOutcomeTokens,
+    parentInvalidToken,
+  ]);
 
   const mergeAmount = minBigIntArray(balances);
   if (mergeAmount > 0n) {
@@ -192,7 +218,7 @@ export const useSellToCollateral = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
     mutationKey: TRADE_RUN_MUTATION_KEY,
-    mutationFn: (props: SellAllProps) => sellToCollateral({ ...props, onStateChange: progress.onStateChange }),
+    mutationFn: withRunLock((props: SellAllProps) => sellToCollateral({ ...props, onStateChange: progress.onStateChange })),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });

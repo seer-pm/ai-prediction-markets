@@ -63,9 +63,6 @@ vi.mock("../GenericCSVUpload", () => ({ GenericCSVUpload: () => null }));
 vi.mock("@/components/trade/OriginalityTradingInterface", () => ({
   OriginalityTradingInterface: () => null,
 }));
-vi.mock("../trade/WithdrawOutcomeTokensInterface", () => ({
-  WithdrawOutcomeTokensInterface: () => null,
-}));
 vi.mock("../trade/RedeemL2Interface", () => ({ RedeemL2Interface: () => null }));
 vi.mock("../trade/SellAllTokensInterface", () => ({
   SellAllTokensInterface: ({
@@ -215,7 +212,6 @@ describe("the corrected Round 3 tab", () => {
     expect(screen.getByText("the table")).toBeTruthy();
     expect(buttons()).toEqual([
       "Upload predictions",
-      "Withdraw tokens",
       "Sell all positions",
       "Start trading",
     ]);

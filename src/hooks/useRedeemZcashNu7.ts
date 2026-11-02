@@ -4,6 +4,7 @@ import { Address } from "viem";
 import { redeemFlatMarkets, type FlatMarketToRedeem } from "./redeemFlatMarkets";
 import { REDEEMABLE_SCAN_KEY } from "./useRedeemableScan";
 import { useTxProgress } from "./useTxProgress";
+import { withRunLock } from "@/lib/on-chain/sessionKey";
 
 interface RedeemZcashNu7Props {
   tradeExecutor: Address;
@@ -21,8 +22,8 @@ interface RedeemZcashNu7Props {
 export const useRedeemZcashNu7 = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
-    mutationFn: (props: RedeemZcashNu7Props) =>
-      redeemFlatMarkets({ ...props, label: "Zcash NU7", onStateChange: progress.onStateChange }),
+    mutationFn: withRunLock((props: RedeemZcashNu7Props) =>
+      redeemFlatMarkets({ ...props, label: "Zcash NU7", onStateChange: progress.onStateChange })),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });

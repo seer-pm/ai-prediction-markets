@@ -1,5 +1,5 @@
 import { queryClient } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { CallBatchesInput, TxStateChange } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS, L1_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
@@ -135,8 +135,8 @@ async function redeemL1({
 export const useRedeemL1 = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
-    mutationFn: (props: RedeemL1Props) =>
-      redeemL1({ ...props, onStateChange: progress.onStateChange }),
+    mutationFn: withRunLock((props: RedeemL1Props) =>
+      redeemL1({ ...props, onStateChange: progress.onStateChange })),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
