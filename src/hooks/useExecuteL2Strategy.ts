@@ -1,7 +1,7 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { RouterAbi } from "@/abis/RouterAbi";
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
-import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
+import { toastifyBatchTxSessionKey, toastSuccess, waitForSentBlock, UNWIND_MIN_PERMISSION_SECONDS } from "@/lib/toastify";
 import { CallBatchesInput, L2TradeProps, TxStateChange } from "@/types";
 import { isTwoStringsEqual, minBigIntArray } from "@/utils/common";
 import { fetchTokensBalances } from "./useTokensBalances";
@@ -16,7 +16,7 @@ import { useTxProgress } from "./useTxProgress";
 import { Address, encodeFunctionData, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { getL2BuyQuotes } from "@/lib/trade/getQuote";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
 import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
 
@@ -96,6 +96,10 @@ export async function getUnwindMintCalls(
   const input: CallBatchesInput = [];
   // Tokens an earlier level will mint that aren't in the wallet yet.
   const credited: { [token: string]: bigint } = {};
+
+  // An unwind follows a failure by seconds; read on a lagging node, the mint looks absent and
+  // nothing is merged.
+  await waitForSentBlock();
 
   for (let i = 0; i < levels.length; i++) {
     const { marketId, tokens, producesToken } = levels[i];
@@ -356,6 +360,7 @@ const executeL2StrategyContract = async ({
         unwindInput,
         onStateChange,
         18_000_000n,
+        { minPermissionSeconds: UNWIND_MIN_PERMISSION_SECONDS },
       );
       if (unwindResult.status) {
         unwindNote = `your ${amount} ${collateral.symbol} was merged back`;
@@ -433,11 +438,11 @@ export const useExecuteL2Strategy = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
     mutationKey: TRADE_RUN_MUTATION_KEY,
-    mutationFn: (tradeProps: L2TradeProps) =>
+    mutationFn: withRunLock((tradeProps: L2TradeProps) =>
       executeL2StrategyContract({
         ...tradeProps,
         onStateChange: progress.onStateChange,
-      }),
+      })),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

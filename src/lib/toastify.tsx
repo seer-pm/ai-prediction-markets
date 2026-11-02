@@ -9,7 +9,9 @@ import {
   ConnectorNotConnectedError,
   SendCallsReturnType,
   estimateFeesPerGas,
+  getBlockNumber,
   getCallsStatus,
+  getTransactionCount,
   getTransactionReceipt,
   sendCalls,
   simulateContract,
@@ -25,6 +27,8 @@ import {
   TransactionReceiptNotFoundError,
   WaitForTransactionReceiptTimeoutError,
   createWalletClient,
+  encodeFunctionData,
+  keccak256,
 } from "viem";
 import { optimism } from "viem/chains";
 import { CheckCircleIcon, CloseCircleIcon, LoadingIcon } from "./icons";
@@ -480,17 +484,125 @@ async function buildExecutableBatch(
   return { good, bad };
 }
 
+/**
+ * The highest block holding a batch this tab sent. Simulations must see at least this state.
+ *
+ * The RPC is load-balanced, so the node answering the next simulation can be a block or two behind
+ * the one that returned the receipt. Simulated there, a batch that spends what the previous batch
+ * produced reverts — a run's middle-market split was refused this way two seconds after its parent
+ * mint had landed (2026-11-01), stranding the mint as tokens.
+ */
+let lastSentBlock = 0n;
+
+export const noteSentBlock = (receipt: TransactionReceipt | undefined) => {
+  if (receipt && receipt.blockNumber > lastSentBlock) {
+    lastSentBlock = receipt.blockNumber;
+  }
+};
+
+/**
+ * The block to simulate at: the latest, but never before `lastSentBlock`. Pinned rather than left
+ * as "latest" so a lagging node fails the call outright instead of answering from stale state.
+ */
+const simulationBlock = async () => {
+  const latest = await getBlockNumber(wagmiConfig, { chainId: CHAIN_ID, cacheTime: 0 });
+  return latest > lastSentBlock ? latest : lastSentBlock;
+};
+
+/**
+ * Waits until the RPC reports `lastSentBlock`, so balance reads that follow a batch see its effect.
+ * Best effort: a load-balanced RPC can still route the next read to a node further behind.
+ */
+export const waitForSentBlock = async (maxAttempts = 10) => {
+  for (let i = 0; i < maxAttempts; i++) {
+    const latest = await getBlockNumber(wagmiConfig, { chainId: CHAIN_ID, cacheTime: 0 });
+    if (latest >= lastSentBlock) return;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+};
+
+const SIMULATE_ATTEMPTS = 3;
+
+/**
+ * A whole-batch simulation, retried before it is believed. A failure here is either a real revert
+ * or a node that has not caught up; telling them apart from the error text is unreliable across
+ * providers, and the cost of retrying a real revert is a few seconds.
+ */
+async function simulateWithRetry<T>(simulate: (blockNumber: bigint) => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < SIMULATE_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+    try {
+      return await simulate(await simulationBlock());
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * An unwind runs right after a failure and needs only a few transactions. Asking for a fresh
+ * permission there is a wallet prompt the user is likely to reject, leaving the mint stranded.
+ */
+export const UNWIND_MIN_PERMISSION_SECONDS = 5 * 60;
+
 const SEND_ATTEMPTS = 3;
-const INSUFFICIENT_GAS_FUNDS =
-  "The total cost (gas * gas fee + value) of executing this transaction exceeds the balance of the account.";
+// Providers word this differently; the old exact-string match missed every one but drpc's.
+const INSUFFICIENT_GAS_FUNDS = /insufficient funds|exceeds the balance of the account/i;
+// The node already holds this exact transaction, or its nonce is spent — by it, if we sent it before.
+const ALREADY_SENT = /already known|known transaction|nonce too low|nonce has already been used/i;
+const NONCE_TOO_LOW = /nonce too low|nonce has already been used/i;
+
+const errorText = (err: unknown) => {
+  const e = err as { shortMessage?: string; message?: string; details?: string } | undefined;
+  return `${e?.shortMessage ?? ""} ${e?.message ?? ""} ${e?.details ?? ""}`;
+};
+
+/**
+ * The next nonce per session key that this tab has handed out. A lagging node can report a pending
+ * count that does not include our last batch yet; signing with that count would reuse its nonce.
+ */
+const usedNonces = new Map<string, number>();
+
+export const nextNonce = async (address: Address) => {
+  const pending = await getTransactionCount(wagmiConfig, {
+    address,
+    blockTag: "pending",
+    chainId: CHAIN_ID,
+  });
+  const afterLast = (usedNonces.get(address.toLowerCase()) ?? -1) + 1;
+  return pending > afterLast ? pending : afterLast;
+};
+
+export const noteNonce = (address: Address, nonce: number) => {
+  const key = address.toLowerCase();
+  if (nonce > (usedNonces.get(key) ?? -1)) usedNonces.set(key, nonce);
+};
 
 export const toastifyBatchTxSessionKey = async (
   tradeExecutor: Address,
   input: CallBatchesInput,
   onStateChange: TxStateChange,
   gasPerBatch = 10_000_000n,
+  {
+    minPermissionSeconds,
+  }: {
+    /**
+     * How long the session key's permission must still run for it to be reused without a new
+     * signature. Defaults to 30 minutes for a fresh run; an unwind after a failure only needs its
+     * own few transactions, and a wallet prompt there is one the user may well reject.
+     */
+    minPermissionSeconds?: number;
+  } = {},
 ): Promise<BatchTxResult> => {
-  const sessionAccount = await authorizeSessionKey(tradeExecutor, onStateChange);
+  const sessionAccount = await authorizeSessionKey(
+    tradeExecutor,
+    onStateChange,
+    minPermissionSeconds,
+  );
 
   // Same transport the simulations run through — a batch that simulates on drpc must not be
   // broadcast to a different, rate-limited endpoint.
@@ -500,8 +612,19 @@ export const toastifyBatchTxSessionKey = async (
     transport: OPTIMISM_TRANSPORT,
   });
 
-  const { maxFeePerGas } = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
-  const maxGasCost = gasPerBatch * BigInt(input.length) * maxFeePerGas;
+  // Every batch is signed with the full 2^24 gas limit, and a node accepts it only if the key can
+  // pay that limit at the signed fee cap — not what it will actually use. Funding per batch below
+  // that (it used to be 10–15M) made the first send of a small run fail and prompt a top-up. The
+  // cap is fixed for the run with headroom, so the funding and every signature agree; what is not
+  // spent is swept back by `withdrawFundSessionKey`.
+  const fees = await estimateFeesPerGas(wagmiConfig, { chainId: CHAIN_ID });
+  const maxFeePerGas = (fees.maxFeePerGas * 3n) / 2n;
+  const maxPriorityFeePerGas =
+    fees.maxPriorityFeePerGas < maxFeePerGas ? fees.maxPriorityFeePerGas : maxFeePerGas;
+  // No batch can use more than the cap, so `n` caps cover the spend of the first n−1 batches plus
+  // the reservation of the last.
+  const perBatch = gasPerBatch > OPTIMISM_MAX_TX_GAS ? gasPerBatch : OPTIMISM_MAX_TX_GAS;
+  const maxGasCost = perBatch * BigInt(input.length) * maxFeePerGas;
 
   await fundSessionKey(maxGasCost, onStateChange);
 
@@ -509,8 +632,10 @@ export const toastifyBatchTxSessionKey = async (
 
   const buildBatchArgs = (calls: Execution[]) => calls.map(({ to, data }) => ({ to, data }));
 
-  const simulateBatchExecute = async (calls: Execution[]) => {
-    const { request } = await simulateContract(wagmiConfig, {
+  // A yes/no on the calls only. The send signs its own transaction, so nothing from the simulation
+  // (its pinned block included) ever reaches the chain.
+  const simulateBatchExecute = async (calls: Execution[], blockNumber: bigint) => {
+    await simulateContract(wagmiConfig, {
       address: tradeExecutor,
       abi: TradeExecutorAbi,
       functionName: "batchExecute",
@@ -518,36 +643,43 @@ export const toastifyBatchTxSessionKey = async (
       account: sessionAccount,
       chainId: CHAIN_ID,
       gas: OPTIMISM_MAX_TX_GAS,
+      blockNumber,
     });
-
-    return request;
+    return calls;
   };
 
   // Returns null when there is nothing executable left in the batch. Callers must not broadcast
   // in that case — simulating an empty call array would "succeed" and burn gas on a no-op tx that
   // reports success while having done nothing.
-  type SimulatedRequest = Awaited<ReturnType<typeof simulateBatchExecute>>;
-
   const executeBatch = async (
     calls: Execution[],
     skipFailCalls?: boolean,
-  ): Promise<{ request: SimulatedRequest; executed: number; pruned: number } | null> => {
+  ): Promise<{ calls: Execution[]; executed: number; pruned: number } | null> => {
     try {
-      return { request: await simulateBatchExecute(calls), executed: calls.length, pruned: 0 };
+      return {
+        calls: await simulateWithRetry((block) => simulateBatchExecute(calls, block)),
+        executed: calls.length,
+        pruned: 0,
+      };
     } catch (err: any) {
       if (!skipFailCalls) {
         console.log("not skip calls ", calls.length, err.message);
         throw err;
       }
 
-      const { good } = await buildExecutableBatch(calls, simulateBatchExecute);
+      // The retry above already gave a lagging node time to catch up, so pruning runs against one
+      // block, fetched once — not a node round trip per call.
+      const block = await simulationBlock();
+      const { good } = await buildExecutableBatch(calls, (goodCalls) =>
+        simulateBatchExecute(goodCalls, block),
+      );
       console.log("keep good calls ", good.length, "of", calls.length);
       if (!good.length) {
         return null;
       }
       try {
         return {
-          request: await simulateBatchExecute(good),
+          calls: await simulateBatchExecute(good, block),
           executed: good.length,
           pruned: calls.length - good.length,
         };
@@ -558,10 +690,41 @@ export const toastifyBatchTxSessionKey = async (
     }
   };
 
+  const signBatch = async (calls: Execution[], nonce: number) => {
+    const serializedTransaction = await sessionWallet.signTransaction(
+      await sessionWallet.prepareTransactionRequest({
+        to: tradeExecutor,
+        data: encodeFunctionData({
+          abi: TradeExecutorAbi,
+          functionName: "batchExecute",
+          args: [buildBatchArgs(calls)],
+        }),
+        value: 0n,
+        gas: OPTIMISM_MAX_TX_GAS,
+        nonce,
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+      }),
+    );
+    return { serializedTransaction, hash: keccak256(serializedTransaction) };
+  };
+
   // A batch that simulated fine but failed to broadcast is a transport problem, not a bad call.
   // Retry it before giving up — and never swallow the failure, regardless of skipFailCalls.
-  const sendBatch = async (request: SimulatedRequest, progress: TxProgress) => {
+  //
+  // The batch is signed once and every attempt resends those exact bytes: one nonce, one hash. A
+  // send that errors after the node took it (a timeout, a fallback node answering "already known")
+  // used to be re-signed with a fresh nonce, and if the first copy was pending that was nonce+1 —
+  // the same trades executed twice. Now a retry can only ever land the one transaction, and the
+  // hash is known from the start, so a lost answer is waited out by hash instead of guessed at.
+  const sendBatch = async (calls: Execution[], progress: TxProgress) => {
+    let nonce = await nextNonce(sessionAccount.address);
+    let signed = await signBatch(calls, nonce);
+    // True once these bytes may have reached a node; until then a "nonce too low" can only mean the
+    // nonce we read was stale, and re-signing with a fresh one cannot duplicate anything.
+    let mayHaveSent = false;
     let lastError: unknown;
+
     for (let attempt = 0; attempt < SEND_ATTEMPTS; attempt++) {
       if (attempt > 0) {
         onStateChange({
@@ -569,20 +732,50 @@ export const toastifyBatchTxSessionKey = async (
           label: `${progress.label} — retrying (${attempt}/${SEND_ATTEMPTS - 1})`,
         });
       }
-      const result = await handleTx(() => sessionWallet.writeContract(request));
+      const result = await handleTx(async () => {
+        try {
+          await sessionWallet.sendRawTransaction({
+            serializedTransaction: signed.serializedTransaction,
+          });
+        } catch (err) {
+          const text = errorText(err);
+          if (!ALREADY_SENT.test(text) || (!mayHaveSent && NONCE_TOO_LOW.test(text))) {
+            throw err;
+          }
+        } finally {
+          mayHaveSent = true;
+        }
+        noteNonce(sessionAccount.address, nonce);
+        return signed.hash;
+      });
       if (result.status) {
         return result.receipt;
       }
       lastError = result.error;
 
-      // The batch was broadcast but we couldn't confirm it. Resending would run the same calls a
-      // second time, so stop here and let the caller surface it.
-      if (result.hash) {
+      // Mined and reverted: final. Resending these bytes would only be refused as nonce too low.
+      if (result.error instanceof TradeError) {
         break;
       }
 
-      if (result.error?.message?.includes(INSUFFICIENT_GAS_FUNDS)) {
-        await fundSessionKey(50_000_000n * maxFeePerGas, onStateChange);
+      const text = errorText(result.error);
+      // Refused before it was ever accepted, with a nonce some other transaction holds — this
+      // tab's earlier sweep, or a count read from a lagging node. Nothing of ours carries that
+      // nonce, so a fresh one cannot run the batch twice.
+      if (!result.hash && NONCE_TOO_LOW.test(text) && attempt === 0) {
+        mayHaveSent = false;
+        nonce = Math.max(nonce + 1, await nextNonce(sessionAccount.address));
+        signed = await signBatch(calls, nonce);
+        continue;
+      }
+      if (INSUFFICIENT_GAS_FUNDS.test(text)) {
+        // The run was funded for every batch at its cap, so this is first taken to be a node that
+        // has not seen the top-up — resent, not refunded, because a refund is a wallet prompt. Only
+        // a second refusal funds again. The same signed bytes stay valid either way.
+        await waitForSentBlock();
+        if (attempt > 0) {
+          await fundSessionKey(maxGasCost * 2n, onStateChange);
+        }
         onStateChange(progress);
         continue;
       }
@@ -596,9 +789,11 @@ export const toastifyBatchTxSessionKey = async (
   let executedCalls = 0;
   let prunedCalls = 0;
   let skippedBatches = 0;
+  let completedBatches = 0;
 
   try {
     for (let i = 0; i < input.length; i++) {
+      completedBatches = i;
       const { calls, message, skipFailCalls, phase, step, of } = input[i];
       const progress: TxProgress = {
         phase: phase ?? "work",
@@ -623,12 +818,13 @@ export const toastifyBatchTxSessionKey = async (
         continue;
       }
 
-      lastReceipt = await sendBatch(batch.request, progress);
+      lastReceipt = await sendBatch(batch.calls, progress);
+      noteSentBlock(lastReceipt);
       executedCalls += batch.executed;
       prunedCalls += batch.pruned;
     }
   } catch (error: any) {
-    return { status: false, error };
+    return { status: false, error, completedBatches };
   }
   return { status: true, receipt: lastReceipt, executedCalls, prunedCalls, skippedBatches };
 };
@@ -646,12 +842,14 @@ export const toastifyBatchTxOwner = async (
   let executedCalls = 0;
   let prunedCalls = 0;
   let skippedBatches = 0;
+  let completedBatches = 0;
 
   const buildBatchArgs = (calls: CallBatchesInput[number]["calls"]) =>
     calls.map(({ to, data }) => ({ to, data }));
 
   try {
     for (let i = 0; i < input.length; i++) {
+      completedBatches = i;
       const { calls, message, skipFailCalls, phase, step, of } = input[i];
 
       // Nothing to do — don't pay for an empty batchExecute([]).
@@ -666,29 +864,27 @@ export const toastifyBatchTxOwner = async (
         of,
       });
 
-      let executableCalls = calls;
-      try {
-        await simulateContract(wagmiConfig, {
+      const simulate = (simCalls: CallBatchesInput[number]["calls"], blockNumber: bigint) =>
+        simulateContract(wagmiConfig, {
           address: tradeExecutor,
           abi: TradeExecutorAbi,
           functionName: "batchExecute",
-          args: [buildBatchArgs(calls)],
+          args: [buildBatchArgs(simCalls)],
           chainId: CHAIN_ID,
           gas: OPTIMISM_MAX_TX_GAS,
+          blockNumber,
         });
+
+      let executableCalls = calls;
+      try {
+        await simulateWithRetry((block) => simulate(calls, block));
       } catch (err) {
         if (!skipFailCalls) {
           throw err;
         }
+        const block = await simulationBlock();
         const { good } = await buildExecutableBatch(calls as Execution[], (goodCalls) =>
-          simulateContract(wagmiConfig, {
-            address: tradeExecutor,
-            abi: TradeExecutorAbi,
-            functionName: "batchExecute",
-            args: [buildBatchArgs(goodCalls)],
-            chainId: CHAIN_ID,
-            gas: OPTIMISM_MAX_TX_GAS,
-          }),
+          simulate(goodCalls, block),
         );
         executableCalls = good;
       }
@@ -722,11 +918,12 @@ export const toastifyBatchTxOwner = async (
       }
 
       lastReceipt = result.receipt;
+      noteSentBlock(lastReceipt);
       executedCalls += executableCalls.length;
       prunedCalls += calls.length - executableCalls.length;
     }
   } catch (error: any) {
-    return { status: false, error };
+    return { status: false, error, completedBatches };
   }
   return { status: true, receipt: lastReceipt, executedCalls, prunedCalls, skippedBatches };
 };

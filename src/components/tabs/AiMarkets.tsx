@@ -1,22 +1,16 @@
 import { MarketTable } from "@/components/MarketTable";
 import { RedeemInterface } from "@/components/trade/RedeemInterface";
-import { WithdrawOutcomeTokensInterface } from "@/components/trade/WithdrawOutcomeTokensInterface";
 import { Button, Card, ErrorPanel } from "@/components/ui";
 import { useAiRedeemable } from "@/hooks/useAiRedeemable";
-import { useMarketsData } from "@/hooks/useMarketsData";
 import { useProcessPredictions } from "@/hooks/useProcessPredictions";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
-import { startTransition, useMemo, useState } from "react";
+import { startTransition, useState } from "react";
 
 export const AiMarkets = () => {
   const { data: tableData, isLoading, isLoadingBalances, error } = useProcessPredictions([]);
   const { account, tradeExecutor, isCreated } = useTradeWalletStatus();
 
-  const [isWithdrawTokensDialogOpen, setIsWithdrawTokensDialogOpen] = useState(false);
   const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
-
-  const { data: marketsData } = useMarketsData();
-  const withdrawTokens = useMemo(() => marketsData?.wrappedTokens, [marketsData?.wrappedTokens]);
 
   const { isRedeemable, availability: redeemState } = useAiRedeemable(tradeExecutor);
 
@@ -32,21 +26,14 @@ export const AiMarkets = () => {
               nothing and before the round had even resolved. */}
           <p className="px-1 text-data text-ink-3">
             {redeemState === "some"
-              ? "This contest has settled — you can claim payouts or move the tokens out."
+              ? "This contest has settled — you can claim your payouts."
               : redeemState === "none"
                 ? isRedeemable
-                  ? "This contest has settled. You hold nothing left to claim here, but any tokens can still be moved out."
-                  : "This contest is still resolving. Payouts open once it settles; tokens can be moved out now."
-                : "Tokens from this contest can be moved out at any time."}
+                  ? "This contest has settled. You hold nothing left to claim here."
+                  : "This contest is still resolving. Payouts open once it settles."
+                : "Checking whether you have payouts to claim…"}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => startTransition(() => setIsWithdrawTokensDialogOpen(true))}
-            >
-              Withdraw tokens
-            </Button>
             {redeemState === "some" && (
               <Button
                 size="sm"
@@ -68,13 +55,6 @@ export const AiMarkets = () => {
 
       {account && tradeExecutor && (
         <>
-          <WithdrawOutcomeTokensInterface
-            open={isWithdrawTokensDialogOpen}
-            onOpenChange={setIsWithdrawTokensDialogOpen}
-            account={account}
-            tradeExecutor={tradeExecutor}
-            tokens={withdrawTokens}
-          />
           <RedeemInterface
             open={isRedeemDialogOpen}
             onOpenChange={setIsRedeemDialogOpen}

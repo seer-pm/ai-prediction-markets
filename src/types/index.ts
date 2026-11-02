@@ -214,11 +214,17 @@ export interface OriginalityTradeProps {
   tableData: OriginalityTableData[];
   /** The parent market the sUSDS is split on — round 2's or round 3's. */
   parentMarketId: Address;
+  /** The parent's Invalid outcome token — the last leg of the merge that undoes a mint. */
+  parentInvalidToken: Address;
   /**
    * Markets between the parent and the repo markets. A mint is split on each of them in turn, so
    * the parent's outcome tokens become the repo tokens the rows actually spend.
    */
-  middleMarkets?: readonly { marketId: Address; collateralToken: Address }[];
+  middleMarkets?: readonly {
+    marketId: Address;
+    collateralToken: Address;
+    wrappedTokens: readonly Address[];
+  }[];
 }
 
 export interface L2TradeProps {
@@ -300,7 +306,15 @@ export type BatchTxResult =
       prunedCalls: number;
       skippedBatches: number;
     }
-  | { status: false; error: BatchTxError };
+  | {
+      status: false;
+      error: BatchTxError;
+      /**
+       * Batches that landed before the failure. A run that mints in its first batches and trades
+       * in later ones needs this to tell "nothing happened" from "the mint landed, then it stopped".
+       */
+      completedBatches: number;
+    };
 
 export type PoolHourData = {
   token0Price: string;

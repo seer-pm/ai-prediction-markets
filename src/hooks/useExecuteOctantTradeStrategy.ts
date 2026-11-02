@@ -1,6 +1,6 @@
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
-import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
+import { toastifyBatchTxSessionKey, toastSuccess, UNWIND_MIN_PERMISSION_SECONDS } from "@/lib/toastify";
 import { getOctantBuyQuotes } from "@/lib/trade/getQuote";
 import { CallBatchesInput, TableData, TxStateChange, UniswapQuoteTradeResult } from "@/types";
 import {
@@ -126,6 +126,7 @@ const executeTradeStrategyContract = async ({
         unwindInput,
         onStateChange,
         30_000_000n,
+        { minPermissionSeconds: UNWIND_MIN_PERMISSION_SECONDS },
       );
       if (unwindResult.status) {
         unwindNote = `your ${amount} ${collateral.symbol} was merged back`;
@@ -214,11 +215,11 @@ export const useExecuteOctantTradeStrategy = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
     mutationKey: TRADE_RUN_MUTATION_KEY,
-    mutationFn: (tradeProps: OctantTradeProps) =>
+    mutationFn: withRunLock((tradeProps: OctantTradeProps) =>
       executeTradeStrategyContract({
         ...tradeProps,
         onStateChange: progress.onStateChange,
-      }),
+      })),
     onSuccess() {
       onSuccess?.();
       setTimeout(() => {

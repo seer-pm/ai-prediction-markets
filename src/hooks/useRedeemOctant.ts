@@ -1,5 +1,5 @@
 import { queryClient } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { CallBatchesInput, TxStateChange } from "@/types";
 import { CHAIN_ID, COLLATERAL_TOKENS, OCTANT_MARKET_ID, ROUTER_ADDRESSES } from "@/utils/constants";
@@ -82,7 +82,7 @@ async function redeemOctant({
 export const useRedeemOctant = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
-    mutationFn: (props: RedeemOctantProps) => redeemOctant({ ...props, onStateChange: progress.onStateChange }),
+    mutationFn: withRunLock((props: RedeemOctantProps) => redeemOctant({ ...props, onStateChange: progress.onStateChange })),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });

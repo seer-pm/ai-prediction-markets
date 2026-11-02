@@ -1,5 +1,5 @@
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getSellFromBalanceZcashQuotes, getZcashQuotes } from "@/lib/trade/getZcashQuote";
 import { allocateZcashBudget } from "@/utils/zcashBudget";
@@ -180,11 +180,11 @@ export const useExecuteZcashStrategy = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
     mutationKey: TRADE_RUN_MUTATION_KEY,
-    mutationFn: (tradeProps: ZcashTradeProps) =>
+    mutationFn: withRunLock((tradeProps: ZcashTradeProps) =>
       executeZcashStrategy({
         ...tradeProps,
         onStateChange: progress.onStateChange,
-      }),
+      })),
     onSuccess() {
       onSuccess?.();
       refreshAfterRun();

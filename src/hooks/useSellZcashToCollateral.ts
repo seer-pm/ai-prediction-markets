@@ -1,5 +1,5 @@
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
-import { withdrawFundSessionKey } from "@/lib/on-chain/sessionKey";
+import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey } from "@/lib/toastify";
 import { getSellAllZcashQuotes } from "@/lib/trade/getZcashQuote";
 import { CallBatchesInput, TxStateChange, ZcashTableData } from "@/types";
@@ -87,8 +87,8 @@ export const useSellZcashToCollateral = (onSuccess?: () => unknown) => {
   const progress = useTxProgress();
   const mutation = useMutation({
     mutationKey: TRADE_RUN_MUTATION_KEY,
-    mutationFn: (props: SellAllProps) =>
-      sellToCollateral({ ...props, onStateChange: progress.onStateChange }),
+    mutationFn: withRunLock((props: SellAllProps) =>
+      sellToCollateral({ ...props, onStateChange: progress.onStateChange })),
     onSuccess() {
       onSuccess?.();
       queryClient.refetchQueries({ queryKey: ["useTokenBalance"] });
