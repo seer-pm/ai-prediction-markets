@@ -12,6 +12,8 @@ const state = vi.hoisted(() => ({
   isLoading: false,
   marketData: {} as Record<string, unknown>,
   balances: [] as bigint[],
+  // Per-token balances, for reads whose answer depends on which tokens are asked about.
+  balanceOf: undefined as ((token: string) => bigint) | undefined,
   chartIds: [] as Array<string[] | undefined>,
   sellAll: vi.fn(),
 }));
@@ -39,8 +41,8 @@ vi.mock("@/hooks/useOriginalityMarketsData", () => ({
   useOriginalityMarketsData: () => ({ data: state.marketData }),
 }));
 vi.mock("@/hooks/useTokensBalances", () => ({
-  useTokensBalances: (_account: unknown, tokens: unknown[] | undefined) => ({
-    data: tokens?.length ? state.balances : [],
+  useTokensBalances: (_account: unknown, tokens: string[] | undefined) => ({
+    data: !tokens?.length ? [] : state.balanceOf ? tokens.map(state.balanceOf) : state.balances,
     isLoading: false,
   }),
 }));
@@ -116,6 +118,7 @@ beforeEach(() => {
   state.isLoading = false;
   state.marketData = { markets: [], parentWrappedTokens: [], parentMarketStatus: "open" };
   state.balances = [];
+  state.balanceOf = undefined;
   state.chartIds = [];
   state.sellAll.mockReset();
 });
@@ -236,5 +239,54 @@ describe("the corrected Round 3 tab", () => {
   it("asks for its chart history", () => {
     render(<OriginalityR3Markets />);
     expect(state.chartIds.at(-1)).toEqual(["0xmarket"]);
+  });
+});
+
+// A run that stopped after its mint: no UP or DOWN anywhere, the sUSDS held as a complete set of the
+// parent's bundle tokens and Invalid (2026-11-01, 50 of each). Sell all ends with the merge that
+// returns it, and while the parent is open it is the only way back.
+describe("the corrected Round 3 tab, holding only complete sets", () => {
+  const SET = 50n * 10n ** 18n;
+  const bundles = ORIGINALITY_ROUND_3.middleMarkets!.map((middle) => middle.collateralToken);
+  const lower = (tokens: readonly string[]) => tokens.map((token) => token.toLowerCase());
+  const holding = (tokens: readonly string[], amount = SET) => {
+    const held = new Set(lower(tokens));
+    state.balanceOf = (token) => (held.has(token.toLowerCase()) ? amount : 0n);
+  };
+  const sellAllButton = () => screen.getByRole("button", { name: "Sell all positions" });
+
+  beforeEach(() => {
+    state.rows = [{ ...HELD_ROW, upBalance: 0n, downBalance: 0n }];
+  });
+
+  it("enables Sell all over a complete bundle set, and runs it", () => {
+    holding([...bundles, ORIGINALITY_ROUND_3.parentInvalidToken]);
+    render(<OriginalityR3Markets />);
+
+    expect(sellAllButton().getAttribute("aria-disabled")).not.toBe("true");
+    fireEvent.click(sellAllButton());
+    fireEvent.click(screen.getByRole("button", { name: "confirm sell all" }));
+    expect(state.sellAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps it disabled when the set is short its Invalid leg — the merge would revert", () => {
+    holding(bundles);
+    render(<OriginalityR3Markets />);
+
+    expect(sellAllButton().getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("enables it over one middle market's complete set", () => {
+    holding(ORIGINALITY_ROUND_3.middleMarkets![1].wrappedTokens);
+    render(<OriginalityR3Markets />);
+
+    expect(sellAllButton().getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("keeps it disabled when nothing is held", () => {
+    holding([]);
+    render(<OriginalityR3Markets />);
+
+    expect(sellAllButton().getAttribute("aria-disabled")).toBe("true");
   });
 });

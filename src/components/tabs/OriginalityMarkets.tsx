@@ -150,12 +150,6 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     middleTokens,
   );
 
-  const collateralTokens = useMemo(() => tableData?.map((x) => x.collateralToken), [tableData]);
-  const { data: balances, isLoading: isLoadingSellBalances } = useTokensBalances(
-    tradeExecutor as Address,
-    collateralTokens,
-  );
-
   const chartData = useMemo(() => {
     if (!charts) return undefined;
     return Object.entries(marketIdToRepo).flatMap(([marketId, repo]) => {
@@ -199,7 +193,54 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     return <FigureLabel label="Total liquidity" cash={cash} unitPrice={unitPrice} />;
   }, [charts, unitPrice]);
 
-  const hasMergeAmount = minBigIntArray(balances ?? []) > 0n;
+  // Besides traded UP/DOWN, Sell all merges complete sets: per middle market (its repo tokens and
+  // its Invalid) and at the parent (the bundle tokens, or round 2's repo tokens, and the parent's
+  // Invalid). These are the same sets, read the same way, as its closing merges. A run that stops
+  // after minting leaves exactly a parent set, and while the parent is open this button is the only
+  // way back to sUSDS — it used to count neither, and stayed disabled over the user's sUSDS.
+  const parentSetTokens = useMemo(
+    () => [
+      ...(round.middleMarkets?.length
+        ? round.middleMarkets.map((middle) => middle.collateralToken)
+        : [
+            ...new Map(
+              (tableData ?? []).map((x) => [x.collateralToken.toLowerCase(), x.collateralToken]),
+            ).values(),
+          ]),
+      round.parentInvalidToken,
+    ],
+    [round.middleMarkets, round.parentInvalidToken, tableData],
+  );
+  const middleSetTokens = useMemo(
+    () => (round.middleMarkets ?? []).flatMap((middle) => [...middle.wrappedTokens]),
+    [round.middleMarkets],
+  );
+  const { data: parentSetBalances, isLoading: isLoadingParentSet } = useTokensBalances(
+    tradeExecutor as Address,
+    parentSetTokens,
+  );
+  const { data: middleSetBalances, isLoading: isLoadingMiddleSet } = useTokensBalances(
+    tradeExecutor as Address,
+    middleSetTokens,
+  );
+  const isLoadingSellBalances = isLoadingParentSet || isLoadingMiddleSet;
+  const hasMergeAmount = useMemo(() => {
+    // A failed read comes back as []; the length checks keep it from reading as a set.
+    if (
+      parentSetBalances?.length === parentSetTokens.length &&
+      minBigIntArray(parentSetBalances) > 0n
+    ) {
+      return true;
+    }
+    if (!middleSetTokens.length || middleSetBalances?.length !== middleSetTokens.length) {
+      return false;
+    }
+    let offset = 0;
+    return (round.middleMarkets ?? []).some((middle) => {
+      const set = middleSetBalances.slice(offset, (offset += middle.wrappedTokens.length));
+      return minBigIntArray(set) > 0n;
+    });
+  }, [parentSetBalances, parentSetTokens, middleSetBalances, middleSetTokens, round.middleMarkets]);
   const hasSellTokens = useMemo(
     () => !!tableData?.filter((x) => x.upBalance || x.downBalance)?.length || hasMergeAmount,
     [tableData, hasMergeAmount],
