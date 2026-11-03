@@ -20,13 +20,36 @@ import { optimism } from "viem/chains";
 type SessionKeyData = {
   privateKey: `0x${string}`;
   address: `0x${string}`;
-  stale: boolean;
   createdAt: number;
-  activeTabs: string[];
+  /**
+   * Whether a permission was ever granted to this key. Only a key that held one is rotated: one
+   * that never did (fresh, or its grant was rejected) has had no power to leak. Keys stored before
+   * this field existed have all been granted, so a missing value counts as granted.
+   */
+  granted?: boolean;
 };
 
+/** A key rotated out, kept until the gas it holds has been swept back to its owner. */
+type RetiredSessionKey = {
+  privateKey: `0x${string}`;
+  address: `0x${string}`;
+  /** The wallet that funded it, and so the one its leftover gas goes back to. */
+  owner: Address;
+  retiredAt: number;
+};
+
+/**
+ * The session key, in localStorage so a run survives a reload.
+ *
+ * A key holding a permission can make the trade wallet execute any call, so it is rotated: each new
+ * permission goes to a fresh key (see `authorizeSessionKey`) and a copy of an old one is useless once
+ * its hour ends. It used to be meant to clear on reopen, but the clear pointed at sessionStorage
+ * after the key moved to localStorage (a602fa1), and it waited on every tab firing beforeunload — so
+ * one key was reused for months.
+ */
 export class SessionKeyManager {
   private static STORAGE_KEY = "trade_executor_session_key";
+  private static RETIRED_KEY = "trade_executor_retired_session_keys";
 
   static create(): `0x${string}` {
     const privateKey = `0x${Array.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -38,9 +61,8 @@ export class SessionKeyManager {
     const data: SessionKeyData = {
       privateKey,
       address: account.address,
-      stale: false,
       createdAt: Date.now(),
-      activeTabs: [],
+      granted: false,
     };
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
@@ -48,8 +70,7 @@ export class SessionKeyManager {
   }
 
   static get(): `0x${string}` | null {
-    const raw = localStorage.getItem(this.STORAGE_KEY);
-    return raw ? JSON.parse(raw).privateKey : null;
+    return this.getData()?.privateKey ?? null;
   }
 
   static getData(): SessionKeyData | null {
@@ -61,43 +82,37 @@ export class SessionKeyManager {
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
   }
 
-  static addActiveTab(tabId: string) {
+  static markGranted() {
     const data = this.getData();
-    if (!data) return;
+    if (data) this.setData({ ...data, granted: true });
+  }
 
-    if (!data.activeTabs.includes(tabId)) {
-      data.activeTabs.push(tabId);
-      this.setData(data);
+  /**
+   * Replaces the current key with a fresh one. The old key is not deleted: it moves to the retired
+   * list until its gas is swept back, so a failed sweep never strands it.
+   */
+  static rotate(owner: Address): `0x${string}` {
+    const old = this.getData();
+    if (old) {
+      this.setRetired([
+        ...this.getRetired(),
+        { privateKey: old.privateKey, address: old.address, owner, retiredAt: Date.now() },
+      ]);
     }
+    return this.create();
   }
 
-  static removeActiveTab(tabId: string) {
-    const data = this.getData();
-    if (!data) return;
-
-    data.activeTabs = data.activeTabs.filter((t) => t !== tabId);
-
-    if (data.activeTabs.length === 0) {
-      data.stale = true;
-    }
-
-    this.setData(data);
+  static getRetired(): RetiredSessionKey[] {
+    const raw = localStorage.getItem(this.RETIRED_KEY);
+    return raw ? JSON.parse(raw) : [];
   }
 
-  static markStale() {
-    const raw = localStorage.getItem(this.STORAGE_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    data.stale = true;
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
+  static dropRetired(address: string) {
+    this.setRetired(this.getRetired().filter((key) => !isTwoStringsEqual(key.address, address)));
   }
 
-  static clear() {
-    sessionStorage.removeItem(this.STORAGE_KEY);
-  }
-
-  static getOrCreate(): `0x${string}` {
-    return this.get() || this.create();
+  private static setRetired(keys: RetiredSessionKey[]) {
+    localStorage.setItem(this.RETIRED_KEY, JSON.stringify(keys));
   }
 }
 
@@ -141,8 +156,8 @@ export const fundSessionKey = async (gasCost: bigint, onStateChange: TxStateChan
     }),
   );
 
+  // The key is kept: part of a top-up may have landed, and the next run tops up only the rest.
   if (!result.status) {
-    SessionKeyManager.clear();
     throw new Error("Failed to fund session key");
   }
   // A node that has not seen the top-up refuses the next batch as unfunded.
@@ -185,13 +200,41 @@ export const withdrawFundSessionKey = async () => {
   }
 };
 
+/**
+ * Sends the gas left on retired keys back to the wallets that funded them, then forgets each key
+ * whose balance is down to what a transfer would cost. A key whose sweep fails stays listed and is
+ * tried again next time. Signed by the retired key itself, so it never prompts the user.
+ */
+export const sweepRetiredSessionKeys = async () => {
+  for (const retired of SessionKeyManager.getRetired()) {
+    try {
+      const account = privateKeyToAccount(retired.privateKey);
+      const { value: balance } = await getBalance(config, { address: account.address });
+      const { maxFeePerGas } = await estimateFeesPerGas(config, { chainId: CHAIN_ID });
+      const sendTxGasCost = 30_000n * maxFeePerGas;
+      if (balance > sendTxGasCost) {
+        const wallet = createWalletClient({ account, chain: optimism, transport: OPTIMISM_TRANSPORT });
+        const nonce = await nextNonce(account.address);
+        const result = await handleTx(() =>
+          wallet.sendTransaction({ to: retired.owner, value: balance - sendTxGasCost, nonce }),
+        );
+        if (!result.status) continue;
+        noteNonce(account.address, nonce);
+      }
+      SessionKeyManager.dropRetired(retired.address);
+    } catch (e) {
+      console.log("Cannot sweep retired session key ", e);
+    }
+  }
+};
+
 export const authorizeSessionKey = async (
   tradeExecutor: Address,
   onStateChange: TxStateChange,
   // How long the permission must still run to be reused; see `toastifyBatchTxSessionKey`.
   minPermissionSeconds = 60 * 30,
 ) => {
-  const sessionAccount = getSessionAccount(onStateChange);
+  let sessionAccount = getSessionAccount(onStateChange);
   // Set session key in contract
   const [currentSessionKey, currentExpiry] = await Promise.all([
     readContract(config, {
@@ -210,6 +253,17 @@ export const authorizeSessionKey = async (
   const isPermitted =
     isTwoStringsEqual(currentSessionKey as Address, sessionAccount.address) && atLeastFromNow;
   if (!isPermitted) {
+    // A new permission is about to be signed anyway, so it goes to a fresh key at no extra prompt:
+    // a copy of the old key, wherever it ended up, stops working when its own hour does. A key that
+    // never held a permission is kept — rotating it would only churn keys on a rejected prompt.
+    const owner = getAccount(config).address;
+    if (SessionKeyManager.getData()?.granted !== false && owner) {
+      SessionKeyManager.rotate(owner);
+      sessionAccount = getSessionAccount(() => {});
+      onStateChange({ phase: "authorize", label: "Created a fresh signing key for this run." });
+      // The old key's gas goes back in the background; it signs that itself.
+      void sweepRetiredSessionKeys();
+    }
     const expiry = Math.floor(new Date().getTime() / 1000) + 60 * 60;
     onStateChange({
       phase: "authorize",
@@ -227,6 +281,7 @@ export const authorizeSessionKey = async (
     if (!result.status) {
       throw new Error("Failed to authorize session key");
     }
+    SessionKeyManager.markGranted();
     // The first batch is simulated as the session key; it must run on a node that has seen this.
     noteSentBlock(result.receipt);
   }
