@@ -40,6 +40,8 @@ export const CHAIN_ID = 10 as SupportedChain;
  */
 export const SEER_MARKETS_URL = `https://app.seer.pm/?chains=${CHAIN_ID}`;
 
+export const GUIDE_URL = "https://deep-pm.gitbook.io/seer-docs";
+
 /**
  * A single market on Seer.
  *

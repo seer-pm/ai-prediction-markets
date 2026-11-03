@@ -1,55 +1,79 @@
 @import "tailwindcss";
+@import "@seer-pm/ui-kit/fonts.css";
+@import "@seer-pm/ui-kit/tokens.css";
+@import "@seer-pm/ui-kit/tailwind.css";
+/* Layered, so a utility on a kit element (`w-full` on a `.seer-button`) still wins. */
+@import "@seer-pm/ui-kit/base.css" layer(base);
+@import "@seer-pm/ui-kit/components.css" layer(components);
 
 /* ---------------------------------------------------------------------------
    Design tokens.
 
-   The neutral ramp and the blue/green/red accents are the ones this app has
-   always used — kept because they read at higher contrast than anything
-   subtler. Depth comes from shadow on white cards over a grey page, not from
-   hairlines. What stays retired: the blue-to-purple gradient that used to sit
-   on every button, header, footer and toast, and the competing cyan/magenta
-   accents alongside it.
+   Every colour is an Electric Foundation token from @seer-pm/ui-kit, so the
+   app follows its light and dark themes. The names below are this app's
+   semantic layer over them; change a value in the kit, not here.
 
-   Colour still carries meaning consistently:
-     blue  = the primary action
-     green = positive direction (undervalued, buy, succeeded, live)
-     red   = negative direction (overvalued, sell, failed, caution)
+   Colour carries meaning consistently:
+     primary = the brand action (purple fills; links and selection in
+               primary-text, which holds 4.5:1 in both themes)
+     long    = positive direction (undervalued, buy, succeeded, live)
+     short   = negative direction (overvalued, sell, failed, caution)
+
+   Status fills follow the kit: the status colour at 10% for the fill and 40%
+   for its border. Text on a solid status fill is `text-paper`, because white
+   on the dark theme's green reads at 2:1.
 --------------------------------------------------------------------------- */
-@theme {
+@theme inline {
   /* surfaces */
-  --color-paper: #f3f4f6;
-  --color-surface: #ffffff;
-  --color-sunken: #f9fafb;
-  --color-rule: #e5e7eb;
-  --color-rule-strong: #d1d5db;
+  --color-paper: var(--seer-page);
+  --color-surface: var(--seer-surface);
+  --color-sunken: var(--seer-surface-raised);
+  --color-rule: var(--seer-border);
+  --color-rule-strong: color-mix(in oklab, var(--seer-text) 25%, var(--seer-border));
 
-  /* text ramp — high contrast top to bottom */
-  --color-ink: #111827;
-  --color-ink-2: #374151;
-  --color-ink-3: #6b7280;
-  --color-ink-4: #9ca3af;
+  /* text ramp: ink-4 is the faintest step that still holds 4.5:1 on a raised
+     surface in both themes */
+  --color-ink: var(--seer-text);
+  --color-ink-2: color-mix(in oklab, var(--seer-text) 80%, var(--seer-muted));
+  --color-ink-3: var(--seer-muted);
+  --color-ink-4: color-mix(in oklab, var(--seer-muted) 90%, var(--seer-surface-raised));
 
   /* primary action */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-bg: #eff6ff;
-  --color-primary-rule: #bfdbfe;
+  --color-primary: var(--seer-brand-purple);
+  --color-primary-hover: var(--seer-brand-purple-hover);
+  --color-primary-text: var(--seer-accent-text);
+  --color-primary-text-hover: color-mix(in oklab, var(--seer-accent-text) 80%, var(--seer-text));
+  --color-primary-bg: var(--seer-accent-soft);
+  --color-primary-rule: color-mix(in oklab, var(--seer-brand-purple) 40%, transparent);
 
   /* direction of trade */
-  --color-long: #16a34a;
-  --color-long-hover: #15803d;
-  --color-long-bg: #f0fdf4;
-  --color-long-rule: #bbf7d0;
-  --color-short: #dc2626;
-  --color-short-bg: #fef2f2;
-  --color-short-rule: #fecaca;
+  --color-long: var(--seer-positive);
+  --color-long-hover: color-mix(in oklab, var(--seer-positive) 85%, var(--seer-text));
+  --color-long-bg: color-mix(in oklab, var(--seer-positive) 10%, transparent);
+  --color-long-rule: color-mix(in oklab, var(--seer-positive) 40%, transparent);
+  --color-short: var(--seer-negative);
+  --color-short-bg: color-mix(in oklab, var(--seer-negative) 10%, transparent);
+  --color-short-rule: color-mix(in oklab, var(--seer-negative) 40%, transparent);
 
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
-    "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  /* Open Sans everywhere. Mono is kept for addresses, hashes and file contents. */
+  --font-sans: var(--seer-font-sans);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
-  /* type scale — role-named so sizes stay decisions, not guesses */
+  /* The kit's two radii. Tailwind's named sizes resolve to them, so `rounded-md`
+     is a control (4px) and `rounded-lg` and up a surface (10px). */
+  --radius-xs: var(--seer-radius-sm);
+  --radius-sm: var(--seer-radius-sm);
+  --radius: var(--seer-radius-sm);
+  --radius-md: var(--seer-radius-sm);
+  --radius-lg: var(--seer-radius-md);
+  --radius-xl: var(--seer-radius-md);
+  --radius-2xl: var(--seer-radius-md);
+  --radius-3xl: var(--seer-radius-md);
+  --radius-4xl: var(--seer-radius-md);
+}
+
+@theme {
+  /* type scale: role-named so sizes stay decisions, not guesses */
   --text-micro: 12px;
   --text-micro--line-height: 16px;
   --text-label: 12px;
@@ -61,19 +85,38 @@
   --text-body--line-height: 21px;
   --text-lede: 16px;
   --text-lede--line-height: 24px;
+  --text-subtitle: 20px;
+  --text-subtitle--line-height: 28px;
   --text-title: 24px;
   --text-title--line-height: 32px;
   --text-display: 30px;
   --text-display--line-height: 36px;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /* Surfaces sit on hairlines, not shadows. Only what floats over the page
+     (menus, popovers, tooltips, toasts) casts one. */
+  --shadow-pop: 0 12px 32px rgb(20 18 35 / 0.16), 0 2px 6px rgb(20 18 35 / 0.08);
 
-  /* elevation */
-  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-raised: 0 1px 2px 0 rgb(0 0 0 / 0.06), 0 1px 3px 0 rgb(0 0 0 / 0.1);
-  --shadow-pop: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* The kit dialog's entrance: a short rise on desktop, a sheet from the bottom edge on a phone. */
+  --animate-dialog-in: dialog-in 240ms var(--seer-ease-out);
+  --animate-sheet-in: sheet-in 240ms var(--seer-ease-out);
+  --animate-backdrop-in: backdrop-in 240ms var(--seer-ease-out);
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes backdrop-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 @layer base {
@@ -99,21 +142,11 @@
 
   body {
     margin: 0;
-    background-color: var(--color-paper);
     color: var(--color-ink-2);
-    font-family: var(--font-sans);
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
-    -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  /* Every number in the product lines up in a column. */
-  code,
-  kbd,
-  samp,
-  pre,
-  .font-mono {
+    /* Every number in the product lines up in a column. */
     font-variant-numeric: tabular-nums;
   }
 
@@ -125,14 +158,7 @@
     font-weight: 700;
   }
 
-  /* One focus treatment everywhere. */
-  :focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-    border-radius: var(--radius-sm);
-  }
-
-  /* Native number spinners fight right-aligned monospaced amounts. */
+  /* Native number spinners fight right-aligned amounts. */
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -140,11 +166,6 @@
   }
   input[type="number"] {
     -moz-appearance: textfield;
-  }
-
-  ::selection {
-    background-color: var(--color-primary-bg);
-    color: var(--color-ink);
   }
 }
 
@@ -157,7 +178,7 @@
  * very little; correctness of paint is worth more than the skipped layout.
  */
 
-/* Toasts: surface + hairline + a single accent bar. Tone set per-toast. */
+/* Toasts: a surface on a hairline. The icon and the progress bar carry the tone. */
 .Toastify__toast-container {
   width: 380px;
   padding: 0;
@@ -167,18 +188,20 @@
   color: var(--color-ink-2);
   border: 1px solid var(--color-rule);
   font-size: var(--text-body);
-  border-left: 4px solid var(--color-primary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-pop);
   padding: 10px 12px;
   min-height: 0;
   font-family: var(--font-sans);
 }
-.Toastify__toast--success {
-  border-left-color: var(--color-long);
+.Toastify__toast--info .Toastify__toast-icon {
+  color: var(--color-primary-text);
 }
-.Toastify__toast--error {
-  border-left-color: var(--color-short);
+.Toastify__toast--success .Toastify__toast-icon {
+  color: var(--color-long);
+}
+.Toastify__toast--error .Toastify__toast-icon {
+  color: var(--color-short);
 }
 .Toastify__toast-body {
   padding: 0;

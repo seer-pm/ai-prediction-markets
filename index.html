@@ -2,11 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/deep.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Prediction Markets</title>
+    <title>Deep · Seer</title>
+    <meta
+      name="description"
+      content="Contests of markets with many outcomes, priced together on Optimism. Load your predictions and trade every market where you disagree in one run."
+    />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Seer" />
+    <meta property="og:title" content="Deep · Seer" />
+    <meta
+      property="og:description"
+      content="Contests of markets with many outcomes, priced together on Optimism."
+    />
+    <meta property="og:url" content="https://deep.seer.pm" />
+    <meta property="og:image" content="https://deep.seer.pm/og-icon.png" />
+    <meta name="twitter:card" content="summary" />
+    <!-- Applies the saved theme, or the system's, before anything paints. Mirrors
+         src/stores/themeStore.ts, which takes over once the bundle loads. -->
+    <script>
+      try {
+        var theme = localStorage.getItem("theme");
+        if (theme !== "light" && theme !== "dark") {
+          theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.dataset.theme = theme;
+      } catch (error) {}
+    </script>
   </head>
   <body>
+    <!--
+      THESIS: a contest page answers its question before it offers a trade. It refuses the
+      category default of a price chart on top and a trading table below.
+      OWN-WORLD: Electric Foundation from @seer-pm/ui-kit. Open Sans, page ground, hairline
+      surfaces, purple for action, purple and gold for the two sides of one reading, muted
+      context lines with up to four followed series in colour.
+      STORY: the asker reads what the market expects across the field and who decides; the
+      trader loads predictions, sees each disagreement on its bar, and runs one trade.
+      FIRST VIEWPORT: the question as the heading, one sentence of live answer, who asks and
+      resolves, then the ranked field with each repository's split bar and prediction tick.
+      FORM: ranked field with split bars and prediction marks (dealt 7, 2 and 1, fused); seed 8d562a19.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review,
+      the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+    -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

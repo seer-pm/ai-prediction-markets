@@ -4,11 +4,15 @@ export type SortDir = "asc" | "desc";
 
 /**
  * Click-to-sort state for a table. Unsorted until a header is clicked, so rows keep the order
- * they arrive in. A fresh column starts on its most useful end — `ascFirst` columns (names) A–Z,
- * the rest (numbers) largest first — and clicking the active column flips it.
+ * they arrive in, unless the table opens on an `initial` order of its own. A fresh column starts on
+ * its most useful end — `ascFirst` columns (names) A–Z, the rest (numbers) largest first — and
+ * clicking the active column flips it.
  */
-export function useTableSort<C extends string>(ascFirst: readonly C[] = []) {
-  const [sort, setSort] = useState<{ column: C; dir: SortDir } | null>(null);
+export function useTableSort<C extends string>(
+  ascFirst: readonly C[] = [],
+  initial: { column: C; dir: SortDir } | null = null,
+) {
+  const [sort, setSort] = useState<{ column: C; dir: SortDir } | null>(initial);
 
   const onSort = (column: C) =>
     setSort((prev) =>

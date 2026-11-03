@@ -97,7 +97,6 @@ export default function ZcashNu7Charts({
       data={series}
       isLoading={isLoading || isLoadingCharts}
       error={chartsError}
-      eyebrow="Zcash · NU7"
       title="Outcome prices over time"
       // The question itself, which the table's band row states only once per group.
       description={market?.marketName}

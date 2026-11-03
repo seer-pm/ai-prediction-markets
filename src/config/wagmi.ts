@@ -2,6 +2,7 @@ import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { createAppKit } from "@reown/appkit/react";
 import { fallback, http } from "wagmi";
 import { optimism } from "wagmi/chains";
+import { resolveTheme, useThemeStore } from "../stores/themeStore";
 import { OPTIMISM_RPC } from "./rpc";
 
 const projectId = import.meta.env.VITE_WC_PROJECT_ID;
@@ -31,14 +32,25 @@ const wagmiAdapter = new WagmiAdapter({
 
 export const config = wagmiAdapter.wagmiConfig;
 
-createAppKit({
+const appKit = createAppKit({
   adapters: [wagmiAdapter],
   networks: [optimism],
   projectId,
   features: {
     analytics: true,
   },
+  // The modal renders in its own shadow root, so it cannot read the kit's CSS variables: the brand
+  // purple, Open Sans and a tighter radius scale (every AppKit radius is a multiple of the master)
+  // are passed in, and the light or dark mode follows the app's.
+  themeMode: resolveTheme(useThemeStore.getState()),
+  themeVariables: {
+    "--w3m-accent": "#7d33ff",
+    "--w3m-font-family": "'Open Sans Variable', 'Open Sans', ui-sans-serif, system-ui, sans-serif",
+    "--w3m-border-radius-master": "2px",
+  },
 });
+
+useThemeStore.subscribe((state) => appKit.setThemeMode(resolveTheme(state)));
 
 declare module "wagmi" {
   interface Register {

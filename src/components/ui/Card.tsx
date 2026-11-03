@@ -8,12 +8,12 @@ interface CardProps {
   flush?: boolean;
 }
 
-/** A white surface lifted off the grey page — depth carries the hierarchy. */
+/** A surface on a hairline over the page. Elevation is kept for what floats (menus, dialogs). */
 export function Card({ children, className, flush = false }: CardProps) {
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-lg bg-surface shadow-card",
+        "overflow-hidden rounded-lg border border-rule bg-surface",
         !flush && "p-6",
         className,
       )}
@@ -25,13 +25,14 @@ export function Card({ children, className, flush = false }: CardProps) {
 
 interface CardHeaderProps {
   title: ReactNode;
-  eyebrow?: ReactNode;
+  /** The heading level. A page whose card is its main heading (the leaderboard) passes `h1`. */
+  as?: "h1" | "h2";
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
 
-export function CardHeader({ title, eyebrow, description, actions, className }: CardHeaderProps) {
+export function CardHeader({ title, as: Heading = "h2", description, actions, className }: CardHeaderProps) {
   return (
     <div
       className={cn(
@@ -40,12 +41,8 @@ export function CardHeader({ title, eyebrow, description, actions, className }: 
       )}
     >
       <div className="min-w-0">
-        {eyebrow && (
-          <p className="mb-1 text-label font-semibold tracking-wider text-ink-3 uppercase">
-            {eyebrow}
-          </p>
-        )}
-        <h2 className="text-title font-bold">{title}</h2>
+        {/* A step under a page heading on a phone, where the page heading is 32px. */}
+        <Heading className="text-subtitle font-bold sm:text-title">{title}</Heading>
         {description && <p className="mt-1 text-body text-ink-3">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

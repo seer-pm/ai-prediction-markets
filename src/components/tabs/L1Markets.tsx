@@ -286,7 +286,6 @@ export const L1Markets = () => {
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingChart}
         error={chartError}
-        eyebrow="Round 2 · L1"
         title="Repository weight in the Ethereum ecosystem"
         volume={volumeLabel}
         liquidity={liquidityLabel}

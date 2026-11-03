@@ -3,13 +3,19 @@ import { Card, CardHeader, EmptyState } from "@/components/ui";
 import { ChartSeries } from "@/types";
 import { withAlpha } from "@/utils/color";
 import { formatWeight } from "@/utils/format";
+import { EMPTY_PINS, defaultPins, pinSlot, togglePin, type Pins } from "@/utils/pins";
+import { useTheme } from "@/stores/themeStore";
 import {
   createChart,
+  type AutoscaleInfoProvider,
+  type DeepPartial,
+  type ChartOptions,
   IChartApi,
   ISeriesApi,
   LineData,
   LineSeries,
   LineStyle,
+  TickMarkType,
   UTCTimestamp,
 } from "lightweight-charts";
 import React, {
@@ -24,29 +30,85 @@ import React, {
 import ErrorBoundary from "./ErrorBoundary";
 
 /**
- * Series colours: saturated enough to tell apart at 1px on white, held to a
- * common lightness so no single line dominates. Replaces the old 60-entry list
- * that mixed neon and pastel at random and was unreadable past a dozen series.
+ * Series colours from the kit's tokens: four slots for the series the reader follows, the text
+ * colour for the one under the cursor, and the muted colour for the rest of the field. Read on
+ * every repaint, since the canvas cannot follow a CSS variable through a theme change.
  */
-const SERIES_COLORS = [
-  "#2563EB",
-  "#DC2626",
-  "#16A34A",
-  "#9333EA",
-  "#EA580C",
-  "#0891B2",
-  "#CA8A04",
-  "#DB2777",
-  "#4F46E5",
-  "#059669",
-  "#B45309",
-  "#7C3AED",
-  "#0E7490",
-  "#BE123C",
-];
+function seriesColors() {
+  const tokens = getComputedStyle(document.documentElement);
+  const token = (name: string) => tokens.getPropertyValue(name).trim();
+  return {
+    slots: [1, 2, 3, 4].map((slot) => token(`--seer-series-${slot}`)),
+    hovered: token("--seer-text"),
+    context: token("--seer-muted"),
+  };
+}
 
-const AXIS_COLOR = "#6B7280";
-const GRID_COLOR = "#E5E7EB";
+/**
+ * The axis, grid and crosshair, read from the kit's tokens on `<html>` so the chart follows the
+ * theme. The canvas cannot use CSS variables itself, so these are re-read on every theme change.
+ */
+function chromeOptions(): DeepPartial<ChartOptions> {
+  const tokens = getComputedStyle(document.documentElement);
+  const token = (name: string) => tokens.getPropertyValue(name).trim();
+  const muted = token("--seer-muted");
+  const border = token("--seer-border");
+  return {
+    layout: {
+      background: { color: "transparent" },
+      textColor: muted,
+      fontFamily: token("--seer-font-sans"),
+      fontSize: 12,
+    },
+    grid: {
+      vertLines: { color: border, style: LineStyle.SparseDotted },
+      horzLines: { color: border, style: LineStyle.SparseDotted },
+    },
+    crosshair: {
+      vertLine: { color: muted, labelBackgroundColor: token("--seer-text") },
+      horzLine: { color: muted, labelBackgroundColor: token("--seer-text") },
+    },
+    timeScale: {
+      timeVisible: true,
+      rightOffset: RIGHT_OFFSET,
+      borderColor: border,
+      tickMarkFormatter: formatTick,
+    },
+  };
+}
+
+/** Bars of space after the last point, where the followed series' labels sit. */
+const RIGHT_OFFSET = 12;
+
+const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const month = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" });
+const clock = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
+
+/**
+ * Days carry their month ("Oct 2"), so a range inside one month still says which month it is.
+ * The chart's own default prints a bare day number and names the month only where one starts.
+ */
+function formatTick(time: unknown, type: TickMarkType): string {
+  const date = new Date((time as number) * 1000);
+  if (type === TickMarkType.Year) return String(date.getUTCFullYear());
+  if (type === TickMarkType.Month) return month.format(date);
+  if (type === TickMarkType.DayOfMonth) return monthDay.format(date);
+  return clock.format(date);
+}
+
+/** Every series here is a price between 0 and 1, so the scale never runs past either end. */
+const clampToUnit: AutoscaleInfoProvider = (original) => {
+  const info = original();
+  if (!info) return info;
+  if (!info.priceRange) return info;
+  return {
+    ...info,
+    priceRange: {
+      minValue: Math.max(0, info.priceRange.minValue),
+      maxValue: Math.min(1, info.priceRange.maxValue),
+    },
+  };
+};
 
 type Props = {
   /** Already resampled by the background job — see `ChartSeries`. Draw it, don't rebuild it. */
@@ -55,11 +117,16 @@ type Props = {
   /** Current pool depth, printed beside the volume figure in the header. */
   liquidity?: string | ReactElement;
   title?: string;
-  eyebrow?: string;
   description?: string;
   actions?: ReactNode;
   /** How a series' latest price reads in the legend. Weights by default. */
   formatValue?: (value: number) => string;
+  /**
+   * The series followed in colour, by outcome name. Given with `onPinsChange`, a parent can share
+   * them with a table; otherwise the chart keeps its own, starting on the leaders.
+   */
+  pins?: Pins;
+  onPinsChange?: (pins: Pins) => void;
 };
 
 function truncateOutcomeName(name: string, maxLength = 14) {
@@ -78,30 +145,34 @@ const MarketChart = React.memo(function MarketChart({
   totalVolumeMarket,
   liquidity,
   title = "Price history",
-  eyebrow,
   description,
   actions,
   formatValue = formatWeight,
+  pins: controlledPins,
+  onPinsChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const theme = useTheme();
   const seriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const seriesTitles = useRef<string[]>([]);
 
-  // Series drawn on the chart, by index into `data`.
-  const [visible, setVisible] = useState<Set<number>>(
-    () => new Set(data.map((_, index) => index)),
-  );
+  const [ownPins, setOwnPins] = useState<Pins>(() => defaultPins(data));
+  const pins = controlledPins ?? ownPins;
+  const setPins = onPinsChange ?? setOwnPins;
+  const pinsRef = useRef(pins);
+  pinsRef.current = pins;
+
   const [hovered, setHovered] = useState<number | null>(null);
-  const visibleRef = useRef(visible);
-  visibleRef.current = visible;
   const hoveredRef = useRef<number | null>(null);
 
-  // Keep the legend in step when the underlying series set changes.
+  // A new series set starts over on its own leaders, and nothing stays hovered.
   useEffect(() => {
-    setVisible(new Set(data.map((_, index) => index)));
+    if (!controlledPins) setOwnPins(defaultPins(data));
     setHovered(null);
     hoveredRef.current = null;
+    // `controlledPins` only decides who owns the pins; a change to it is not a new series set.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   const legendEntries: LegendEntry[] = useMemo(
@@ -109,42 +180,55 @@ const MarketChart = React.memo(function MarketChart({
       data.map((series, index) => ({
         index,
         name: series.outcomeName,
-        color: SERIES_COLORS[index % SERIES_COLORS.length],
+        slot: pinSlot(pins, series.outcomeName),
         value: series.lastPrice,
       })),
-    [data],
+    [data, pins],
   );
 
   const appliedHighlight = useRef<number | null | undefined>(undefined);
   const highlightFrame = useRef<number | null>(null);
 
   /**
-   * Pulls one series forward and pushes the rest back. With forty overlapping
-   * lines, picking one out of the tangle is otherwise guesswork.
+   * Followed series in their slot colours with a label at the line end, the hovered one in the
+   * text colour on top, and the rest of the field as muted context that steps further back while
+   * one line is being read.
    */
-  const applyHighlightNow = useCallback((target: number | null) => {
-    seriesRef.current.forEach((series, index) => {
-      if (!series) return;
-      const isVisible = visibleRef.current.has(index);
-      if (!isVisible) {
-        series.applyOptions({ visible: false, lastValueVisible: false, title: "" });
-        return;
-      }
+  const applyHighlightNow = useCallback(
+    (target: number | null) => {
+      const colors = seriesColors();
+      const lifted: number[] = [];
 
-      const baseColor = SERIES_COLORS[index % SERIES_COLORS.length];
-      const isHovered = target === index;
-      const resting = target === null;
+      seriesRef.current.forEach((series, index) => {
+        if (!series) return;
+        const slot = pinSlot(pinsRef.current, data[index]?.outcomeName ?? "");
+        const isHovered = target === index;
+        const followed = slot !== null;
+        if (followed) lifted.push(index);
 
-      series.applyOptions({
-        visible: true,
-        lineWidth: resting ? 2 : isHovered ? 3 : 1,
-        color: resting || isHovered ? baseColor : withAlpha(baseColor, 0.18),
-        title: isHovered ? (seriesTitles.current[index] ?? "") : "",
-        lastValueVisible: isHovered,
-        priceLineVisible: false,
+        series.applyOptions({
+          visible: true,
+          lineWidth: isHovered ? 3 : followed ? 2 : 1,
+          color: isHovered
+            ? followed
+              ? colors.slots[slot]
+              : colors.hovered
+            : followed
+              ? colors.slots[slot]
+              : withAlpha(colors.context, target === null ? 0.3 : 0.14),
+          title: isHovered || followed ? (seriesTitles.current[index] ?? "") : "",
+          lastValueVisible: isHovered || followed,
+          priceLineVisible: false,
+        });
       });
-    });
-  }, []);
+
+      // Later series draw over earlier ones, so the lines being read go to the top of the stack.
+      const total = seriesRef.current.length;
+      if (target !== null && !lifted.includes(target)) lifted.push(target);
+      lifted.forEach((index) => seriesRef.current[index]?.setSeriesOrder(total - 1));
+    },
+    [data],
+  );
 
   /**
    * Dragging the cursor down a hundred-row legend fires an enter event per row,
@@ -167,11 +251,15 @@ const MarketChart = React.memo(function MarketChart({
     [applyHighlightNow],
   );
 
-  // Visibility changes have to repaint even when the hovered series is the same.
+  // A change of pins or theme has to repaint even when the hovered series is the same.
   const refreshHighlight = useCallback(() => {
     appliedHighlight.current = undefined;
     applyHighlight(hoveredRef.current);
   }, [applyHighlight]);
+
+  useEffect(() => {
+    refreshHighlight();
+  }, [pins, refreshHighlight]);
 
   useEffect(
     () => () => {
@@ -190,29 +278,11 @@ const MarketChart = React.memo(function MarketChart({
   );
 
   const toggleSeries = useCallback(
-    (index: number) => {
-      // Built outside the state updater: `applyHighlight` reads the ref
-      // synchronously, and React may run an updater more than once.
-      const next = new Set(visibleRef.current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-
-      visibleRef.current = next;
-      setVisible(next);
-      refreshHighlight();
-    },
-    [refreshHighlight],
+    (name: string) => setPins(togglePin(pinsRef.current, name)),
+    [setPins],
   );
 
-  const toggleAll = useCallback(
-    (nextVisible: boolean) => {
-      const next = nextVisible ? new Set(data.map((_, index) => index)) : new Set<number>();
-      setVisible(next);
-      visibleRef.current = next;
-      refreshHighlight();
-    },
-    [data, refreshHighlight],
-  );
+  const clearPins = useCallback(() => setPins(EMPTY_PINS), [setPins]);
 
   /* ============================
      CREATE CHART
@@ -225,42 +295,29 @@ const MarketChart = React.memo(function MarketChart({
     const chart = createChart(container, {
       width: container.clientWidth,
       height: container.clientHeight,
-      layout: {
-        background: { color: "transparent" },
-        textColor: AXIS_COLOR,
-        fontFamily:
-          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
-        fontSize: 12,
+      ...chromeOptions(),
+      // Whole labels only: a price cut at the pane's top edge reads as a different number.
+      rightPriceScale: {
+        borderVisible: false,
+        entireTextOnly: true,
+        scaleMargins: { top: 0.08, bottom: 0.08 },
       },
-      grid: {
-        vertLines: { color: GRID_COLOR, style: LineStyle.SparseDotted },
-        horzLines: { color: GRID_COLOR, style: LineStyle.SparseDotted },
-      },
-      crosshair: {
-        vertLine: { color: "#9CA3AF", labelBackgroundColor: "#111827" },
-        horzLine: { color: "#9CA3AF", labelBackgroundColor: "#111827" },
-      },
-      timeScale: { timeVisible: true, rightOffset: 12, borderColor: GRID_COLOR },
-      rightPriceScale: { borderVisible: false },
     });
 
     chartRef.current = chart;
 
-    data.forEach((outcomeData, i) => {
+    data.forEach((outcomeData) => {
       const series = chart.addSeries(LineSeries, {
-        color: SERIES_COLORS[i % SERIES_COLORS.length],
-        lineWidth: 2,
+        lineWidth: 1,
         // Nothing on the price scale at rest: the legend is the readout, and a
         // hundred stacked labels made the right edge unreadable. The name comes
         // back only for the series being hovered.
         title: "",
         lastValueVisible: false,
         priceLineVisible: false,
-        priceFormat: {
-          type: "price",
-          precision: 4,
-          minMove: 0.0001, // should match precision
-        },
+        // The axis and the line-end labels read like the legend.
+        priceFormat: { type: "custom", formatter: formatValue, minMove: 0.0001 },
+        autoscaleInfoProvider: clampToUnit,
       });
 
       seriesRef.current.push(series);
@@ -274,7 +331,11 @@ const MarketChart = React.memo(function MarketChart({
       series.setData(lineData);
     });
 
-    chart.timeScale().fitContent();
+    // The whole history, with half a bar of room before the first point so the first date label
+    // is not cut at the pane's edge. Set from the data rather than read back after `fitContent`,
+    // which applies on the next paint. Logical indices run over every distinct time in any series.
+    const bars = new Set(data.flatMap((series) => series.points.map(([time]) => time))).size;
+    chart.timeScale().setVisibleLogicalRange({ from: -0.6, to: bars - 1 + RIGHT_OFFSET });
     // Restore whatever the legend had selected before this rebuild.
     appliedHighlight.current = undefined;
     applyHighlightNow(hoveredRef.current);
@@ -305,12 +366,17 @@ const MarketChart = React.memo(function MarketChart({
       seriesRef.current = [];
       seriesTitles.current = [];
     };
-  }, [data, applyHighlightNow]);
+  }, [data, applyHighlightNow, formatValue]);
+
+  // `data-theme` is already on <html> when this runs, so the tokens read are the new theme's.
+  useEffect(() => {
+    chartRef.current?.applyOptions(chromeOptions());
+    refreshHighlight();
+  }, [theme, refreshHighlight]);
 
   return (
     <Card flush>
       <CardHeader
-        eyebrow={eyebrow}
         title={title}
         description={description}
         actions={
@@ -337,10 +403,9 @@ const MarketChart = React.memo(function MarketChart({
           <div className="h-64 shrink-0 md:h-full md:w-60">
             <ChartLegend
               entries={legendEntries}
-              visible={visible}
               hovered={hovered}
               onToggle={toggleSeries}
-              onToggleAll={toggleAll}
+              onClear={clearPins}
               onHover={handleHover}
               formatValue={formatValue}
             />

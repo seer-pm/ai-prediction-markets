@@ -26,7 +26,7 @@ export function Tooltip({ content, children, side = "top", asChild = true }: Too
           side={side}
           sideOffset={6}
           collisionPadding={12}
-          className="z-50 max-w-[20rem] rounded-md bg-ink px-3 py-2 text-data text-white shadow-pop"
+          className="z-50 max-w-[20rem] rounded-md bg-ink px-3 py-2 text-data text-paper shadow-pop"
         >
           {content}
           <RadixTooltip.Arrow className="fill-ink" width={10} height={5} />

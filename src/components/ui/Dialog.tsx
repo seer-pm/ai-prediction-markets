@@ -1,14 +1,13 @@
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { cn } from "@/utils/cn";
 import type { ReactNode } from "react";
-import { XIcon } from "./icons";
 
-type Size = "sm" | "md" | "lg";
+type Size = "sm" | "md";
 
+/** The kit's two dialog widths: 480px, and 640px for the wide one. */
 const SIZES: Record<Size, string> = {
-  sm: "max-w-lg",
-  md: "max-w-2xl",
-  lg: "max-w-4xl",
+  sm: "w-[min(480px,calc(100vw-32px))]",
+  md: "w-[min(640px,calc(100vw-32px))]",
 };
 
 interface DialogProps {
@@ -20,13 +19,19 @@ interface DialogProps {
   footer?: ReactNode;
   size?: Size;
   /**
-   * False while a multi-transaction run is in flight. The old hand-rolled
-   * modal always closed on Escape and backdrop click, which orphaned a running
-   * mutation behind a dismissed UI.
+   * False while a multi-transaction run is in flight: Escape, the backdrop and the close button
+   * stop dismissing it, so a running mutation never ends up behind a closed UI.
    */
   dismissible?: boolean;
 }
 
+/**
+ * The kit's dialog (header, title, description, body and footer from components.css) on Radix
+ * rather than the kit's native `<dialog>`. A modal `<dialog>` sits in the top layer and makes the
+ * rest of the page inert, and this app's run toasts and its tooltips render in `<body>`: they
+ * would land beneath the backdrop and stop responding during exactly the runs that start here.
+ * The box mirrors `.seer-dialog`: hairline surface, 10px radius, a bottom sheet on a phone.
+ */
 export function Dialog({
   open,
   onOpenChange,
@@ -49,55 +54,48 @@ export function Dialog({
           browser to rasterise everything beneath it — over a long table that
           shows up as a flash every time a dialog opens.
         */}
-        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <RadixDialog.Overlay className="fixed inset-0 z-50 animate-backdrop-in bg-seer-ink/56" />
         <RadixDialog.Content
           onEscapeKeyDown={block}
           onPointerDownOutside={block}
           onInteractOutside={block}
           className={cn(
-            "fixed top-1/2 left-1/2 z-50 flex max-h-[88vh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col",
-            "rounded-lg bg-surface shadow-pop",
+            "fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-32px)] -translate-x-1/2 -translate-y-1/2 flex-col",
+            "rounded-lg border border-rule bg-surface text-ink shadow-pop animate-dialog-in",
+            "max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:w-full max-sm:max-h-[calc(100dvh-24px)] max-sm:translate-x-0 max-sm:translate-y-0",
+            "max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:animate-sheet-in",
             SIZES[size],
           )}
         >
-          <div className="flex items-start justify-between gap-4 border-b border-rule px-6 py-5">
-            <div className="min-w-0">
-              <RadixDialog.Title className="text-title font-bold">{title}</RadixDialog.Title>
-              {description && (
-                <RadixDialog.Description className="mt-1 text-body text-ink-3">
-                  {description}
-                </RadixDialog.Description>
+          <div className="seer-dialog-panel min-h-0 flex-1">
+            <div className="seer-dialog-header">
+              <div className="seer-dialog-heading">
+                <RadixDialog.Title className="seer-dialog-title">{title}</RadixDialog.Title>
+                {description && (
+                  <RadixDialog.Description className="seer-dialog-description">
+                    {description}
+                  </RadixDialog.Description>
+                )}
+              </div>
+              {dismissible && (
+                <RadixDialog.Close
+                  className="seer-button seer-button-ghost seer-button-icon seer-button-sm"
+                  aria-label="Close"
+                >
+                  <span className="seer-icon seer-icon-close" aria-hidden="true" />
+                </RadixDialog.Close>
               )}
             </div>
-            {dismissible && (
-              <RadixDialog.Close
-                className="-mt-1 -mr-1 cursor-pointer rounded-md p-1.5 text-ink-4 transition-colors hover:bg-sunken hover:text-ink"
-                aria-label="Close"
-              >
-                <XIcon />
-              </RadixDialog.Close>
-            )}
+
+            {/*
+              A body that renders nothing would otherwise leave an empty padded
+              band. Callers pass a falsy child when they have nothing to say, and
+              the kit then drops the footer's rule as well.
+            */}
+            {children && <div className="seer-dialog-body min-h-0 flex-1">{children}</div>}
+
+            {footer && <div className="seer-dialog-footer">{footer}</div>}
           </div>
-
-          {/*
-            A body that renders nothing would otherwise leave an empty padded
-            band, and its own rule would stack against the header's. Callers
-            pass a falsy child when they have nothing to say.
-          */}
-          {children && (
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-          )}
-
-          {footer && (
-            <div
-              className={cn(
-                "flex flex-col-reverse gap-3 px-6 py-5 sm:flex-row sm:justify-end",
-                !!children && "border-t border-rule",
-              )}
-            >
-              {footer}
-            </div>
-          )}
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>

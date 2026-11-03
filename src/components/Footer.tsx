@@ -1,39 +1,29 @@
-import { GithubIcon, SecuredByKleros, TelegramIcon, TwitterIcon } from "@/lib/icons";
+import { seerApps } from "@seer-pm/ui-kit";
+import { EcosystemFooter } from "@seer-pm/ui-kit/react";
+import { GUIDE_URL } from "@/utils/constants";
+import { PATHS } from "@/utils/views";
 
-const SOCIALS = [
-  { href: "https://t.me/kleros", label: "Telegram", Icon: TelegramIcon },
-  { href: "https://x.com/kleros_io", label: "X", Icon: TwitterIcon },
-  { href: "https://github.com/kleros", label: "GitHub", Icon: GithubIcon },
+const DEEP_LINKS = [
+  { name: "Markets", url: PATHS.markets },
+  { name: "Leaderboard", url: PATHS.leaderboard },
+  { name: "Guide", url: GUIDE_URL },
 ];
 
+const TAGLINE = seerApps.find((app) => app.id === "deep")?.summary;
+
+/**
+ * The footer every Seer site closes with, with Deep's own pages first. Its column takes the page
+ * container's width and gutters (`CONTAINER` in App.tsx) so the edges line up.
+ */
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-rule bg-surface">
-      <div className="mx-auto flex max-w-[86rem] flex-col items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:px-8">
-        <a
-          href="https://kleros.io/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-ink-3 transition-opacity hover:opacity-70"
-        >
-          <SecuredByKleros />
-        </a>
-
-        <div className="flex items-center gap-4 text-ink-3">
-          {SOCIALS.map(({ href, label, Icon }) => (
-            <a
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={label}
-              className="transition-opacity hover:opacity-70"
-            >
-              <Icon />
-            </a>
-          ))}
-        </div>
-      </div>
-    </footer>
+    <div className="mt-auto [--seer-footer-gutter:16px] [--seer-footer-max-width:86rem] sm:[--seer-footer-gutter:24px] lg:[--seer-footer-gutter:32px]">
+      <EcosystemFooter
+        appName="Deep"
+        homeUrl={PATHS.markets}
+        tagline={TAGLINE}
+        groups={[{ title: "Deep", links: DEEP_LINKS }]}
+      />
+    </div>
   );
 }

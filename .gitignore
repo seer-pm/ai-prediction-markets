@@ -33,3 +33,7 @@ src/gql
 # generated reports / bundled scripts
 scripts/out
 scripts/.*.mjs
+
+# impeccable working files
+.impeccable/review/
+.impeccable/questions/

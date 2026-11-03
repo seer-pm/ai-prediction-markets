@@ -43,8 +43,6 @@ export interface OriginalityMiddleMarket {
  */
 export interface OriginalityRound {
   id: "round2" | "round3" | "round3-incorrect";
-  /** Chart eyebrow. */
-  eyebrow: string;
   parentMarketId: Address;
   /** The parent's Invalid outcome token — the last leg of a complete-set merge. */
   parentInvalidToken: Address;
@@ -70,7 +68,6 @@ export interface OriginalityRound {
 
 export const ORIGINALITY_ROUND_2: OriginalityRound = {
   id: "round2",
-  eyebrow: "Round 2 · Originality",
   parentMarketId: ORIGINALITY_PARENT_MARKET_ID,
   parentInvalidToken: "0x2281bb55063b8d036e5077f5b654c9bb1b397a34",
   dataFunction: "get-originality-markets-data",
@@ -80,7 +77,6 @@ export const ORIGINALITY_ROUND_2: OriginalityRound = {
 
 export const ORIGINALITY_ROUND_3: OriginalityRound = {
   id: "round3",
-  eyebrow: "Round 3 · Originality",
   parentMarketId: ORIGINALITY_R3_V3_PARENT_MARKET_ID,
   parentInvalidToken: ORIGINALITY_R3_V3_PARENT_INVALID_TOKEN,
   middleMarkets: ORIGINALITY_R3_V3_MIDDLE_MARKETS,
@@ -99,7 +95,6 @@ export const ORIGINALITY_ROUND_3: OriginalityRound = {
 /** The first round-3 set, missing its middle level. Withdraw-only — see the interface comment. */
 export const ORIGINALITY_ROUND_3_INCORRECT: OriginalityRound = {
   id: "round3-incorrect",
-  eyebrow: "Round 3 · Originality · incorrect market",
   parentMarketId: ORIGINALITY_R3_PARENT_MARKET_ID,
   parentInvalidToken: ORIGINALITY_R3_PARENT_INVALID_TOKEN,
   dataFunction: "get-originality-r3-markets-data",

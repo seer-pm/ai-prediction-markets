@@ -1,0 +1,1005 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-23T20:08:54.114Z",
+  "title": "Design System: Deep",
+  "extensions": {
+    "tokenOwner": {
+      "package": "@seer-pm/ui-kit",
+      "version": "0.4.0",
+      "source": "packages/seer-pm-ui-kit in the seer-pm monorepo (css/tokens.css, css/base.css, css/components.css, css/tailwind-theme.css); vendored here as vendor/seer-pm-ui-kit-0.4.0.tgz",
+      "localLayer": "src/index.css (@theme inline semantic colours and radii, @theme type scale, --shadow-pop, dialog animations)",
+      "themeSwitch": "data-theme on <html>, written by src/stores/themeStore.ts and the inline script in index.html"
+    },
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Electric Purple",
+        "canonical": "var(--seer-brand-purple)",
+        "cssVar": "--color-primary",
+        "approxHex": "#7d33ff",
+        "tonalRamp": [
+          "#0e002b",
+          "#2b0164",
+          "#4b00a6",
+          "#6e0eea",
+          "#895afe",
+          "#a791ff",
+          "#c9c0fe",
+          "#eeecfe"
+        ]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Pressed Purple",
+        "canonical": "var(--seer-brand-purple-hover)",
+        "cssVar": "--color-primary-hover",
+        "approxHex": "#6925df",
+        "tonalRamp": [
+          "#0e002b",
+          "#2a0066",
+          "#4a01a7",
+          "#6a27e0",
+          "#875bfe",
+          "#a592ff",
+          "#c8c0ff",
+          "#eeecff"
+        ]
+      },
+      "primary-text": {
+        "role": "primary",
+        "displayName": "Link Violet",
+        "canonical": "var(--seer-accent-text)",
+        "cssVar": "--color-primary-text",
+        "approxHex": "#6c2bd9",
+        "tonalRamp": [
+          "#0e002a",
+          "#2c0164",
+          "#4c01a5",
+          "#6c2bd9",
+          "#8b59fe",
+          "#a890fe",
+          "#cabfff",
+          "#eeecfe"
+        ]
+      },
+      "primary-text-dark": {
+        "role": "primary",
+        "displayName": "Bright Violet",
+        "canonical": "var(--seer-accent-text) under data-theme=dark",
+        "cssVar": "--color-primary-text",
+        "approxHex": "#b18aff",
+        "tonalRamp": [
+          "#100028",
+          "#30015f",
+          "#4f1f8d",
+          "#6e44b3",
+          "#8f67d9",
+          "#b28bff",
+          "#cfbdfe",
+          "#f0ebfe"
+        ]
+      },
+      "primary-text-hover": {
+        "role": "primary",
+        "displayName": "Pressed Violet",
+        "canonical": "color-mix(in oklab, var(--seer-accent-text) 80%, var(--seer-text))",
+        "cssVar": "--color-primary-text-hover",
+        "approxHex": "#592caf",
+        "tonalRamp": [
+          "#0e002a",
+          "#2c0164",
+          "#4b159c",
+          "#6840c2",
+          "#8864ea",
+          "#a890ff",
+          "#cabfff",
+          "#eeecfe"
+        ]
+      },
+      "primary-bg": {
+        "role": "primary",
+        "displayName": "Lilac Wash",
+        "canonical": "var(--seer-accent-soft)",
+        "cssVar": "--color-primary-bg",
+        "approxHex": "#efe9fc",
+        "tonalRamp": [
+          "#0d0914",
+          "#272230",
+          "#443f4e",
+          "#635e6e",
+          "#857f90",
+          "#a7a2b3",
+          "#cbc6d8",
+          "#f1ebfe"
+        ]
+      },
+      "primary-bg-dark": {
+        "role": "primary",
+        "displayName": "Ink Wash",
+        "canonical": "var(--seer-accent-soft) under data-theme=dark",
+        "cssVar": "--color-primary-bg",
+        "approxHex": "#241e33",
+        "tonalRamp": [
+          "#0d071a",
+          "#272136",
+          "#443e55",
+          "#635d76",
+          "#847e98",
+          "#a7a0bc",
+          "#cbc4e1",
+          "#f0ebfe"
+        ]
+      },
+      "primary-rule": {
+        "role": "primary",
+        "displayName": "Purple Hairline",
+        "canonical": "color-mix(in oklab, var(--seer-brand-purple) 40%, transparent)",
+        "cssVar": "--color-primary-rule",
+        "approxHex": "#7d33ff",
+        "tonalRamp": [
+          "#0e002b",
+          "#2b0164",
+          "#4b00a6",
+          "#6e0eea",
+          "#895afe",
+          "#a791ff",
+          "#c9c0fe",
+          "#eeecfe"
+        ]
+      },
+      "long": {
+        "role": "secondary",
+        "displayName": "Ledger Green",
+        "canonical": "var(--seer-positive)",
+        "cssVar": "--color-long",
+        "approxHex": "#13795b",
+        "tonalRamp": [
+          "#000f09",
+          "#002d1f",
+          "#044e39",
+          "#047355",
+          "#3a9576",
+          "#60b998",
+          "#85debc",
+          "#bfffe4"
+        ]
+      },
+      "long-dark": {
+        "role": "secondary",
+        "displayName": "Ledger Green (dark)",
+        "canonical": "var(--seer-positive) under data-theme=dark",
+        "cssVar": "--color-long",
+        "approxHex": "#3ecf8e",
+        "tonalRamp": [
+          "#000f06",
+          "#002e1a",
+          "#004f31",
+          "#01744a",
+          "#029b64",
+          "#2ac282",
+          "#5ce7a5",
+          "#c3ffdc"
+        ]
+      },
+      "long-hover": {
+        "role": "secondary",
+        "displayName": "Pressed Green",
+        "canonical": "color-mix(in oklab, var(--seer-positive) 85%, var(--seer-text))",
+        "cssVar": "--color-long-hover",
+        "approxHex": "#1b6951",
+        "tonalRamp": [
+          "#000f09",
+          "#022d20",
+          "#014f3a",
+          "#247058",
+          "#4a9379",
+          "#6eb69b",
+          "#92dbbf",
+          "#c0ffe5"
+        ]
+      },
+      "long-bg": {
+        "role": "secondary",
+        "displayName": "Green Wash",
+        "canonical": "color-mix(in oklab, var(--seer-positive) 10%, transparent)",
+        "cssVar": "--color-long-bg",
+        "approxHex": "#13795b",
+        "tonalRamp": [
+          "#000f09",
+          "#002d1f",
+          "#044e39",
+          "#047355",
+          "#3a9576",
+          "#60b998",
+          "#85debc",
+          "#bfffe4"
+        ]
+      },
+      "long-rule": {
+        "role": "secondary",
+        "displayName": "Green Hairline",
+        "canonical": "color-mix(in oklab, var(--seer-positive) 40%, transparent)",
+        "cssVar": "--color-long-rule",
+        "approxHex": "#13795b",
+        "tonalRamp": [
+          "#000f09",
+          "#002d1f",
+          "#044e39",
+          "#047355",
+          "#3a9576",
+          "#60b998",
+          "#85debc",
+          "#bfffe4"
+        ]
+      },
+      "short": {
+        "role": "secondary",
+        "displayName": "Signal Red",
+        "canonical": "var(--seer-negative)",
+        "cssVar": "--color-short",
+        "approxHex": "#c0283f",
+        "tonalRamp": [
+          "#1e0003",
+          "#4c010f",
+          "#7f0220",
+          "#b31634",
+          "#db4554",
+          "#fe717a",
+          "#ffb2b2",
+          "#ffe8e8"
+        ]
+      },
+      "short-dark": {
+        "role": "secondary",
+        "displayName": "Signal Red (dark)",
+        "canonical": "var(--seer-negative) under data-theme=dark",
+        "cssVar": "--color-short",
+        "approxHex": "#ff6b81",
+        "tonalRamp": [
+          "#1e0004",
+          "#4b0115",
+          "#7e0129",
+          "#b01b41",
+          "#d84761",
+          "#fe6f84",
+          "#feb1b7",
+          "#ffe8e9"
+        ]
+      },
+      "short-bg": {
+        "role": "secondary",
+        "displayName": "Red Wash",
+        "canonical": "color-mix(in oklab, var(--seer-negative) 10%, transparent)",
+        "cssVar": "--color-short-bg",
+        "approxHex": "#c0283f",
+        "tonalRamp": [
+          "#1e0003",
+          "#4c010f",
+          "#7f0220",
+          "#b31634",
+          "#db4554",
+          "#fe717a",
+          "#ffb2b2",
+          "#ffe8e8"
+        ]
+      },
+      "short-rule": {
+        "role": "secondary",
+        "displayName": "Red Hairline",
+        "canonical": "color-mix(in oklab, var(--seer-negative) 40%, transparent)",
+        "cssVar": "--color-short-rule",
+        "approxHex": "#c0283f",
+        "tonalRamp": [
+          "#1e0003",
+          "#4c010f",
+          "#7f0220",
+          "#b31634",
+          "#db4554",
+          "#fe717a",
+          "#ffb2b2",
+          "#ffe8e8"
+        ]
+      },
+      "series-up": {
+        "role": "tertiary",
+        "displayName": "Series Purple",
+        "canonical": "var(--seer-series-1)",
+        "cssVar": "--color-seer-series-1",
+        "approxHex": "#7d33ff",
+        "tonalRamp": [
+          "#0e002b",
+          "#2b0164",
+          "#4b00a6",
+          "#6e0eea",
+          "#895afe",
+          "#a791ff",
+          "#c9c0fe",
+          "#eeecfe"
+        ]
+      },
+      "series-up-dark": {
+        "role": "tertiary",
+        "displayName": "Series Purple (dark)",
+        "canonical": "var(--seer-series-1) under data-theme=dark",
+        "cssVar": "--color-seer-series-1",
+        "approxHex": "#8f55f7",
+        "tonalRamp": [
+          "#100028",
+          "#2e0062",
+          "#5001a1",
+          "#712ed1",
+          "#9157f9",
+          "#ad8efe",
+          "#cdbeff",
+          "#efecfe"
+        ]
+      },
+      "series-down": {
+        "role": "tertiary",
+        "displayName": "Series Gold",
+        "canonical": "var(--seer-series-2)",
+        "cssVar": "--color-seer-series-2",
+        "approxHex": "#b8860b",
+        "tonalRamp": [
+          "#110a00",
+          "#322200",
+          "#563d03",
+          "#7e5a04",
+          "#a77904",
+          "#ce9c31",
+          "#f4c05b",
+          "#feeccc"
+        ]
+      },
+      "series-down-dark": {
+        "role": "tertiary",
+        "displayName": "Series Gold (dark)",
+        "canonical": "var(--seer-series-2) under data-theme=dark",
+        "cssVar": "--color-seer-series-2",
+        "approxHex": "#b5850f",
+        "tonalRamp": [
+          "#110a00",
+          "#322200",
+          "#563d00",
+          "#7d5b04",
+          "#a77a05",
+          "#cd9c34",
+          "#f3c15d",
+          "#ffeccb"
+        ]
+      },
+      "series-3": {
+        "role": "tertiary",
+        "displayName": "Series Blue",
+        "canonical": "var(--seer-series-3)",
+        "cssVar": "--color-seer-series-3",
+        "approxHex": "#2a78d6",
+        "tonalRamp": [
+          "#000a20",
+          "#00244f",
+          "#004083",
+          "#055fba",
+          "#3582e1",
+          "#63a7ff",
+          "#a6ccff",
+          "#e5f0fe"
+        ]
+      },
+      "series-3-dark": {
+        "role": "tertiary",
+        "displayName": "Series Blue (dark)",
+        "canonical": "var(--seer-series-3) under data-theme=dark",
+        "cssVar": "--color-seer-series-3",
+        "approxHex": "#3987e5",
+        "tonalRamp": [
+          "#000b1f",
+          "#00244e",
+          "#024081",
+          "#025fb9",
+          "#3482e0",
+          "#61a7ff",
+          "#a6ccfe",
+          "#e4f0fe"
+        ]
+      },
+      "series-4": {
+        "role": "tertiary",
+        "displayName": "Series Rose",
+        "canonical": "var(--seer-series-4)",
+        "cssVar": "--color-seer-series-4",
+        "approxHex": "#d55181",
+        "tonalRamp": [
+          "#1d000a",
+          "#490122",
+          "#7c003d",
+          "#a8255c",
+          "#d04c7c",
+          "#f8719f",
+          "#ffafc5",
+          "#fee8ed"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "var(--seer-page)",
+        "cssVar": "--color-paper",
+        "approxHex": "#f7f7f9",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424243",
+          "#616163",
+          "#828284",
+          "#a5a5a7",
+          "#c9c9cb",
+          "#eeeef0"
+        ]
+      },
+      "paper-dark": {
+        "role": "neutral",
+        "displayName": "Night Paper",
+        "canonical": "var(--seer-page) under data-theme=dark",
+        "cssVar": "--color-paper",
+        "approxHex": "#101013",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252528",
+          "#414245",
+          "#616165",
+          "#828286",
+          "#a4a4a9",
+          "#c8c9cd",
+          "#eeeef2"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "var(--seer-surface)",
+        "cssVar": "--color-surface",
+        "approxHex": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Night Surface",
+        "canonical": "var(--seer-surface) under data-theme=dark",
+        "cssVar": "--color-surface",
+        "approxHex": "#1a1a1e",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252529",
+          "#414146",
+          "#616166",
+          "#828287",
+          "#a4a4aa",
+          "#c8c8ce",
+          "#eeeef4"
+        ]
+      },
+      "sunken": {
+        "role": "neutral",
+        "displayName": "Raised Grey",
+        "canonical": "var(--seer-surface-raised)",
+        "cssVar": "--color-sunken",
+        "approxHex": "#f1f1f4",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252527",
+          "#424244",
+          "#616163",
+          "#828285",
+          "#a5a5a7",
+          "#c9c9cc",
+          "#eeeef1"
+        ]
+      },
+      "sunken-dark": {
+        "role": "neutral",
+        "displayName": "Night Raised",
+        "canonical": "var(--seer-surface-raised) under data-theme=dark",
+        "cssVar": "--color-sunken",
+        "approxHex": "#1f1f24",
+        "tonalRamp": [
+          "#0b0b0f",
+          "#24242a",
+          "#414147",
+          "#606166",
+          "#828288",
+          "#a4a4ab",
+          "#c8c8cf",
+          "#eeeef5"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline Grey",
+        "canonical": "var(--seer-border)",
+        "cssVar": "--color-rule",
+        "approxHex": "#e2e2e9",
+        "tonalRamp": [
+          "#0b0b0f",
+          "#24242a",
+          "#414147",
+          "#616066",
+          "#828288",
+          "#a4a4ab",
+          "#c8c8cf",
+          "#eeeef5"
+        ]
+      },
+      "rule-dark": {
+        "role": "neutral",
+        "displayName": "Night Hairline",
+        "canonical": "var(--seer-border) under data-theme=dark",
+        "cssVar": "--color-rule",
+        "approxHex": "#34343c",
+        "tonalRamp": [
+          "#0a0a11",
+          "#24242c",
+          "#414149",
+          "#606069",
+          "#81818b",
+          "#a4a4ae",
+          "#c8c8d2",
+          "#ededf8"
+        ]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Firm Hairline",
+        "canonical": "color-mix(in oklab, var(--seer-text) 25%, var(--seer-border))",
+        "cssVar": "--color-rule-strong",
+        "approxHex": "#a9a9b0",
+        "tonalRamp": [
+          "#0b0b0f",
+          "#24242a",
+          "#414147",
+          "#606067",
+          "#828288",
+          "#a4a4ab",
+          "#c8c8cf",
+          "#eeeef5"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Near Black",
+        "canonical": "var(--seer-text)",
+        "cssVar": "--color-ink",
+        "approxHex": "#17171c",
+        "tonalRamp": [
+          "#0b0b0f",
+          "#24242a",
+          "#414147",
+          "#606067",
+          "#818288",
+          "#a4a4ab",
+          "#c8c8cf",
+          "#eeeef5"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Near White",
+        "canonical": "var(--seer-text) under data-theme=dark",
+        "cssVar": "--color-ink",
+        "approxHex": "#ededf2",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252528",
+          "#414145",
+          "#616165",
+          "#828286",
+          "#a4a4a9",
+          "#c8c8cd",
+          "#eeeef3"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Body Ink",
+        "canonical": "color-mix(in oklab, var(--seer-text) 80%, var(--seer-muted))",
+        "cssVar": "--color-ink-2",
+        "approxHex": "#24242a",
+        "tonalRamp": [
+          "#0b0b10",
+          "#24242a",
+          "#414148",
+          "#606067",
+          "#818189",
+          "#a4a4ac",
+          "#c8c8d0",
+          "#edeef6"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "canonical": "var(--seer-muted)",
+        "cssVar": "--color-ink-3",
+        "approxHex": "#5c5c66",
+        "tonalRamp": [
+          "#0a0a12",
+          "#24242d",
+          "#41414a",
+          "#60606a",
+          "#81818c",
+          "#a4a4af",
+          "#c8c8d3",
+          "#ededf9"
+        ]
+      },
+      "ink-3-dark": {
+        "role": "neutral",
+        "displayName": "Night Slate",
+        "canonical": "var(--seer-muted) under data-theme=dark",
+        "cssVar": "--color-ink-3",
+        "approxHex": "#a8a8b3",
+        "tonalRamp": [
+          "#0a0a12",
+          "#24242d",
+          "#41414a",
+          "#60606a",
+          "#81818c",
+          "#a4a4af",
+          "#c8c8d3",
+          "#ededf9"
+        ]
+      },
+      "ink-4": {
+        "role": "neutral",
+        "displayName": "Faint Slate",
+        "canonical": "color-mix(in oklab, var(--seer-muted) 90%, var(--seer-surface-raised))",
+        "cssVar": "--color-ink-4",
+        "approxHex": "#6a6a73",
+        "tonalRamp": [
+          "#0b0a11",
+          "#24242c",
+          "#414149",
+          "#606069",
+          "#81818b",
+          "#a4a4ae",
+          "#c8c8d2",
+          "#ededf8"
+        ]
+      },
+      "seer-ink": {
+        "role": "neutral",
+        "displayName": "Foundation Ink",
+        "canonical": "var(--seer-brand-ink)",
+        "cssVar": "--color-seer-ink",
+        "approxHex": "#141223",
+        "tonalRamp": [
+          "#0b0818",
+          "#242235",
+          "#413f53",
+          "#605e74",
+          "#817f96",
+          "#a3a2ba",
+          "#c8c6df",
+          "#edecfe"
+        ]
+      },
+      "on-ink": {
+        "role": "neutral",
+        "displayName": "Lilac White",
+        "canonical": "var(--seer-on-ink)",
+        "cssVar": "--color-seer-on-ink",
+        "approxHex": "#f2edff",
+        "tonalRamp": [
+          "#0c0914",
+          "#262330",
+          "#433f4e",
+          "#635e6e",
+          "#847f8f",
+          "#a7a2b3",
+          "#cbc6d7",
+          "#f0ebfd"
+        ]
+      },
+      "on-ink-muted": {
+        "role": "neutral",
+        "displayName": "Dusk Grey",
+        "canonical": "var(--seer-on-ink-muted)",
+        "cssVar": "--color-seer-on-ink-muted",
+        "approxHex": "#b9b1ca",
+        "tonalRamp": [
+          "#0e0718",
+          "#282134",
+          "#453e53",
+          "#645d73",
+          "#857e95",
+          "#a8a0b9",
+          "#ccc4de",
+          "#f1ebfe"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The contest question, the page H1. Held to 24ch, balanced."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card headings; Subtitle on a phone."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Card headings below 640px, one step under the 32px page heading."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "The live answer under the question, contest tab labels, typed amounts."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Document default in ink-2: table cells, descriptions, menu items."
+      },
+      "data": {
+        "displayName": "Data",
+        "purpose": "Read figures: the UP price beside a bar, legend values, tooltips."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase 0.05em: table column headers, badges, Live and network tags. Never above a heading."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Fact labels, phone-row prediction lines, footnotes."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "The kit's button type; 13px small, 15px large."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Wallet addresses, hashes and file contents only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "pop",
+        "value": "0 12px 32px rgb(20 18 35 / 0.16), 0 2px 6px rgb(20 18 35 / 0.08)",
+        "purpose": "Menus, popovers, tooltips, toasts and dialogs. Surfaces at rest have none."
+      }
+    ],
+    "motion": [
+      {
+        "name": "seer-ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The kit's easing for every state change."
+      },
+      {
+        "name": "seer-duration-fast",
+        "value": "150ms",
+        "purpose": "Colour and border changes on buttons, inputs, tabs and rows."
+      },
+      {
+        "name": "prediction-tick",
+        "value": "left, opacity 700ms cubic-bezier(0.16, 1, 0.3, 1), from left 0",
+        "purpose": "The one authored moment: ticks ease in from the bar origin when predictions load."
+      },
+      {
+        "name": "dialog-in",
+        "value": "240ms, from opacity 0 and translateY(12px)",
+        "purpose": "Dialog entrance on desktop."
+      },
+      {
+        "name": "sheet-in",
+        "value": "240ms, from translateY(100%)",
+        "purpose": "Dialog as a bottom sheet under 640px."
+      },
+      {
+        "name": "backdrop-in",
+        "value": "240ms, from opacity 0",
+        "purpose": "Dialog backdrop (Foundation Ink at 56%)."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animations and transitions at 0.01ms; animate-spin at 1.6s and animate-pulse at 2.4s keep running",
+        "purpose": "Feedback keeps moving, decoration stops."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The kit's primary button: one solid purple action per region (Connect wallet, the current onboarding step, the run).",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Connect wallet</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--seer-radius-sm); font: 600 14px/1.2 var(--seer-font-sans); cursor: pointer; transition: background-color 150ms var(--seer-ease-out), color 150ms var(--seer-ease-out), box-shadow 150ms var(--seer-ease-out); } .ds-btn:focus-visible { outline: 2px solid var(--seer-accent-text); outline-offset: 3px; } .ds-btn-primary { background: var(--seer-brand-purple); color: #fff; } .ds-btn-primary:hover { background: var(--seer-brand-purple-hover); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Deep's default button, the kit's outline: ink text on an inset hairline that turns violet on hover.",
+      "html": "<button class=\"ds-btn-outline\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4\"/></svg>Upload predictions</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 0; border-radius: var(--seer-radius-sm); background: transparent; color: var(--seer-text); box-shadow: inset 0 0 0 1px var(--seer-border); font: 600 13px/1.2 var(--seer-font-sans); cursor: pointer; transition: box-shadow 150ms var(--seer-ease-out), color 150ms var(--seer-ease-out); } .ds-btn-outline:hover { color: var(--seer-accent-text); box-shadow: inset 0 0 0 1px var(--seer-accent-text); } .ds-btn-outline:focus-visible { outline: 2px solid var(--seer-accent-text); outline-offset: 3px; }"
+    },
+    {
+      "name": "Ghost Nav Button",
+      "kind": "nav",
+      "refersTo": "button-ghost-current",
+      "description": "Header pages as ghost buttons; the current page fills Lilac Wash with violet text.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-ghost\" aria-current=\"page\">Markets</button><button class=\"ds-ghost\">Leaderboard</button></nav>",
+      "css": ".ds-nav { display: flex; gap: 4px; } .ds-ghost { min-height: 40px; padding: 0 16px; border: 0; border-radius: var(--seer-radius-sm); background: transparent; color: var(--seer-text); font: 600 14px/1.2 var(--seer-font-sans); cursor: pointer; transition: background-color 150ms var(--seer-ease-out); } .ds-ghost:hover { background: var(--seer-surface-raised); } .ds-ghost[aria-current=\"page\"] { background: var(--seer-accent-soft); color: var(--seer-accent-text); } .ds-ghost:focus-visible { outline: 2px solid var(--seer-accent-text); outline-offset: 3px; }"
+    },
+    {
+      "name": "Contest Tab",
+      "kind": "nav",
+      "refersTo": "contest-tab-active",
+      "description": "Contest tabs on a firm hairline; the active one in violet with a 2px purple underline, live contests marked by a pulsing dot and a Live tag.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab\" aria-selected=\"true\"><span class=\"ds-dot\"></span>Round 3 · Originality<span class=\"ds-live\">Live</span></button><button class=\"ds-tab\">Archive</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid color-mix(in oklab, var(--seer-text) 25%, var(--seer-border)); font-family: var(--seer-font-sans); } .ds-tab { margin-bottom: -1px; display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--seer-muted); font: 600 16px/24px var(--seer-font-sans); cursor: pointer; transition: color 150ms var(--seer-ease-out); } .ds-tab:hover { color: var(--seer-text); } .ds-tab[aria-selected=\"true\"] { border-color: var(--seer-brand-purple); color: var(--seer-accent-text); } .ds-dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--seer-positive); } .ds-live { font: 600 12px/16px var(--seer-font-sans); letter-spacing: 0.05em; text-transform: uppercase; color: var(--seer-positive); }"
+    },
+    {
+      "name": "Field Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The kit's input group: 44px, hairline border, 10px radius, violet focus ring; amounts carry a unit and a Max action.",
+      "html": "<label class=\"ds-group\"><input class=\"ds-input\" inputmode=\"decimal\" placeholder=\"0.00\"><span class=\"ds-affix\">sUSDS</span></label>",
+      "css": ".ds-group { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-inline: 12px; border: 1px solid var(--seer-border); border-radius: var(--seer-radius-md); background: var(--seer-surface); transition: border-color 150ms var(--seer-ease-out); } .ds-group:hover { border-color: color-mix(in srgb, var(--seer-border), var(--seer-text) 22%); } .ds-group:focus-within { outline: 2px solid var(--seer-accent-text); outline-offset: 2px; border-color: var(--seer-accent-text); } .ds-input { flex: 1; min-width: 0; padding: 10px 0; border: 0; background: transparent; color: var(--seer-text); font: 400 16px/24px var(--seer-font-sans); font-variant-numeric: tabular-nums; outline: none; } .ds-input::placeholder { color: var(--seer-muted); } .ds-affix { font: 600 13px/1 var(--seer-font-sans); color: var(--seer-muted); }"
+    },
+    {
+      "name": "Badges",
+      "kind": "chip",
+      "refersTo": "badge-neutral",
+      "description": "Label-type badges at 4px radius: neutral, long and short (10% fill, 40% border).",
+      "html": "<span class=\"ds-badge\">Ended</span> <span class=\"ds-badge ds-long\">Succeeded</span> <span class=\"ds-badge ds-short\">Failed</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 8px; border: 1px solid var(--seer-border); border-radius: var(--seer-radius-sm); background: var(--seer-surface-raised); color: color-mix(in oklab, var(--seer-text) 80%, var(--seer-muted)); font: 600 12px/16px var(--seer-font-sans); letter-spacing: 0.05em; text-transform: uppercase; } .ds-long { border-color: color-mix(in oklab, var(--seer-positive) 40%, transparent); background: color-mix(in oklab, var(--seer-positive) 10%, transparent); color: var(--seer-positive); } .ds-short { border-color: color-mix(in oklab, var(--seer-negative) 40%, transparent); background: color-mix(in oklab, var(--seer-negative) 10%, transparent); color: var(--seer-negative); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A surface on a hairline at 10px radius, no shadow, with a ruled header band.",
+      "html": "<section class=\"ds-card\"><div class=\"ds-card-head\"><h2>Original work per repository</h2><p>Ranked by the market's estimate.</p></div><div class=\"ds-card-body\">Rows sit here on hairlines.</div></section>",
+      "css": ".ds-card { overflow: hidden; border: 1px solid var(--seer-border); border-radius: var(--seer-radius-md); background: var(--seer-surface); color: color-mix(in oklab, var(--seer-text) 80%, var(--seer-muted)); font: 400 14px/21px var(--seer-font-sans); } .ds-card-head { padding: 20px 24px; border-bottom: 1px solid var(--seer-border); } .ds-card-head h2 { margin: 0; font: 700 24px/32px var(--seer-font-sans); color: var(--seer-text); } .ds-card-head p { margin: 4px 0 0; color: var(--seer-muted); } .ds-card-body { padding: 24px; }"
+    },
+    {
+      "name": "Outcome Bar",
+      "kind": "custom",
+      "refersTo": "outcome-bar-track",
+      "description": "UP in series purple from the left, DOWN in series gold from the right, both at raw price on one scale, the reader's prediction as an ink tick.",
+      "html": "<div class=\"ds-ob\"><span class=\"ds-ob-up-v\">88.7%</span><span class=\"ds-ob-track\"><span class=\"ds-ob-up\" style=\"width:88.7%\"></span><span class=\"ds-ob-down\" style=\"width:11.8%\"></span><span class=\"ds-ob-tick\" style=\"left:80%\"></span></span><span class=\"ds-ob-down-v\">11.8%</span></div>",
+      "css": ".ds-ob { display: flex; align-items: center; gap: 10px; font: 600 14px/20px var(--seer-font-sans); font-variant-numeric: tabular-nums; } .ds-ob-up-v { width: 56px; text-align: right; color: var(--seer-text); } .ds-ob-down-v { width: 56px; font-weight: 400; color: var(--seer-muted); } .ds-ob-track { position: relative; display: block; width: 120px; height: 8px; border-radius: 9999px; background: var(--seer-border); } .ds-ob-up { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 9999px; background: var(--seer-series-1); } .ds-ob-down { position: absolute; top: 0; bottom: 0; right: 0; border-radius: 9999px; background: var(--seer-series-2); box-shadow: 0 0 0 2px var(--seer-surface); } .ds-ob-tick { position: absolute; top: -4px; bottom: -4px; width: 2px; transform: translateX(-50%); border-radius: 9999px; background: var(--seer-text); box-shadow: 0 0 0 2px var(--seer-surface); transition: left 700ms var(--seer-ease-out); }"
+    },
+    {
+      "name": "Legend Row",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "A followed series in the chart legend: a slot-colour swatch, the name at 600 and its value; unfollowed rows show a hairline ring.",
+      "html": "<ul class=\"ds-legend\"><li><button class=\"ds-lr\" aria-pressed=\"true\"><span class=\"ds-sw\" style=\"background:var(--seer-series-1)\"></span><span class=\"ds-n\">supranational/blst</span><span class=\"ds-v\">88.7%</span></button></li><li><button class=\"ds-lr\" aria-pressed=\"false\"><span class=\"ds-sw ds-ring\"></span><span class=\"ds-n\">flashbots/mev-boost</span><span class=\"ds-v\">87.0%</span></button></li></ul>",
+      "css": ".ds-legend { list-style: none; margin: 0; padding: 0; width: 240px; display: grid; gap: 1px; } .ds-lr { display: flex; width: 100%; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: var(--seer-radius-sm); background: transparent; text-align: left; cursor: pointer; font: 400 14px/20px var(--seer-font-sans); font-variant-numeric: tabular-nums; transition: background-color 150ms var(--seer-ease-out); } .ds-lr:hover, .ds-lr:focus-visible { background: var(--seer-surface-raised); } .ds-sw { width: 10px; height: 10px; flex: none; border-radius: 9999px; } .ds-ring { border: 1px solid color-mix(in oklab, var(--seer-text) 25%, var(--seer-border)); } .ds-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: color-mix(in oklab, var(--seer-text) 80%, var(--seer-muted)); } .ds-lr[aria-pressed=\"true\"] .ds-n { font-weight: 600; color: var(--seer-text); } .ds-v { color: var(--seer-muted); }"
+    },
+    {
+      "name": "Seer Promo",
+      "kind": "card",
+      "refersTo": "promo-field",
+      "description": "An ink field in both themes (data-theme=dark) pointing to the Seer app, with the kit's secondary button.",
+      "html": "<div class=\"ds-promo\" data-theme=\"dark\"><div><p class=\"ds-p1\">Trading one market at a time?</p><p class=\"ds-p2\">Seer has the individual market view, liquidity provision and full analytics.</p></div><a class=\"ds-promo-btn\" href=\"#\">Browse on Seer</a></div>",
+      "css": ".ds-promo { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 24px; border-radius: var(--seer-radius-md); background: var(--seer-brand-ink); font-family: var(--seer-font-sans); } .ds-p1 { margin: 0; font: 600 16px/24px var(--seer-font-sans); color: var(--seer-on-ink); } .ds-p2 { margin: 4px 0 0; font: 400 14px/21px var(--seer-font-sans); color: var(--seer-on-ink-muted); } .ds-promo-btn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: var(--seer-radius-sm); background: #241e33; color: #b18aff; font: 600 14px/1.2 var(--seer-font-sans); text-decoration: none; transition: background-color 150ms var(--seer-ease-out); } .ds-promo-btn:hover { background: color-mix(in srgb, #241e33, var(--seer-brand-purple) 14%); } .ds-promo-btn:focus-visible { outline: 2px solid #b18aff; outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Ranked Field",
+    "overview": "Deep is a working surface for contests that price dozens of outcomes at once (98 repositories in Round 3). Its world is Electric Foundation from `@seer-pm/ui-kit`, applied as an operating app: a cool grey page, white surfaces on hairlines, Open Sans at every size, purple for the one action that matters. The reading comes before the trade. A contest page opens on its question as the page's own heading, one sentence of live answer, and who asks and resolves; then the whole field, ranked, each row carrying its two-sided reading on one bar. Any single series is detail on demand.\n\nDensity is high but calm. Rows are 14px tabular text with 16px of vertical padding, peers are separated by hairlines, and color is spent only where it means something: purple for action, green and red for the direction of a trade or a result, the kit's series colors for the identity of a followed line or a side of a pair. Everything else is the grey ramp. The app follows the reader's light or dark theme through the kit's `data-theme`, and every Deep token is a semantic name mapped onto a kit token, so both themes hold without a second palette.",
+    "keyCharacteristics": [
+      "Hairline surfaces on a grey page: white cards with a 1px rule at 10px radius, no shadow at rest.",
+      "Three color meanings and no fourth: primary for action, long and short for direction, series for identity.",
+      "A two-sided reading is one bar: UP in series purple from the left, DOWN in series gold from the right, the reader's prediction as an ink tick.",
+      "Muted context lines with at most four followed series in color.",
+      "Tabular figures across the whole document; every number is printed, so color is never the only channel.",
+      "Theme-following in both directions, with one ink field (the Seer promo) and the kit footer that stay ink in both themes."
+    ],
+    "rules": [
+      {
+        "name": "The Kit Owns the Value Rule",
+        "body": "Every color in Deep is `var(--seer-*)` or a `color-mix` of two of them. A new color is a new kit token, added in the kit, never a literal in this repo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Meanings Rule",
+        "body": "Purple is action, green and red are direction, series colors are identity. A series color never stands for a gain or a loss, a status color never marks a side of a pair, and purple never decorates.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fixed Ink Rule",
+        "body": "The Seer promo and the ecosystem footer are ink in both themes. An ink field sets `data-theme=\"dark\"` so kit controls on it take the dark tokens whatever the page theme.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Document Rule",
+        "body": "`body` sets `font-variant-numeric: tabular-nums`, so every price, weight, balance and rank lines up in its column and does not jitter as prices move.",
+        "section": "typography"
+      },
+      {
+        "name": "The Role Name Rule",
+        "body": "Sizes are chosen by role (`text-body`, `text-data`, `text-label`, `text-micro`, `text-lede`, `text-title`), not by Tailwind's numeric steps. A size outside the roles is a new role, named in `src/index.css`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Shared Column Rule",
+        "body": "Header, content and footer share one container and one set of gutters. Nothing runs full-bleed except the footer's ink band.",
+        "section": "layout"
+      },
+      {
+        "name": "The Field in the First Screen Rule",
+        "body": "On a contest page, controls that sit between the brief and the field cost one line, not a padded box (the predictions toolbar is a ruled strip, not a card), so the field's first rows stay in view.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline Surface Rule",
+        "body": "A surface at rest has a 1px rule and no shadow. A shadow means the element floats above the page and will go away.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Opaque Bar Rule",
+        "body": "The sticky header is opaque `paper`, never frosted: a persistent backdrop filter re-composites the page under it on every scroll.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Pair Bar Rule",
+        "body": "A two-sided reading (UP and DOWN, pass and fail) is one bar on one scale with both sides at their raw price, Series Purple from the left and Series Gold from the right. Never two separate bars, never status colors.",
+        "section": "components"
+      },
+      {
+        "name": "The Four Followed Rule",
+        "body": "A chart with many series draws them all as muted context and follows at most four in color, one per series slot, in slot order. A fifth is refused, not cycled.",
+        "section": "components"
+      },
+      {
+        "name": "The Printed Number Rule",
+        "body": "Color is never the only channel: every bar prints its values, every delta prints its sign, every status dot sits beside its word.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do take every color, radius, font and motion value from `@seer-pm/ui-kit` through Deep's semantic names in `src/index.css`, and change a shared value in the kit's package, never here.",
+      "Do open a contest page on its question, the live answer and who asks and resolves, then the ranked field; the trading tools follow.",
+      "Do draw a two-sided price as the Outcome Bar, with the reader's prediction as a tick on the same scale.",
+      "Do keep surfaces on 1px hairlines at 10px radius and reserve the pop shadow for things that float.",
+      "Do put solid status fills under `paper` text, not white.",
+      "Do set `data-theme=\"dark\"` on any ink field, and read chart colors from the kit tokens on each theme change.",
+      "Do move state over 150ms on the kit's ease-out (`cubic-bezier(0.16, 1, 0.3, 1)`), keep the prediction tick as the one authored motion, and let spinners and pulses keep turning (slowed) under reduced motion.",
+      "Do give a disabled action its reason in a tooltip and keep it focusable."
+    ],
+    "donts": [
+      "Don't write a literal color, radius or font in a component, or redefine a `--seer-*` value in this repo.",
+      "Don't use a series color for a gain or loss, or green and red for a side of a pair.",
+      "Don't follow more than four series in color, or give every line in a field its own hue.",
+      "Don't put a shadow on a card at rest or frost the sticky header.",
+      "Don't box a toolbar or a single row as a card; peers sit on hairlines.",
+      "Don't put a small uppercase label above a heading. The label role names a column, a badge or a tag, beside or above the values it names.",
+      "Don't let a color carry a number on its own; print the value and its sign."
+    ]
+  }
+}

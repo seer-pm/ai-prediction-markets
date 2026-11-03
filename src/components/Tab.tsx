@@ -100,7 +100,7 @@ export const Tab = () => {
               onClick={() => handleTabClick(tab.id)}
               className={cn(
                 "-mb-px inline-flex shrink-0 cursor-pointer items-center gap-2 border-b-2 px-4 py-3 text-lede font-semibold whitespace-nowrap transition-colors",
-                active ? "border-primary text-primary" : "border-transparent text-ink-3 hover:text-ink",
+                active ? "border-primary text-primary-text" : "border-transparent text-ink-3 hover:text-ink",
               )}
             >
               <StatusDot tone="long" pulse />
@@ -116,7 +116,7 @@ export const Tab = () => {
             className={cn(
               "-mb-px inline-flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-4 py-3 text-lede font-semibold whitespace-nowrap transition-colors",
               activeArchived
-                ? "border-primary text-primary"
+                ? "border-primary text-primary-text"
                 : "border-transparent text-ink-3 hover:text-ink",
             )}
           >
@@ -129,7 +129,7 @@ export const Tab = () => {
             <DropdownMenu.Content
               align="start"
               sideOffset={4}
-              className="z-50 min-w-56 overflow-hidden rounded-md border border-rule bg-surface py-1 shadow-pop"
+              className="z-50 min-w-56 overflow-hidden rounded-lg border border-rule bg-surface py-1 shadow-pop"
             >
               <p className="px-3 py-1.5 text-label font-semibold tracking-wider text-ink-4 uppercase">
                 Ended contests
@@ -145,7 +145,7 @@ export const Tab = () => {
                       active ? "text-ink" : "text-ink-2",
                     )}
                   >
-                    <span className="w-4 shrink-0 text-primary">{active && <CheckIcon />}</span>
+                    <span className="w-4 shrink-0 text-primary-text">{active && <CheckIcon />}</span>
                     {tab.label}
                   </DropdownMenu.Item>
                 );

@@ -13,21 +13,22 @@ interface FieldProps {
   className?: string;
 }
 
+/** The kit's field (`.seer-field`): label, the control, then a hint or the error. */
 export function Field({ label, htmlFor, children, hint, error, aside, className }: FieldProps) {
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("seer-field", className)}>
       <div className="flex items-end justify-between gap-3">
-        <label htmlFor={htmlFor} className="text-body font-medium text-ink">
+        <label htmlFor={htmlFor} className="seer-label">
           {label}
         </label>
-        {aside && <div className="flex items-center gap-3 text-body text-ink-3">{aside}</div>}
+        {aside && <div className="seer-hint flex items-center gap-3">{aside}</div>}
       </div>
       {children}
       {/* Errors live under the field, never inside the submit button. */}
       {error ? (
-        <p className="text-body text-short">{error}</p>
+        <p className="seer-error">{error}</p>
       ) : hint ? (
-        <p className="text-body text-ink-3">{hint}</p>
+        <p className="seer-hint">{hint}</p>
       ) : null}
     </div>
   );
@@ -59,41 +60,22 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
       error={error}
       aside={
         balance !== undefined || balanceLoading ? (
-          <>
-            <span className="text-ink-3">
-              Balance{" "}
-              {balanceLoading ? (
-                <Skeleton className="ml-1 inline-block align-middle" width={60} height={13} />
-              ) : (
-                <span className="font-mono text-ink-2">
-                  {balance}
-                  {unit ? ` ${unit}` : ""}
-                </span>
-              )}
-            </span>
-            {onMax && (
-              <button
-                type="button"
-                onClick={onMax}
-                disabled={disabled || balanceLoading}
-                className="cursor-pointer text-body font-semibold text-primary transition-colors hover:text-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                Max
-              </button>
+          <span>
+            Balance{" "}
+            {balanceLoading ? (
+              <Skeleton className="ml-1 inline-block align-middle" width={60} height={13} />
+            ) : (
+              <span className="text-ink-2">
+                {balance}
+                {unit ? ` ${unit}` : ""}
+              </span>
             )}
-          </>
+          </span>
         ) : undefined
       }
     >
-      <div
-        className={cn(
-          "flex items-center rounded-md border bg-surface transition-colors",
-          error
-            ? "border-short ring-2 ring-short-rule"
-            : "border-rule-strong focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-rule",
-          disabled && "bg-sunken",
-        )}
-      >
+      {/* Unit and Max sit inside the box, as in every Seer amount field. */}
+      <div className="seer-input-group">
         <input
           ref={ref}
           id={id}
@@ -102,34 +84,28 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
           inputMode="decimal"
           disabled={disabled}
           aria-invalid={!!error}
-          className={cn(
-            "min-w-0 flex-1 bg-transparent p-4 font-mono text-lede text-ink outline-none placeholder:font-sans placeholder:text-ink-4 disabled:cursor-not-allowed",
-            className,
-          )}
+          className={cn("seer-input text-lede", className)}
           {...rest}
         />
-        {unit && (
-          <span className="shrink-0 border-l border-rule px-4 py-4 text-body font-medium text-ink-3">
-            {unit}
-          </span>
+        {unit && <span className="seer-input-affix">{unit}</span>}
+        {onMax && (
+          <button
+            type="button"
+            onClick={onMax}
+            disabled={disabled || balanceLoading}
+            className="seer-button seer-button-ghost seer-button-sm text-primary-text"
+          >
+            Max
+          </button>
         )}
       </div>
     </Field>
   );
 });
 
-/** Plain text input matching the amount field's shell. */
+/** Plain text input, the kit's `.seer-input`. */
 export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function TextInput({ className, ...rest }, ref) {
-    return (
-      <input
-        ref={ref}
-        className={cn(
-          "w-full rounded-md border border-rule-strong bg-surface px-3 py-2.5 text-body text-ink transition-colors outline-none placeholder:text-ink-4 focus:border-primary focus:ring-2 focus:ring-primary-rule disabled:cursor-not-allowed disabled:bg-sunken",
-          className,
-        )}
-        {...rest}
-      />
-    );
+    return <input ref={ref} className={cn("seer-input", className)} {...rest} />;
   },
 );

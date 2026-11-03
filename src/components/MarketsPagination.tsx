@@ -1,8 +1,8 @@
-import { ChevronLeft, ChevronRight } from "@/lib/icons";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import ReactPaginate from "react-paginate";
 
 const cell =
-  "h-9 min-w-9 px-1 flex items-center justify-center rounded-md border border-rule-strong bg-surface text-body text-ink-2 cursor-pointer shadow-raised transition-colors hover:bg-sunken";
+  "h-9 min-w-9 px-1 flex items-center justify-center rounded-md border border-rule-strong bg-surface text-body text-ink-2 cursor-pointer transition-colors hover:bg-sunken";
 
 function MarketsPagination({
   pageCount,
@@ -16,11 +16,11 @@ function MarketsPagination({
   return (
     <ReactPaginate
       breakLabel="…"
-      nextLabel={<ChevronRight fill="currentColor" />}
+      nextLabel={<ChevronRightIcon aria-label="Next page" />}
       onPageChange={handlePageClick}
       forcePage={page - 1}
       pageCount={pageCount}
-      previousLabel={<ChevronLeft fill="currentColor" />}
+      previousLabel={<ChevronLeftIcon aria-label="Previous page" />}
       renderOnZeroPageCount={null}
       className="flex items-center justify-center gap-1.5"
       activeClassName="!border-primary !bg-primary !text-white"

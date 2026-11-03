@@ -52,7 +52,6 @@ const OctantMarketTableInner: React.FC<MarketTableProps> = ({
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Octant"
         title="Project funding share"
         description="Each project's share of the round, as a percentage."
         actions={

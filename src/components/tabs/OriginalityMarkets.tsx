@@ -4,6 +4,7 @@ import { useContest } from "@/components/contest/contestState";
 import { tradeDisabledReason } from "@/utils/contest";
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { WITHDRAW_PHASES, mergeFirstSellCopy } from "@/utils/txPhases";
+import { ContestBrief } from "@/components/contest/ContestBrief";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
@@ -19,6 +20,8 @@ import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
+import { formatShare } from "@/utils/format";
+import { defaultPins, togglePin, type Pins } from "@/utils/pins";
 import { parseOriginalityCSV } from "@/utils/csvParser";
 import {
   ORIGINALITY_ROUND_2,
@@ -157,6 +160,38 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       return series ? [{ ...series, outcomeName: repo }] : [];
     });
   }, [charts, marketIdToRepo]);
+
+  // The repositories followed in colour, shared by the field and the chart. Until the reader picks
+  // any, the chart's own leaders stand in, so both open on the same three.
+  const [chosenPins, setChosenPins] = useState<Pins | null>(null);
+  const pins = useMemo(() => chosenPins ?? defaultPins(chartData ?? []), [chosenPins, chartData]);
+  const toggleRepoPin = useCallback((repo: string) => setChosenPins(togglePin(pins, repo)), [pins]);
+
+  // What the market answers today, in the asker's terms, from the same prices the field shows.
+  const ranked = useMemo(
+    () =>
+      (tableData ?? [])
+        .filter((row) => row.repo !== "Invalid result" && row.upPrice !== null)
+        .sort((a, b) => (b.upPrice ?? 0) - (a.upPrice ?? 0)),
+    [tableData],
+  );
+  const answer = useMemo(() => {
+    if (ranked.length === 0) return "Prices appear here once these markets have traded.";
+    const share = (value: number | null) => `${Math.round((value ?? 0) * 100)}%`;
+    const median = ranked[Math.floor(ranked.length / 2)];
+    const top = ranked[0];
+    const bottom = ranked[ranked.length - 1];
+    return (
+      <>
+        The market expects the typical repository to be{" "}
+        <strong className="font-semibold text-ink">{share(median.upPrice)} original work</strong>,
+        the rest carried by its dependencies. It rates{" "}
+        <strong className="font-semibold text-ink">{top.repo}</strong> the most original, at{" "}
+        {share(top.upPrice)}, and <strong className="font-semibold text-ink">{bottom.repo}</strong>{" "}
+        the least, at {share(bottom.upPrice)}.
+      </>
+    );
+  }, [ranked]);
 
   // A repo market is split against a parent outcome token, not sUSDS. The parent's outcomes (Invalid
   // aside) share one sUSDS between them, so each token is valued at an even share of it. Until the
@@ -439,19 +474,22 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
 
   return (
     <>
-      <ContestChart
-        data={isUndefined(chartData) ? undefined : chartData}
-        isLoading={isLoadingCharts}
-        error={chartsError}
-        eyebrow={round.eyebrow}
-        title="Share of original work over time"
-        description="Each line is a repository's UP price — the market's estimate of how much of it is original."
-        volume={volumeLabel}
-        liquidity={liquidityLabel}
-        refreshMarketIds={chartMarketIds}
+      <ContestBrief
+        question="How much of each repository is its own original work?"
+        answer={answer}
+        live={!finished}
+        facts={[
+          { label: "Asked by", value: "Deep Funding" },
+          { label: "Resolved by", value: "The Deep Funding jury's evaluation", wide: true },
+          {
+            label: "Repositories",
+            value: tableData ? tableData.filter((row) => row.repo !== "Invalid result").length : "…",
+          },
+        ]}
       />
 
       <ContestBar
+        bare
         predictionCount={predictions.length}
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
@@ -487,6 +525,22 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
         emptyState={emptyState}
         onExport={exportWeight}
         exportDisabled={!tableData}
+        pins={pins}
+        onTogglePin={toggleRepoPin}
+      />
+
+      <ContestChart
+        data={isUndefined(chartData) ? undefined : chartData}
+        isLoading={isLoadingCharts}
+        error={chartsError}
+        title="Original work over time"
+        description="Each line is a repository's UP price. The ones you follow are in colour; the rest of the field stays behind them."
+        volume={volumeLabel}
+        liquidity={liquidityLabel}
+        refreshMarketIds={chartMarketIds}
+        pins={pins}
+        onPinsChange={setChosenPins}
+        formatValue={formatShare}
       />
 
       <GenericCSVUpload<OriginalityRow>

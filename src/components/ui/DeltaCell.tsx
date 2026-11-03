@@ -37,7 +37,7 @@ export function DeltaCell({ value, max = 0, bar = true, format, title, className
             <span className="mx-auto block h-4 w-px bg-rule" />
           </span>
         )}
-        <span className="font-mono text-body text-ink-4">—</span>
+        <span className="text-body text-ink-4">—</span>
       </div>
     );
   }
@@ -61,7 +61,7 @@ export function DeltaCell({ value, max = 0, bar = true, format, title, className
         </span>
       )}
       <span
-        className={cn("font-mono text-body font-semibold", positive ? "text-long" : "text-short")}
+        className={cn("text-body font-semibold", positive ? "text-long" : "text-short")}
       >
         {format(value)}
       </span>

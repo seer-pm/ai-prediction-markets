@@ -23,7 +23,7 @@ function Trigger({ label, muted }: { label: string; muted: boolean }) {
   return (
     <Popover.Trigger
       className={cn(
-        "flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-rule-strong bg-surface px-3 text-body shadow-raised transition-colors hover:border-ink-4",
+        "seer-input flex min-h-10 cursor-pointer items-center justify-between gap-2 py-0 text-left text-body",
         muted ? "text-ink-4" : "text-ink",
       )}
     >
@@ -52,7 +52,7 @@ function Surface({
         align="start"
         sideOffset={4}
         collisionPadding={12}
-        className="z-50 w-[var(--radix-popover-trigger-width)] min-w-56 overflow-hidden rounded-md border border-rule bg-surface shadow-pop"
+        className="z-50 w-[var(--radix-popover-trigger-width)] min-w-56 overflow-hidden rounded-lg border border-rule bg-surface shadow-pop"
       >
         {searchable && (
           <div className="flex items-center gap-2 border-b border-rule px-3 py-2">
@@ -139,7 +139,7 @@ export function Select({
                 }}
                 className={cn(rowClass, isSelected ? "text-ink" : "text-ink-2")}
               >
-                <span className="w-4 shrink-0 text-primary">{isSelected && <CheckIcon />}</span>
+                <span className="w-4 shrink-0 text-primary-text">{isSelected && <CheckIcon />}</span>
                 <span className="truncate">{option.text}</span>
               </button>
             );
@@ -207,7 +207,7 @@ export function MultiSelect({
             <button
               type="button"
               onClick={() => onChange([])}
-              className="w-full cursor-pointer border-b border-rule px-3 py-2 text-left text-body text-primary transition-colors hover:text-primary-hover"
+              className="w-full cursor-pointer border-b border-rule px-3 py-2 text-left text-body text-primary-text transition-colors hover:text-primary-text-hover"
             >
               Clear selection
             </button>
@@ -226,7 +226,7 @@ export function MultiSelect({
               >
                 <span
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-[3px] border",
+                    "flex size-4 shrink-0 items-center justify-center rounded-sm border",
                     isChecked ? "border-primary bg-primary text-white" : "border-rule-strong",
                   )}
                 >

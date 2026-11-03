@@ -18,11 +18,21 @@ const grouped = (min: number, max: number) =>
 const weightFormatter = grouped(4, 4);
 const collateralFormatter = grouped(2, 2);
 const percentFormatter = grouped(2, 2);
+const shareFormatter = grouped(1, 1);
 
 /** Market weights / prices: 4 decimals is enough to act on, 8 was noise. */
 export function formatWeight(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return EM_DASH;
   return weightFormatter.format(value);
+}
+
+/**
+ * A 0-1 price read as a share, "88.7%": how a question's asker reads an estimate. Weights stay in
+ * `formatWeight` wherever they meet a predictions CSV, which is written in weights.
+ */
+export function formatShare(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return EM_DASH;
+  return `${shareFormatter.format(value * 100)}%`;
 }
 
 /** Signed delta with an explicit sign glyph — colour is never the only channel. */

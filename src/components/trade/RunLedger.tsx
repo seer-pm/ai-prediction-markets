@@ -21,7 +21,7 @@ type RowState = "done" | "running" | "failed" | "skipped" | "pending";
 function Marker({ state }: { state: RowState }) {
   if (state === "running") {
     return (
-      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-primary">
+      <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-primary-text">
         <Spinner size={16} />
       </span>
     );
@@ -32,8 +32,8 @@ function Marker({ state }: { state: RowState }) {
       aria-hidden
       className={cn(
         "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
-        state === "done" && "border-long bg-long text-white",
-        state === "failed" && "border-short bg-short text-white",
+        state === "done" && "border-long bg-long text-paper",
+        state === "failed" && "border-short bg-short text-paper",
         // A skipped stage is neither a success nor a failure: an outlined dash, so a glance down
         // the column still reads as "these ran, this one had nothing to do".
         state === "skipped" && "border-rule-strong bg-sunken text-ink-4",
@@ -125,7 +125,7 @@ export function RunLedger({
                     <span className="shrink-0 text-body text-ink-4">Nothing to do</span>
                   )}
                   {showCounter && (
-                    <span className="shrink-0 font-mono text-body font-semibold text-ink-3">
+                    <span className="shrink-0 text-body font-semibold text-ink-3">
                       {current!.step}/{current!.of}
                     </span>
                   )}

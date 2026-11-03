@@ -193,7 +193,6 @@ export const OctantMarkets = () => {
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingChart}
         error={chartError}
-        eyebrow="Octant"
         title="Project funding share over time"
         volume={volumeLabel}
         liquidity={liquidityLabel}

@@ -68,7 +68,6 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Zcash · NU7"
         title="Predicted outcome prices"
         description="One row per outcome, grouped by ballot question. Your number sits beside the market's, and the difference is what a run would trade."
         actions={
@@ -119,13 +118,13 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
                       href={getSeerMarketUrl(market.marketId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group/link inline-flex items-baseline gap-1.5 text-body font-semibold whitespace-normal text-ink transition-colors hover:text-primary"
+                      className="group/link inline-flex items-baseline gap-1.5 text-body font-semibold whitespace-normal text-ink transition-colors hover:text-primary-text"
                     >
                       <span>{market.marketName}</span>
                       <ExternalIcon
                         width={13}
                         height={13}
-                        className="shrink-0 self-center text-ink-4 transition-colors group-hover/link:text-primary"
+                        className="shrink-0 self-center text-ink-4 transition-colors group-hover/link:text-primary-text"
                       />
                     </a>
                     {market.marketStatus === MarketStatus.CLOSED && (
@@ -138,7 +137,7 @@ const ZcashNu7MarketTableInner: React.FC<ZcashNu7MarketTableProps> = ({
 
                 {market.outcomes.map((leg) => (
                   <Tr key={leg.token}>
-                    <Td className="font-mono text-ink-4">{leg.outcomeNumber}</Td>
+                    <Td className="text-ink-4">{leg.outcomeNumber}</Td>
                     <Td className="whitespace-normal text-ink">{leg.outcome}</Td>
                     <Td numeric>
                       {isLoadingBalances && leg.balance === undefined ? (

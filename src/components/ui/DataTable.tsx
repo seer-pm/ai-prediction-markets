@@ -1,5 +1,5 @@
 import { cn } from "@/utils/cn";
-import type { ReactNode, Ref, ThHTMLAttributes, TdHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref, type ThHTMLAttributes, type TdHTMLAttributes } from "react";
 import { ChevronDownIcon } from "./icons";
 import { Skeleton } from "./Skeleton";
 
@@ -26,9 +26,37 @@ export function TableScroller({
   children: ReactNode;
   className?: string;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+
+  // A row cut at the box's edge reads as the end of the table. While rows remain below, the bottom
+  // fades into the surface, so the cut reads as "more" instead.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setMore(el.scrollHeight - el.clientHeight - el.scrollTop > 2);
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, []);
+
   return (
-    <div className={cn("max-h-[min(72vh,46rem)] overflow-auto overscroll-contain", className)}>
-      {children}
+    <div className={cn("relative", className)}>
+      <div ref={ref} className="max-h-[min(72vh,46rem)] overflow-auto overscroll-contain">
+        {children}
+      </div>
+      {more && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-12 bg-gradient-to-t from-surface to-transparent"
+        />
+      )}
     </div>
   );
 }
@@ -177,7 +205,7 @@ export function Td({ numeric, pinned, className, children, ...rest }: TdProps) {
     <td
       className={cn(
         "border-b border-rule px-3 py-4 whitespace-nowrap text-ink-2 sm:px-6",
-        numeric && "text-right font-mono",
+        numeric && "text-right",
         pinned &&
           "sticky left-0 z-[1] bg-surface transition-colors group-hover:bg-sunken after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-rule",
         className,

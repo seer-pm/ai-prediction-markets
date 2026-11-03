@@ -140,8 +140,8 @@ export function LeaderboardPanel() {
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Leaderboard"
-        title={scopeLabel(scope)}
+        as="h1"
+        title={`Leaderboard · ${scopeLabel(scope)}`}
         description={
           scope === "global"
             ? `Every wallet across all deep markets, ranked by ${SORT_LABELS[sortBy]}. Profit is realised and marked-to-market, in USD.`
@@ -199,17 +199,16 @@ export function LeaderboardPanel() {
           >
             <TextInput
               type="search"
-              className="w-full py-1.5 sm:w-56"
+              className="min-h-10 w-full py-2 sm:w-56"
               placeholder="Search by address"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
             />
-            <Button size="sm" type="submit" variant="secondary" iconLeft={<SearchIcon />}>
+            <Button type="submit" variant="secondary" iconLeft={<SearchIcon />}>
               Search
             </Button>
             {search && (
               <Button
-                size="sm"
                 variant="ghost"
                 onClick={() => {
                   setSearch("");

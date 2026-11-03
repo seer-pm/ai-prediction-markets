@@ -8,7 +8,7 @@ type Tone = "info" | "working" | "success" | "error";
 
 const TONES: Record<Tone, { box: string; icon: string; title: string }> = {
   info: { box: "border-rule bg-sunken", icon: "text-ink-3", title: "text-ink" },
-  working: { box: "border-primary-rule bg-primary-bg", icon: "text-primary", title: "text-primary" },
+  working: { box: "border-primary-rule bg-primary-bg", icon: "text-primary-text", title: "text-primary-text" },
   success: { box: "border-long-rule bg-long-bg", icon: "text-long", title: "text-long" },
   error: { box: "border-short-rule bg-short-bg", icon: "text-short", title: "text-short" },
 };
