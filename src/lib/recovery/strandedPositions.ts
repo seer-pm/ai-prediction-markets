@@ -44,8 +44,12 @@ import {
 /** The 1155-to-20 factory every Seer outcome token on Optimism was created by. */
 export const WRAPPED1155_FACTORY: Address = "0xD194319D1804C1051DD21Ba1Dc931cA72410B79f";
 
-/** Optimism caps a transaction at 2^24 gas; chunks are kept under this, with room to spare. */
-export const MAX_CHUNK_GAS = 14_000_000n;
+/**
+ * Optimism caps a transaction at 2^24 (~16.7M) gas; chunks are kept under this, with ~1.7M to
+ * spare. At 14M the stranded wallet this page was built for (255 tokens, unwrap estimated 13.5M)
+ * sat 0.5M from being split into two unwraps; 15M keeps it to one.
+ */
+export const MAX_CHUNK_GAS = 15_000_000n;
 
 const wrappedAbi = parseAbi([
   "function factory() view returns (address)",
