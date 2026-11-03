@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PATHS, ROUND3_WITHDRAW_PATH, viewFromPath } from "./views";
+import { PATHS, RECOVER_POSITIONS_PATH, ROUND3_WITHDRAW_PATH, viewFromPath } from "./views";
 
 describe("viewFromPath", () => {
   it("maps each view's own path back to it", () => {
@@ -13,6 +13,12 @@ describe("viewFromPath", () => {
     expect(viewFromPath("/round3-withdraw")).toBe("round3-withdraw");
     expect(viewFromPath("/round3-withdraw/")).toBe("round3-withdraw");
     expect(viewFromPath("/Round3-Withdraw")).toBe("round3-withdraw");
+  });
+
+  it("opens the recovery page from its link", () => {
+    expect(RECOVER_POSITIONS_PATH).toBe("/recover-positions");
+    expect(viewFromPath("/recover-positions/")).toBe("recover-positions");
+    expect(viewFromPath("/Recover-Positions")).toBe("recover-positions");
   });
 
   it("keeps the leaderboard path working", () => {
