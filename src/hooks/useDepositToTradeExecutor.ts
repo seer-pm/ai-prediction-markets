@@ -1,7 +1,7 @@
 import { erc20Abi } from "@/abis/erc20Abi";
 import { queryClient } from "@/config/queryClient";
 import { config } from "@/config/wagmi";
-import { toastifyTx } from "@/lib/toastify";
+import { noteSentBlock, toastifySendCallsTx, toastifyTx } from "@/lib/toastify";
 import { CHAIN_ID } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { writeContract } from "@wagmi/core";
@@ -15,40 +15,70 @@ interface DepositProps {
   use7702: boolean;
 }
 
-async function depositToTradeExecutor({ tradeExecutor, tokens, amounts, use7702 }: DepositProps) {
-  const calls: Execution[] = [];
+/**
+ * Moves tokens from the connected wallet into the trade wallet: one `transfer` per token, signed
+ * by the user. A wallet that batches signs them `TRANSFERS_PER_CONFIRMATION` at a time; any other
+ * signs each one.
+ *
+ * Every transfer is sent. The non-batched path used to `return` inside its loop, so a deposit of
+ * several tokens moved the first and reported success. The batched path built its calls and never
+ * sent them.
+ */
+export async function depositToTradeExecutor({
+  tradeExecutor,
+  tokens,
+  amounts,
+  use7702,
+}: DepositProps) {
+  const calls: Execution[] = tokens.map((token, i) => ({
+    to: token,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [tradeExecutor, amounts[i]],
+    }),
+  }));
+
+  if (use7702) {
+    const result = await toastifySendCallsTx(calls, config, {
+      txSent: { title: "Depositing tokens..." },
+      txSuccess: { title: "Tokens deposited!" },
+    });
+    if (!result.status) {
+      throw result.error;
+    }
+    // So a balance read that follows waits for a node that has seen these transfers.
+    noteSentBlock(result.receipt);
+    return result;
+  }
+
+  let last: Awaited<ReturnType<typeof toastifyTx>> | undefined;
   for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-    const amount = amounts[i];
-    if (use7702) {
-      calls.push({
-        to: token,
-        value: 0n,
-        data: encodeFunctionData({
+    const result = await toastifyTx(
+      () =>
+        writeContract(config, {
+          address: tokens[i],
           abi: erc20Abi,
           functionName: "transfer",
-          args: [tradeExecutor, amount],
+          chainId: CHAIN_ID,
+          args: [tradeExecutor, amounts[i]],
         }),
-      });
-    } else {
-      const writePromise = writeContract(config, {
-        address: token,
-        abi: erc20Abi,
-        functionName: "transfer",
-        chainId: CHAIN_ID,
-        args: [tradeExecutor, amount],
-      });
-
-      const result = await toastifyTx(() => writePromise, {
-        txSent: { title: "Depositing token..." },
+      {
+        txSent: {
+          title: "Depositing token...",
+          subtitle: tokens.length > 1 ? `${i + 1} of ${tokens.length}` : undefined,
+        },
         txSuccess: { title: "Token deposited!" },
-      });
-      if (!result.status) {
-        throw result.error;
-      }
-      return result;
+      },
+    );
+    if (!result.status) {
+      throw result.error;
     }
+    noteSentBlock(result.receipt);
+    last = result;
   }
+  return last;
 }
 
 export const useDepositToTradeExecutor = (onSuccess?: () => unknown) => {

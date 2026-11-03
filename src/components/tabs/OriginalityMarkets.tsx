@@ -8,7 +8,9 @@ import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
-import { Button, Card, EmptyState, ErrorPanel } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorPanel, Panel } from "@/components/ui";
+import { useCheck7702Support } from "@/hooks/useCheck7702Support";
+import { transferConfirmations } from "@/utils/walletTransfers";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { chartLiquidity, chartVolume, liveSeries, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
@@ -56,6 +58,8 @@ const ORIGINALITY_SAMPLE_CONFIG: SampleCsvConfig = {
   sampleData: sampleOriginalityPredictions,
   filename: "originality-predictions",
 };
+
+const confirmationsLabel = (count: number) => (count === 1 ? "once" : `${count} times`);
 
 export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: OriginalityRound }) => {
   const [predictions, setPredictions] = useLocalStorage<OriginalityRow[]>(
@@ -241,9 +245,29 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       return minBigIntArray(set) > 0n;
     });
   }, [parentSetBalances, parentSetTokens, middleSetBalances, middleSetTokens, round.middleMarkets]);
+  // This contest's outcome tokens held in the user's own wallet. Until 2026-11-03 a "Withdraw
+  // tokens" button moved every one of them there, out of reach of Sell all and Redeem, which act
+  // on the trade wallet. Sell all now checks the own wallet too, and moves them back first.
+  const ownWalletTokens = useMemo(
+    () => (originalityMarketData?.markets ?? []).flatMap((market) => market.wrappedTokens),
+    [originalityMarketData?.markets],
+  );
+  const { data: ownWalletBalances, isLoading: isLoadingOwnWallet } = useTokensBalances(
+    account as Address,
+    ownWalletTokens,
+  );
+  const ownWalletHeldCount = useMemo(
+    () => (ownWalletBalances ?? []).filter((balance) => balance > 0n).length,
+    [ownWalletBalances],
+  );
+  const { supports7702 } = useCheck7702Support();
+
   const hasSellTokens = useMemo(
-    () => !!tableData?.filter((x) => x.upBalance || x.downBalance)?.length || hasMergeAmount,
-    [tableData, hasMergeAmount],
+    () =>
+      !!tableData?.filter((x) => x.upBalance || x.downBalance)?.length ||
+      hasMergeAmount ||
+      ownWalletHeldCount > 0,
+    [tableData, hasMergeAmount, ownWalletHeldCount],
   );
 
   const hasRedeemable = useMemo(
@@ -279,8 +303,12 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       parentMarketId: round.parentMarketId,
       parentInvalidToken: round.parentInvalidToken,
       middleMarkets: round.middleMarkets,
+      ...(account &&
+        ownWalletHeldCount > 0 && {
+          ownWallet: { account, tokens: ownWalletTokens, use7702: supports7702 },
+        }),
     });
-  }, [tableData, sellAll, tradeExecutor, round]);
+  }, [tableData, sellAll, tradeExecutor, round, account, ownWalletHeldCount, ownWalletTokens, supports7702]);
 
   const exportWeight = useCallback(() => {
     if (!tableData) return;
@@ -360,7 +388,17 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       onOpenChange={setIsSellAllDialogOpen}
       {...(round.incorrect && { title: "Withdraw", confirmLabel: "Withdraw" })}
       {...mergeFirstSellCopy("UP and DOWN")}
-      phases={WITHDRAW_PHASES}
+      phases={ownWalletHeldCount > 0 ? ["return", ...WITHDRAW_PHASES] : WITHDRAW_PHASES}
+      notice={
+        ownWalletHeldCount > 0 && (
+          <Panel title="Some of your positions are in your own wallet">
+            {ownWalletHeldCount} of your positions sit in your own wallet, not the trade wallet. They
+            move back first, so they can be sold with the rest — your wallet asks you to confirm{" "}
+            {confirmationsLabel(transferConfirmations(ownWalletHeldCount, supports7702))}. Then the
+            run continues as usual.
+          </Panel>
+        )
+      }
       isError={sellAll.isError}
       error={sellAll.error}
       isPending={sellAll.isPending}
@@ -368,7 +406,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       progress={sellAll.progress}
       reset={sellAll.reset}
       onSellAll={handleSellAll}
-      isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
+      isLoading={isLoadingSellBalances || isLoading || isLoadingBalances || isLoadingOwnWallet}
       hasTokens={hasSellTokens}
     />
   );

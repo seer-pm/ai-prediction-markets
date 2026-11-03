@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render as renderBare, screen } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -14,6 +14,9 @@ const state = vi.hoisted(() => ({
   balances: [] as bigint[],
   // Per-token balances, for reads whose answer depends on which tokens are asked about.
   balanceOf: undefined as ((token: string) => bigint) | undefined,
+  // What the user's own wallet (not the trade wallet) holds, per token.
+  ownBalanceOf: undefined as ((token: string) => bigint) | undefined,
+  supports7702: false,
   chartIds: [] as Array<string[] | undefined>,
   sellAll: vi.fn(),
 }));
@@ -41,14 +44,23 @@ vi.mock("@/hooks/useOriginalityMarketsData", () => ({
   useOriginalityMarketsData: () => ({ data: state.marketData }),
 }));
 vi.mock("@/hooks/useTokensBalances", () => ({
-  useTokensBalances: (_account: unknown, tokens: string[] | undefined) => ({
-    data: !tokens?.length ? [] : state.balanceOf ? tokens.map(state.balanceOf) : state.balances,
+  useTokensBalances: (account: unknown, tokens: string[] | undefined) => ({
+    data: !tokens?.length
+      ? []
+      : account && account === state.wallet.account
+        ? tokens.map(state.ownBalanceOf ?? (() => 0n))
+        : state.balanceOf
+          ? tokens.map(state.balanceOf)
+          : state.balances,
     isLoading: false,
   }),
 }));
 const idle = { isError: false, error: null, isPending: false, isSuccess: false, progress: undefined, reset: () => {} };
 vi.mock("@/hooks/useSellToCollateral", () => ({
   useSellToCollateral: () => ({ ...idle, mutate: state.sellAll }),
+}));
+vi.mock("@/hooks/useCheck7702Support", () => ({
+  useCheck7702Support: () => ({ supports7702: state.supports7702, isLoading: false }),
 }));
 vi.mock("@/hooks/useRedeemOriginality", () => ({
   useRedeemOriginality: () => ({ ...idle, mutate: vi.fn() }),
@@ -73,14 +85,18 @@ vi.mock("../trade/SellAllTokensInterface", () => ({
     title = "Sell all positions",
     description,
     phases,
+    notice,
   }: {
     open: boolean;
     onSellAll: () => void;
     title?: string;
     description?: string;
     phases?: string[];
+    notice?: ReactNode;
   }) =>
     open ? (
+      <>
+      {notice}
       <button
         onClick={onSellAll}
         data-title={title}
@@ -89,6 +105,7 @@ vi.mock("../trade/SellAllTokensInterface", () => ({
       >
         confirm sell all
       </button>
+      </>
     ) : null,
 }));
 
@@ -119,6 +136,8 @@ beforeEach(() => {
   state.marketData = { markets: [], parentWrappedTokens: [], parentMarketStatus: "open" };
   state.balances = [];
   state.balanceOf = undefined;
+  state.ownBalanceOf = undefined;
+  state.supports7702 = false;
   state.chartIds = [];
   state.sellAll.mockReset();
 });
@@ -288,5 +307,76 @@ describe("the corrected Round 3 tab, holding only complete sets", () => {
     render(<OriginalityR3Markets />);
 
     expect(sellAllButton().getAttribute("aria-disabled")).toBe("true");
+  });
+});
+
+// A user who clicked the old "Withdraw tokens" (removed 2026-11-03) holds this contest's outcome
+// tokens in their own wallet, where Sell all could not see them: the button sat disabled, or sold
+// only what the trade wallet still had. Sell all now moves them back first.
+describe("positions sitting in the user's own wallet", () => {
+  const MARKETS = [
+    { id: "0xm1", collateralToken: "0xc1", wrappedTokens: ["0xd1", "0xu1", "0xi1"] },
+    { id: "0xm2", collateralToken: "0xc2", wrappedTokens: ["0xd2", "0xu2", "0xi2"] },
+  ];
+  const ALL_TOKENS = MARKETS.flatMap((market) => market.wrappedTokens);
+  const ownWalletHolds = (...tokens: string[]) => {
+    state.ownBalanceOf = (token) => (tokens.includes(token) ? 7n : 0n);
+  };
+
+  beforeEach(() => {
+    state.marketData = { markets: MARKETS, parentWrappedTokens: [], parentMarketStatus: "open" };
+    // Nothing left in the trade wallet: everything was moved out.
+    state.rows = [{ ...HELD_ROW, upBalance: 0n, downBalance: 0n }];
+  });
+
+  it("enables Withdraw on the incorrect set, and moves them back before the run", () => {
+    ownWalletHolds("0xd1", "0xu1", "0xu2");
+    render(<OriginalityR3IncorrectMarkets />);
+    expect(screen.getByText("You hold positions in these markets.")).toBeTruthy();
+
+    const withdraw = screen.getByRole("button", { name: "Withdraw" });
+    expect(withdraw.getAttribute("aria-disabled")).not.toBe("true");
+    fireEvent.click(withdraw);
+
+    const confirm = screen.getByRole("button", { name: "confirm sell all" });
+    expect(confirm.getAttribute("data-phases")).toBe("return,authorize,unwind,requote,sell,merge,settle");
+    expect(screen.getByText(/3 of your positions sit in your own wallet/)).toBeTruthy();
+    // Not a batching wallet: one confirmation per token.
+    expect(screen.getByText(/confirm\s+3 times/)).toBeTruthy();
+
+    fireEvent.click(confirm);
+    expect(state.sellAll.mock.calls[0][0]).toMatchObject({
+      tradeExecutor: EXECUTOR,
+      ownWallet: { account: ACCOUNT, tokens: ALL_TOKENS, use7702: false },
+    });
+  });
+
+  it("counts batched confirmations when the wallet batches", () => {
+    state.supports7702 = true;
+    ownWalletHolds(...ALL_TOKENS);
+    render(<OriginalityR3Markets />);
+    fireEvent.click(screen.getByRole("button", { name: "Sell all positions" }));
+    // Six transfers, ten to a confirmation.
+    expect(screen.getByText(/confirm\s+once/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "confirm sell all" }));
+    expect(state.sellAll.mock.calls[0][0].ownWallet).toMatchObject({ use7702: true });
+  });
+
+  it("leaves the run as it was when the own wallet holds none of them", () => {
+    state.rows = [HELD_ROW];
+    render(<OriginalityR3Markets />);
+    fireEvent.click(screen.getByRole("button", { name: "Sell all positions" }));
+    const confirm = screen.getByRole("button", { name: "confirm sell all" });
+    expect(confirm.getAttribute("data-phases")).toBe("authorize,unwind,requote,sell,merge,settle");
+    expect(screen.queryByText(/in your own wallet/)).toBeNull();
+    fireEvent.click(confirm);
+    expect(state.sellAll.mock.calls[0][0].ownWallet).toBeUndefined();
+  });
+
+  it("keeps Sell all disabled when neither wallet holds anything", () => {
+    render(<OriginalityR3Markets />);
+    expect(
+      screen.getByRole("button", { name: "Sell all positions" }).getAttribute("aria-disabled"),
+    ).toBe("true");
   });
 });
