@@ -2,9 +2,6 @@ import type { TxPhase } from "@/types";
 
 /** What each stage is called in the run ledger. */
 export const TX_PHASE_LABELS: Record<TxPhase, string> = {
-  // Positions sitting in the user's own wallet go back to the trade wallet before a sell-all can
-  // touch them — the one stage the user signs in their wallet rather than through the session key.
-  return: "Move positions back to your trade wallet",
   authorize: "Authorise the run",
   mint: "Mint complete sets",
   sell: "Sell overvalued outcomes",

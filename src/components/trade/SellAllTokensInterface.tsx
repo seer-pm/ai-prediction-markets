@@ -27,8 +27,6 @@ export interface SellAllTokensInterfaceProps {
   isLoading: boolean;
   /** True if there are tokens to sell */
   hasTokens: boolean;
-  /** Shown before the run starts, above the warning: anything the run does besides selling. */
-  notice?: React.ReactNode;
 }
 
 export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
@@ -48,7 +46,6 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   onSellAll,
   isLoading,
   hasTokens,
-  notice,
 }) => {
   const status = runStatus({ isPending, isSuccess, isError });
 
@@ -120,12 +117,9 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
           />
         ) : (
           status === "idle" && (
-            <>
-              {notice}
-              <Panel tone="error" title="Be careful">
-                {warning}
-              </Panel>
-            </>
+            <Panel tone="error" title="Be careful">
+              {warning}
+            </Panel>
           )
         )}
       </div>
