@@ -8,6 +8,7 @@ import Footer from "./components/Footer";
 import { LeaderboardPanel } from "./components/leaderboard/LeaderboardPanel";
 import { ProfileDialog } from "./components/profile/ProfileDialog";
 import { ReadinessRail } from "./components/ReadinessRail";
+import { RecoverPositions } from "./components/RecoverPositions";
 import { Round3Withdraw } from "./components/Round3Withdraw";
 import { Tab } from "./components/Tab";
 import { UnclaimedPayouts } from "./components/trade/UnclaimedPayouts";
@@ -169,6 +170,27 @@ const AppContent: React.FC = () => {
                   goTo("markets");
                 }}
               />
+            </div>
+          )}
+
+          {/* For holders of positions the old "Withdraw tokens" moved out. Unlinked too. */}
+          {mounted.has("recover-positions") && (
+            <div style={{ display: view === "recover-positions" ? "block" : "none" }}>
+              <ErrorBoundary
+                fallback={(error) => (
+                  <Card>
+                    <EmptyState
+                      title="This page could not be displayed"
+                      description={error.message}
+                      actions={
+                        <Button onClick={() => window.location.reload()}>Reload the page</Button>
+                      }
+                    />
+                  </Card>
+                )}
+              >
+                <RecoverPositions onOpenMarkets={() => goTo("markets")} />
+              </ErrorBoundary>
             </div>
           )}
 
