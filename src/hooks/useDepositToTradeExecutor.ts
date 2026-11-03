@@ -17,7 +17,7 @@ interface DepositProps {
 
 /**
  * Moves tokens from the connected wallet into the trade wallet: one `transfer` per token, signed
- * by the user. A wallet that batches signs them `TRANSFERS_PER_CONFIRMATION` at a time; any other
+ * by the user. A wallet that batches signs them through `toastifySendCallsTx`; any other
  * signs each one.
  *
  * Every transfer is sent. The non-batched path used to `return` inside its loop, so a deposit of
