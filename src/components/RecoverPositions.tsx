@@ -57,10 +57,6 @@ export function RecoverPositions({ onOpenMarkets }: { onOpenMarkets: () => void 
         your trade wallet to your own wallet. They are safe there, but the app cannot see them, so{" "}
         <strong>Sell all</strong> and <strong>Redeem</strong> cannot use them.
       </p>
-      <p className="mt-2">
-        This page moves them back in a few transactions, not one per token. Then sell or redeem them
-        as usual.
-      </p>
     </Panel>
   );
 
