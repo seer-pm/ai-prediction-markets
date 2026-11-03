@@ -10,6 +10,7 @@ import { useTxProgress } from "./useTxProgress";
 import { Address } from "viem";
 import { mergeFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalancesOrThrow } from "./useTokensBalances";
+import { depositToTradeExecutor } from "./useDepositToTradeExecutor";
 import { TradeError } from "@/utils/errors";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { CompleteSetMerge, planCompleteSetMerges } from "@/utils/completeSets";
@@ -26,6 +27,56 @@ interface SellAllProps {
    * only becomes a parent outcome token again by merging its middle market.
    */
   middleMarkets?: readonly OriginalityMiddleMarket[];
+  /**
+   * Outcome tokens of this contest that may sit in the user's own wallet rather than the trade
+   * wallet — moved there by the "Withdraw tokens" button this app had until 2026-11-03. Whatever
+   * of them is held is moved back first, so the run below can merge and sell it.
+   */
+  ownWallet?: { account: Address; tokens: Address[]; use7702: boolean };
+}
+
+/**
+ * Moves what the user's own wallet holds of `tokens` back into the trade wallet. Amounts are read
+ * now, not taken from the dialog: a transfer sized from a stale balance reverts — the reason a
+ * user's second "Withdraw tokens" click failed on 2026-10-31. Reading fresh also makes a stopped
+ * run resumable: the next one moves only what is still there.
+ */
+async function returnFromOwnWallet(
+  tradeExecutor: Address,
+  { account, tokens, use7702 }: NonNullable<SellAllProps["ownWallet"]>,
+  onStateChange: TxStateChange,
+) {
+  let held: bigint[];
+  try {
+    held = await fetchTokensBalancesOrThrow(account, tokens);
+  } catch {
+    throw new TradeError(
+      "Could not check your wallet for positions to move back.",
+      "Nothing was sent. Try Sell all again.",
+    );
+  }
+  const toMove = tokens.flatMap((token, i) => (held[i] > 0n ? [{ token, amount: held[i] }] : []));
+  if (!toMove.length) {
+    onStateChange({ phase: "return", label: "Nothing in your wallet to move back", skipped: true });
+    return;
+  }
+  onStateChange({
+    phase: "return",
+    label: `Moving ${toMove.length} position${toMove.length === 1 ? "" : "s"} back — confirm in your wallet`,
+  });
+  try {
+    await depositToTradeExecutor({
+      tradeExecutor,
+      tokens: toMove.map((x) => x.token),
+      amounts: toMove.map((x) => x.amount),
+      use7702,
+    });
+  } catch (error) {
+    throw new TradeError(
+      error instanceof Error && error.message ? error.message : "Moving your positions back stopped.",
+      "Nothing is lost: whatever did not move is still in your own wallet. Run Sell all again to move the rest and continue.",
+    );
+  }
 }
 
 // A merge unwraps each of a market's three outcome tokens; the redeem path keeps a batch to
@@ -74,9 +125,15 @@ async function sellToCollateral({
   parentMarketId,
   parentInvalidToken,
   middleMarkets,
+  ownWallet,
   onStateChange,
 }: SellAllProps & { onStateChange: TxStateChange }) {
   const router = ROUTER_ADDRESSES[CHAIN_ID];
+  // Before the session key is authorised: these transfers are the user's own, signed in their
+  // wallet, and nothing is in flight yet if they decline.
+  if (ownWallet?.tokens.length) {
+    await returnFromOwnWallet(tradeExecutor, ownWallet, onStateChange);
+  }
   // Each repo market's complete sets (DOWN + UP + Invalid) are merged back into its collateral
   // token before anything is sold, and only what is left unmatched is sold — see
   // `planCompleteSetMerges`.

@@ -248,6 +248,7 @@ export interface ApprovalRequest {
  * string that gets overwritten — see `RunLedger`.
  */
 export type TxPhase =
+  | "return"
   | "authorize"
   | "mint"
   | "sell"
