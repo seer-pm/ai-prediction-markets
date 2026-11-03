@@ -22,7 +22,7 @@ import {
   shouldDehydrateQuery,
 } from "./config/queryClient";
 import { config } from "./config/wagmi";
-import { SessionKeyManager, withdrawFundSessionKey } from "./lib/on-chain/sessionKey";
+import { sweepRetiredSessionKeys } from "./lib/on-chain/sessionKey";
 import { useContestTabStore } from "./stores/contestTabStore";
 import { cn } from "./utils/cn";
 import { ORIGINALITY_ROUND_3_INCORRECT } from "./utils/originalityRounds";
@@ -204,44 +204,11 @@ const AppContent: React.FC = () => {
 };
 
 function App() {
+  // Keys are rotated when a new permission is granted (`authorizeSessionKey`); a rotated key's
+  // gas is swept back here as well as right after the rotation, in case that sweep failed. The
+  // current key is left alone — the next run spends what it holds before topping it up.
   useEffect(() => {
-    const init = async () => {
-      // 1️⃣ Try refund before registering this tab
-      const session = SessionKeyManager.getData();
-      if (session) {
-        if (session.stale && session.activeTabs.length === 0) {
-          try {
-            console.log("Attempting refund...");
-            await withdrawFundSessionKey();
-            SessionKeyManager.clear();
-            console.log("Refund successful");
-          } catch (e) {
-            console.log("Refund failed, will retry later", e);
-          }
-        } else {
-          console.log("Session active or other tabs still active");
-        }
-      }
-
-      // 2️⃣ Now register this tab
-      const tabId = crypto.randomUUID();
-      SessionKeyManager.addActiveTab(tabId);
-
-      // 3️⃣ Setup unload listener
-      const handleBeforeUnload = () => {
-        SessionKeyManager.removeActiveTab(tabId);
-      };
-      window.addEventListener("beforeunload", handleBeforeUnload);
-
-      // 4️⃣ Cleanup on unmount
-      return () => {
-        window.removeEventListener("beforeunload", handleBeforeUnload);
-        SessionKeyManager.removeActiveTab(tabId);
-      };
-    };
-
-    // call the async init
-    init();
+    void sweepRetiredSessionKeys();
   }, []);
 
   return (
