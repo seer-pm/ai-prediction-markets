@@ -1,4 +1,5 @@
 import { getOriginalityMinMint, useExecuteOriginalityStrategy } from "@/hooks/useExecuteOriginalityStrategy";
+import type { LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { OriginalityTableData } from "@/types";
 import { collateral } from "@/utils/constants";
@@ -20,6 +21,8 @@ interface TradingInterfaceProps {
   parentInvalidToken: Address;
   /** Markets the mint is split on after the parent — see `OriginalityRound.middleMarkets`. */
   middleMarkets?: readonly OriginalityMiddleMarket[];
+  /** Offers "Leaderboard submit" for a round that takes submissions — see `StrategyDialog`. */
+  leaderboardSubmission?: LeaderboardSubmission;
 }
 
 export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
@@ -31,6 +34,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
   parentMarketId,
   parentInvalidToken,
   middleMarkets,
+  leaderboardSubmission,
 }) => {
   const { data: balanceData, isLoading: isBalanceLoading } = useTokenBalance({
     address: tradeExecutor,
@@ -63,6 +67,7 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
       open={open}
       onOpenChange={onOpenChange}
       title="Start trading"
+      leaderboardSubmission={leaderboardSubmission}
       stats={[
         { label: "Repositories", value: String(repoCount) },
         { label: "To buy", value: String(buyCount), tone: "long" },

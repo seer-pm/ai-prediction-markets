@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DEEP_CONTESTS, LEADERBOARD_CONTESTS, TAB_CONTESTS, getContest, type Contest } from "./contests";
+import {
+  DEEP_CONTESTS,
+  LEADERBOARD_CONTESTS,
+  TAB_CONTESTS,
+  getContest,
+  isContestId,
+  type Contest,
+} from "./contests";
 import { ORIGINALITY_R3_PARENT_MARKET_ID } from "./originalityR3Markets";
 import { ORIGINALITY_R3_V3_MARKET_IDS } from "./originalityR3V3Markets";
 import { ORIGINALITY_ROUND_3, ORIGINALITY_ROUND_3_INCORRECT } from "./originalityRounds";
+import { SUBMISSION_CONTESTS, isSubmissionContest } from "./predictionSubmission";
 
 const ids = (contests: readonly Contest[]) => contests.map((contest) => contest.id);
 
@@ -56,5 +64,30 @@ describe("the corrected Round 3", () => {
     expect(ORIGINALITY_ROUND_3.parentMarketId).not.toBe(ORIGINALITY_ROUND_3_INCORRECT.parentMarketId);
     expect(ORIGINALITY_ROUND_3.dataFunction).not.toBe(ORIGINALITY_ROUND_3_INCORRECT.dataFunction);
     expect(ORIGINALITY_ROUND_3.queryKey).not.toEqual(ORIGINALITY_ROUND_3_INCORRECT.queryKey);
+  });
+});
+
+describe("leaderboard submissions", () => {
+  // From now on every contest saves the predictions people trade on. A new live contest fails here
+  // until it is added to `SUBMISSION_CONTESTS`, and the compiler then asks for its market reader.
+  it("are taken by every live, ranked contest", () => {
+    const live = LEADERBOARD_CONTESTS.filter((contest) => !contest.finished);
+    expect(live.length).toBeGreaterThan(0);
+    for (const contest of live) {
+      expect(isSubmissionContest(contest.id), `${contest.id} is not in SUBMISSION_CONTESTS`).toBe(true);
+    }
+  });
+
+  it("only ever name a registered contest", () => {
+    for (const id of SUBMISSION_CONTESTS) expect(isContestId(id)).toBe(true);
+  });
+
+  it("are not taken by the incorrect set, which takes no new trades", () => {
+    expect(isSubmissionContest("round3-incorrect")).toBe(false);
+    expect(ORIGINALITY_ROUND_3_INCORRECT.submissionContest).toBeUndefined();
+  });
+
+  it("go from the Round 3 tab to the Round 3 contest", () => {
+    expect(ORIGINALITY_ROUND_3.submissionContest).toBe("round3");
   });
 });

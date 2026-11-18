@@ -1,3 +1,4 @@
+import { toastError, toastSuccess } from "@/lib/toastify";
 import { getAppUrl } from "@/utils/common";
 import {
   canonicalLegs,
@@ -25,6 +26,24 @@ export interface SubmitPredictionsResult {
   accepted: number;
   /** Legs dropped because their market already had an answer. */
   ignored: number;
+}
+
+/** The toast a saved submission gets, whether it went out with a trade run or on its own. */
+export function toastSubmitted(result: SubmitPredictionsResult) {
+  toastSuccess({
+    title: "Predictions submitted to the leaderboard",
+    subtitle:
+      result.ignored > 0
+        ? `${result.ignored} on markets that already have an answer were left out.`
+        : "They stay hidden until the markets end.",
+  });
+}
+
+export function toastSubmitFailed(error: unknown) {
+  toastError({
+    title: "Leaderboard submission failed",
+    subtitle: error instanceof Error ? error.message : undefined,
+  });
 }
 
 /**

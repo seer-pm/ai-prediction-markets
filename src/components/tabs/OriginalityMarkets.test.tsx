@@ -61,6 +61,13 @@ vi.mock("@/components/OriginalityMarketTable", () => ({
   OriginalityMarketTable: () => <div>the table</div>,
 }));
 vi.mock("@/components/predictions/PredictionDropzone", () => ({ PredictionDropzone: () => null }));
+vi.mock("@/components/predictions/SubmitPredictionsButton", () => ({
+  SubmitPredictionsButton: ({ submission }: { submission: { contest: string; legs: unknown[] } }) => (
+    <button data-contest={submission.contest} data-legs={JSON.stringify(submission.legs)}>
+      Submit predictions
+    </button>
+  ),
+}));
 vi.mock("../GenericCSVUpload", () => ({ GenericCSVUpload: () => null }));
 vi.mock("@/components/trade/OriginalityTradingInterface", () => ({
   OriginalityTradingInterface: () => null,
@@ -93,6 +100,7 @@ vi.mock("../trade/SellAllTokensInterface", () => ({
 }));
 
 import { TooltipProvider } from "@/components/ui";
+import { ORIGINALITY_R3_V3_MARKET_IDS } from "@/utils/originalityR3V3Markets";
 import { ORIGINALITY_ROUND_3, ORIGINALITY_ROUND_3_INCORRECT } from "@/utils/originalityRounds";
 import { OriginalityR3IncorrectMarkets, OriginalityR3Markets } from "./OriginalityMarkets";
 
@@ -216,8 +224,30 @@ describe("the corrected Round 3 tab", () => {
     expect(buttons()).toEqual([
       "Upload predictions",
       "Sell all positions",
+      "Submit predictions",
       "Start trading",
     ]);
+  });
+
+  it("submits each predicted repo to the Round 3 contest, against its UP outcome", () => {
+    const [repoMarket] = ORIGINALITY_R3_V3_MARKET_IDS;
+    state.rows = [
+      { ...HELD_ROW, marketId: repoMarket, predictedOriginality: 0.62 },
+      // Not one of the 98 repo markets: the endpoint would refuse the whole submission over it.
+      { ...HELD_ROW, repo: "elsewhere", marketId: "0x00000000000000000000000000000000000000ff", predictedOriginality: 0.5 },
+    ];
+    render(<OriginalityR3Markets />);
+    const submit = screen.getByRole("button", { name: "Submit predictions" });
+    expect(submit.getAttribute("data-contest")).toBe("round3");
+    expect(JSON.parse(submit.getAttribute("data-legs") ?? "[]")).toEqual([
+      { marketId: repoMarket.toLowerCase(), outcomeIndex: 1, prediction: 0.62 },
+    ]);
+  });
+
+  it("offers Submit predictions to a wallet with no trade wallet, which can still sign", () => {
+    state.wallet = { ...connected, tradeExecutor: undefined, canTrade: false, isCreated: false };
+    render(<OriginalityR3Markets />);
+    expect(buttons()).toEqual(["Upload predictions", "Submit predictions"]);
   });
 
   it("keeps its Sell all name, and says matched pairs are merged before the rest is sold", () => {

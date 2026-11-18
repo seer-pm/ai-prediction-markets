@@ -7,6 +7,7 @@ import { WITHDRAW_PHASES, mergeFirstSellCopy } from "@/utils/txPhases";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { OriginalityMarketTable } from "@/components/OriginalityMarketTable";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
+import { SubmitPredictionsButton } from "@/components/predictions/SubmitPredictionsButton";
 import { OriginalityTradingInterface } from "@/components/trade/OriginalityTradingInterface";
 import { Button, Card, EmptyState, ErrorPanel } from "@/components/ui";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
@@ -15,11 +16,14 @@ import { useOriginalityMarketsData } from "@/hooks/useOriginalityMarketsData";
 import { useProcessOriginalityPredictions } from "@/hooks/useProcessOriginalityPredictions";
 import { useRedeemOriginality } from "@/hooks/useRedeemOriginality";
 import { useSellToCollateral } from "@/hooks/useSellToCollateral";
+import type { LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
 import { OriginalityRow } from "@/types";
 import { downloadCsv, isUndefined, minBigIntArray } from "@/utils/common";
+import { getContest } from "@/utils/contests";
 import { parseOriginalityCSV } from "@/utils/csvParser";
+import { originalityPredictionLegs } from "@/utils/originalitySubmission";
 import {
   ORIGINALITY_ROUND_2,
   ORIGINALITY_ROUND_3,
@@ -77,6 +81,18 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
     error,
     marketIdToRepo,
   } = useProcessOriginalityPredictions(predictions, round);
+
+  // What this round sends to the leaderboard — from the trade dialog's "Leaderboard submit" and from
+  // "Submit predictions" alike, so the two always send the same numbers. Checked against the
+  // contest's own market list, which is also what the write endpoint accepts.
+  const leaderboardSubmission = useMemo<LeaderboardSubmission | undefined>(() => {
+    if (!round.submissionContest) return undefined;
+    const marketIds = getContest(round.submissionContest)?.marketIds ?? [];
+    return {
+      contest: round.submissionContest,
+      legs: originalityPredictionLegs(tableData ?? [], marketIds),
+    };
+  }, [round.submissionContest, tableData]);
 
   // One chart, one line per repository — so every child market is needed at once, and the batch
   // endpoint fetches them in a single request rather than one per repository.
@@ -462,18 +478,25 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
                 {/* Trading stops with the contest; claiming what you already hold does not. */}
                 {!finished && sellAllButton}
                 {redeemButton}
-                {!finished && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => startTransition(() => setIsTradeDialogOpen(true))}
-                    disabled={!!disabledReason || !account}
-                    disabledReason={disabledReason}
-                  >
-                    Start trading
-                  </Button>
-                )}
               </>
+            )}
+            {/* Outside `canTrade`: submitting needs a signature, not a trade wallet. */}
+            {!finished && leaderboardSubmission && (
+              <SubmitPredictionsButton
+                submission={leaderboardSubmission}
+                hasPredictions={predictions.length > 0}
+              />
+            )}
+            {canTrade && !finished && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => startTransition(() => setIsTradeDialogOpen(true))}
+                disabled={!!disabledReason || !account}
+                disabledReason={disabledReason}
+              >
+                Start trading
+              </Button>
             )}
             {isCreated && isUseOldWallet && redeemButton}
           </>
@@ -510,6 +533,7 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
           parentMarketId={round.parentMarketId}
           parentInvalidToken={round.parentInvalidToken}
           middleMarkets={round.middleMarkets}
+          leaderboardSubmission={leaderboardSubmission}
         />
       )}
 

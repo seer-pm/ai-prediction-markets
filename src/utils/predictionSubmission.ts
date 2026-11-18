@@ -12,10 +12,19 @@ import { sha256, stringToBytes } from "viem";
  */
 
 /**
- * Contests that accept submissions. Only the live ones: a submission on a contest whose markets have
- * already been answered could only ever be scored against a known result.
+ * Contests that take leaderboard submissions.
+ *
+ * Every live, ranked contest belongs here, and a test in `./contests.test.ts` fails when one is
+ * missing: a contest added without it would leave the predictions people trade on unsaved. A
+ * finished contest stays listed, because its stored submissions are still what its Score column
+ * reads. Being listed does not mean every prediction is taken: a leg on a market that already has
+ * an answer is dropped at write time (`acceptsPredictions`), so a finished contest takes nothing new.
+ *
+ * Adding one also needs its markets read on chain, in `MARKET_FETCHERS` in
+ * `netlify/functions/utils/predictionSubmissions.ts` — the compiler asks for it — and a
+ * `leaderboardSubmission` passed from the contest's trade dialog plus a `SubmitPredictionsButton`.
  */
-export const SUBMISSION_CONTESTS = ["zcash-nu7", "zcash"] as const;
+export const SUBMISSION_CONTESTS = ["round3", "zcash-nu7", "zcash"] as const;
 export type SubmissionContestId = (typeof SUBMISSION_CONTESTS)[number];
 
 export function isSubmissionContest(id: string): id is SubmissionContestId {
@@ -30,7 +39,10 @@ export interface PredictionLeg {
   prediction: number;
 }
 
-/** 37 grants markets × 1 leg, or 5 ballot questions × ≤3 legs — generous headroom over both. */
+/**
+ * 98 Originality repos × 1 leg, 37 grants markets × 1 leg, or 5 ballot questions × ≤3 legs —
+ * headroom over all three.
+ */
 export const MAX_SUBMISSION_LEGS = 200;
 
 /**
