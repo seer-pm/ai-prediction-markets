@@ -1,9 +1,13 @@
 import { AmountInput, Button, Dialog, ErrorPanel, Panel, Switch, Tooltip } from "@/components/ui";
 import { InfoIcon } from "@/components/ui/icons";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { useSubmitPredictions, type LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
+import {
+  toastSubmitFailed,
+  toastSubmitted,
+  useSubmitPredictions,
+  type LeaderboardSubmission,
+} from "@/hooks/useSubmitPredictions";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
-import { toastError, toastSuccess } from "@/lib/toastify";
 import { DepositInterface } from "./DepositInterface";
 import type { TxProgressState } from "@/hooks/useTxProgress";
 import type { TxPhase } from "@/types";
@@ -167,21 +171,7 @@ export function StrategyDialog({
         );
         return;
       }
-      void send(signed).then(
-        (result) =>
-          toastSuccess({
-            title: "Predictions submitted to the leaderboard",
-            subtitle:
-              result.ignored > 0
-                ? `${result.ignored} on markets that already have an answer were left out.`
-                : "They stay hidden until the markets end.",
-          }),
-        (error) =>
-          toastError({
-            title: "Leaderboard submission failed",
-            subtitle: error instanceof Error ? error.message : undefined,
-          }),
-      );
+      void send(signed).then(toastSubmitted, toastSubmitFailed);
     }
     onSubmit(value);
   };

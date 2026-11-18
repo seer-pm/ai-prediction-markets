@@ -10,6 +10,7 @@ import {
   ORIGINALITY_R3_V3_PARENT_INVALID_TOKEN,
   ORIGINALITY_R3_V3_PARENT_MARKET_ID,
 } from "./originalityR3V3Markets";
+import type { SubmissionContestId } from "./predictionSubmission";
 
 /**
  * A level between the parent and the repo markets: a market conditional on one parent outcome
@@ -62,6 +63,12 @@ export interface OriginalityRound {
   /** localStorage key for the uploaded predictions — one per round, so a round-2 CSV never trades round 3. */
   predictionsStorageKey: string;
   /**
+   * The leaderboard contest this round's predictions are submitted to — see `SUBMISSION_CONTESTS`.
+   * Absent on round 2, which ended before submissions existed, and on the incorrect set, which
+   * takes no new trades.
+   */
+  submissionContest?: SubmissionContestId;
+  /**
    * The set was built wrongly and replaced. No new trades; selling back to sUSDS and withdrawing
    * stay available. `replacedBy` is the contest tab holding the corrected set.
    */
@@ -94,6 +101,7 @@ export const ORIGINALITY_ROUND_3: OriginalityRound = {
   // Shared with the incorrect set on purpose: same repos, same question, so a CSV already loaded
   // there carries over.
   predictionsStorageKey: "originality-r3",
+  submissionContest: "round3",
 };
 
 /** The first round-3 set, missing its middle level. Withdraw-only — see the interface comment. */

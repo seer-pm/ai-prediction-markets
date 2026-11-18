@@ -10,6 +10,7 @@ import { MarketStatus } from "@seer-pm/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { canonicalAddress, readOwnerMap } from "./executorOwners";
 import type { MarketOnChain } from "./marketView";
+import { fetchOriginalityR3V3MarketsOnChain } from "./originalityR3OnChain";
 import { fetchZcashMarketsOnChain } from "./zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./zcashNu7OnChain";
 
@@ -103,7 +104,13 @@ export async function writeSubmission(submission: StoredSubmission): Promise<voi
   if (error) throw error;
 }
 
+/**
+ * Each submission contest's markets — the ones a leg may name. Round 3 is its 98 repo markets
+ * only: the parent and middle levels have no pool, so nobody predicts them, and `MarketView`
+ * reverts on the middle markets (see `./originalityR3OnChain`).
+ */
 const MARKET_FETCHERS: Record<SubmissionContestId, () => Promise<MarketOnChain[]>> = {
+  round3: fetchOriginalityR3V3MarketsOnChain,
   zcash: fetchZcashMarketsOnChain,
   "zcash-nu7": fetchZcashNu7MarketsOnChain,
 };
@@ -119,10 +126,10 @@ export async function fetchContestMarkets(
 /**
  * Whether a prediction on this market can still be taken.
  *
- * Not "is trading still open": both live contests read `open` while they trade, because their
- * Reality questions opened for answers before the ballots closed. The line is the first posted
- * answer — past it the result is public, and a prediction submitted then would be scored against
- * something the submitter could already see.
+ * Not "is trading still open": every submission contest so far reads `open` while it trades,
+ * because its Reality questions opened for answers early — before the ballots closed on Zcash, at
+ * creation on Round 3. The line is the first posted answer — past it the result is public, and a
+ * prediction submitted then would be scored against something the submitter could already see.
  */
 export function acceptsPredictions(market: MarketOnChain): boolean {
   return market.marketStatus === MarketStatus.NOT_OPEN || market.marketStatus === MarketStatus.OPEN;
@@ -134,7 +141,7 @@ function payoutShares(market: MarketOnChain): number[] | null {
   const numerators = market.payoutNumerators.map(Number);
   const total = numerators.reduce((sum, value) => sum + value, 0);
   if (!(total > 0)) return null;
-  // Settled wholly on Invalid (always the last outcome in both contests): there is no answer to
+  // Settled wholly on Invalid (always the last outcome in every submission contest): there is no answer to
   // have been right or wrong about, so the market drops out rather than scoring everyone zero.
   if (numerators[numerators.length - 1] === total) return null;
   return numerators.map((value) => value / total);
@@ -143,8 +150,9 @@ function payoutShares(market: MarketOnChain): number[] | null {
 /**
  * 100 × (1 − mean absolute error) over every predicted outcome whose market has resolved, so higher
  * is better and the number reads directly: 88 means off by 12 points on average. A leg is compared
- * to its outcome's payout share, which is 1 or 0 for a clean resolution. Always predicting 0.5 lands
- * at 50.
+ * to its outcome's payout share: 1 or 0 for a clean categorical resolution, where always predicting
+ * 0.5 lands at 50; and for a scalar market the answer's place in its range — a Round 3 repo the jury
+ * scores 70 of 100 pays UP 0.7, so an UP prediction of 0.6 is off by 10 points.
  *
  * Absolute rather than squared error is a deliberate product choice. It is not a proper scoring
  * rule: someone who believes 0.7 minimises expected error by submitting 1, so it rewards rounding
