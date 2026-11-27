@@ -2,6 +2,7 @@ import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, waitForSentBlock } from "@/lib/toastify";
 import { getSellAllQuotes } from "@/lib/trade/getQuote";
+import { skippedNames } from "@/lib/trade/settleWithRetry";
 import { CallBatchesInput, OriginalityTableData, TxStateChange } from "@/types";
 import { minBigIntArray } from "@/utils/common";
 import { CHAIN_ID, ROUTER_ADDRESSES } from "@/utils/constants";
@@ -104,10 +105,11 @@ async function sellToCollateral({
     onStateChange({ phase: "unwind", label: "No matched UP and DOWN tokens to merge", skipped: true });
   }
   onStateChange({ phase: "requote", label: "Pricing your positions" });
-  const sellAllQuotes = await getSellAllQuotes({
+  const { quotes: sellAllQuotes, failed } = await getSellAllQuotes({
     account: tradeExecutor,
     tableData: rows,
   });
+  const skippedMarkets = skippedNames(failed, (row) => row.repo);
   const swapCalls = getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const BATCH_SIZE = 100;
   // An approve and a swap per sell. A large sell costs up to ~490k gas for the pair (60 calls
@@ -127,7 +129,13 @@ async function sellToCollateral({
     });
   }
   if (!sellInput.length) {
-    onStateChange({ phase: "sell", label: "Nothing left to sell after merging", skipped: true });
+    onStateChange({
+      phase: "sell",
+      label: failed.length
+        ? "No position could be priced to sell"
+        : "Nothing left to sell after merging",
+      skipped: true,
+    });
   }
   const sellResult = await toastifyBatchTxSessionKey(
     tradeExecutor,
@@ -211,7 +219,7 @@ async function sellToCollateral({
     }
   }
   await withdrawFundSessionKey();
-  return sellResult;
+  return { ...sellResult, skippedMarkets };
 }
 
 export const useSellToCollateral = (onSuccess?: () => unknown) => {

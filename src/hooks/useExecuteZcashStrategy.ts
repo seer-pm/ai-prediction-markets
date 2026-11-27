@@ -163,7 +163,7 @@ const executeZcashStrategy = async ({
     // Every market that had something to do failed to price: that, not the amount, is the cause.
     if (failed.length) {
       throw new TradeError(
-        `None of your ${failed.length} markets could be priced.`,
+        `${failed.length} market${failed.length === 1 ? "" : "s"} could not be priced, and nothing else had a trade to make.`,
         `Their quotes failed ${ZCASH_QUOTE_ATTEMPTS} times each, usually a network problem rather than the pools. Nothing was traded in this step; try again in a minute.`,
       );
     }
