@@ -370,7 +370,7 @@ const ZcashGrantsMarkets = ({ roundId }: { roundId: ZcashRoundId }) => {
 
       {tradeExecutor && tableData && (
         <ZcashTradingInterface
-          roundId={roundId}
+          leaderboardSubmission={leaderboardSubmission}
           open={isTradeDialogOpen}
           onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
