@@ -34,6 +34,7 @@ import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
+import { SkippedMarketsNotice } from "@/components/trade/SkippedMarketsNotice";
 
 /** The first and last proposal on the ballot, as the upload dialog's example rows. */
 const csvFormatOf = (roundId: ZcashRoundId): CSVFormatInfo => {
@@ -393,6 +394,15 @@ const ZcashGrantsMarkets = ({ roundId }: { roundId: ZcashRoundId }) => {
         onSellAll={handleSellAll}
         isLoading={isLoading || isLoadingBalances}
         hasTokens={hasSellTokens}
+        runNotice={
+          sellAll.data && (
+            <SkippedMarketsNotice
+              markets={sellAll.data.skippedMarkets}
+              prunedCalls={sellAll.data.prunedCalls}
+              retry="Those positions are still in your wallet. Run Sell all again to sell them."
+            />
+          )
+        }
       />
 
       <RedeemL2Interface

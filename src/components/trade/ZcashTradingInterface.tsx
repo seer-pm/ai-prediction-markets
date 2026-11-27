@@ -7,6 +7,7 @@ import { collateral } from "@/utils/constants";
 import { formatAmount } from "@/utils/format";
 import React, { useMemo, useState } from "react";
 import { Address } from "viem";
+import { SkippedMarketsNotice } from "./SkippedMarketsNotice";
 import { StrategyDialog } from "./StrategyDialog";
 
 interface TradingInterfaceProps {
@@ -86,6 +87,15 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
       hasPositions={hasPositions}
       mutation={executeTradeMutation}
       onAmountChange={setAmount}
+      runNotice={
+        executeTradeMutation.data && (
+          <SkippedMarketsNotice
+            markets={executeTradeMutation.data.skippedMarkets}
+            prunedCalls={executeTradeMutation.data.prunedCalls}
+            retry="Run the strategy again to retry them. The amount is split again across every market still away from your number."
+          />
+        )
+      }
       minAmount={
         minMint === undefined
           ? undefined

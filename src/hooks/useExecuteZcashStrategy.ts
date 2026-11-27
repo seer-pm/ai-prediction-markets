@@ -1,11 +1,22 @@
 import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
-import { getSellFromBalanceZcashQuotes, getZcashQuotes } from "@/lib/trade/getZcashQuote";
+import {
+  getSellFromBalanceZcashQuotes,
+  getZcashQuotes,
+  ZCASH_QUOTE_ATTEMPTS,
+  type ZcashQuoteFailure,
+} from "@/lib/trade/getZcashQuote";
 import { allocateZcashBudget, getZcashMinMint } from "@/utils/zcashBudget";
-import { CallBatchesInput, TxStateChange, ZcashQuoteResult, ZcashTradeProps } from "@/types";
+import {
+  BatchTxResult,
+  CallBatchesInput,
+  TxStateChange,
+  ZcashQuoteResult,
+  ZcashTradeProps,
+} from "@/types";
 import { CHAIN_ID, collateral, DECIMALS, ROUTER_ADDRESSES, VOLUME_MIN } from "@/utils/constants";
-import { noTradeError } from "@/utils/errors";
+import { noTradeError, TradeError } from "@/utils/errors";
 import { safeParseUnits } from "@/utils/format";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { NO_INDEX, YES_INDEX } from "@/utils/zcashMarkets";
@@ -62,10 +73,12 @@ const executeZcashStrategy = async ({
   // 1. Turn inventory already held on an overvalued side into sUSDS, so the main pass has more to
   //    spend than the mint amount alone. Executed on its own so the proceeds are real before the
   //    budget is divided.
-  const sellFromBalanceQuotes = await getSellFromBalanceZcashQuotes({
-    account: tradeExecutor,
-    tableData,
-  });
+  const { quotes: sellFromBalanceQuotes, failed: presaleFailed } =
+    await getSellFromBalanceZcashQuotes({
+      account: tradeExecutor,
+      tableData,
+    });
+  let prunedCalls = 0;
 
   const sellTokenMapping = sellFromBalanceQuotes.reduce(
     (acc, result) => {
@@ -99,6 +112,7 @@ const executeZcashStrategy = async ({
       await withdrawFundSessionKey();
       throw sellResult.error;
     }
+    prunedCalls += sellResult.prunedCalls;
   }
 
   // 2. Fold the pre-sale into each row: the tokens are gone and the pools have already moved, so
@@ -132,10 +146,11 @@ const executeZcashStrategy = async ({
     proceedsByMarket,
   });
 
-  const zcashQuoteResults = await getZcashQuotes({
+  const { results: zcashQuoteResults, failed } = await getZcashQuotes({
     account: tradeExecutor,
     tableData: newTableData,
   });
+  const skippedMarkets = skippedMarketNames([...presaleFailed, ...failed]);
   // Nothing to trade: say whether the amount was too small to split, rather than "No quote found".
   const nothingToTrade = () =>
     noTradeError({
@@ -145,6 +160,13 @@ const executeZcashStrategy = async ({
       symbol: collateral.symbol,
     });
   if (!zcashQuoteResults.length) {
+    // Every market that had something to do failed to price: that, not the amount, is the cause.
+    if (failed.length) {
+      throw new TradeError(
+        `None of your ${failed.length} markets could be priced.`,
+        `Their quotes failed ${ZCASH_QUOTE_ATTEMPTS} times each, usually a network problem rather than the pools. Nothing was traded in this step; try again in a minute.`,
+      );
+    }
     throw nothingToTrade();
   }
 
@@ -171,11 +193,28 @@ const executeZcashStrategy = async ({
     throw result.error;
   }
 
+  prunedCalls += result.prunedCalls;
+
   onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
-  toastSuccess({ title: "Strategy executed" });
-  return result;
+  toastSuccess({
+    title: "Strategy executed",
+    subtitle: skippedMarkets.length
+      ? `${skippedMarkets.length} market${skippedMarkets.length === 1 ? " was" : "s were"} not traded. See the dialog.`
+      : "",
+  });
+  return { ...result, prunedCalls, skippedMarkets } satisfies ZcashRunResult;
 };
+
+/** What the dialog reports after a run that went through. */
+export type ZcashRunResult = Extract<BatchTxResult, { status: true }> & {
+  /** Markets whose quotes failed every attempt, by proposal title, so were left out. */
+  skippedMarkets: string[];
+};
+
+const skippedMarketNames = (failures: ZcashQuoteFailure[]) => [
+  ...new Set(failures.map(({ row }) => row.project)),
+];
 
 const refreshAfterRun = () => {
   setTimeout(() => {
