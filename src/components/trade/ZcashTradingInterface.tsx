@@ -3,6 +3,7 @@ import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { isZcashRowFundable, zcashShareOf } from "@/utils/zcashBudget";
 import { YES_INDEX } from "@/utils/zcashMarkets";
 import type { PredictionLeg } from "@/utils/predictionSubmission";
+import type { ZcashRoundId } from "@/utils/zcashRounds";
 import { ZcashTableData } from "@/types";
 import { collateral } from "@/utils/constants";
 import { formatAmount } from "@/utils/format";
@@ -11,6 +12,8 @@ import { Address } from "viem";
 import { StrategyDialog } from "./StrategyDialog";
 
 interface TradingInterfaceProps {
+  /** The contest these trades and the leaderboard submission belong to. */
+  roundId: ZcashRoundId;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   markets: ZcashTableData[];
@@ -19,6 +22,7 @@ interface TradingInterfaceProps {
 }
 
 export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
+  roundId,
   open,
   onOpenChange,
   tradeExecutor,
@@ -76,7 +80,7 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
       open={open}
       onOpenChange={onOpenChange}
       title="Start trading"
-      leaderboardSubmission={{ contest: "zcash", legs: leaderboardLegs }}
+      leaderboardSubmission={{ contest: roundId, legs: leaderboardLegs }}
       stats={[
         { label: "Markets", value: String(fundableCount) },
         { label: "Above market", value: String(aboveCount), tone: "long" },

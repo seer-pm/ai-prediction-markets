@@ -1,4 +1,4 @@
-import { ZCASH_MARKETS } from "@/utils/zcashMarkets";
+import { ZCASH_ROUNDS, type ZcashRoundId } from "@/utils/zcashRounds";
 import { fetchMarketsOnChain, type MarketOnChain } from "./marketView";
 
 /**
@@ -16,10 +16,16 @@ import { fetchMarketsOnChain, type MarketOnChain } from "./marketView";
 export type ZcashMarketOnChain = MarketOnChain;
 
 /**
- * One multicall covers all 37.
+ * One multicall covers a round (37 markets in Q3, 55 in Q4).
  *
- * Order matches `ZCASH_MARKETS`, which callers rely on to pair a result with its ballot metadata.
+ * Order matches the round's `markets`, which callers rely on to pair a result with its ballot
+ * metadata.
  */
-export async function fetchZcashMarketsOnChain(): Promise<ZcashMarketOnChain[]> {
-  return fetchMarketsOnChain(ZCASH_MARKETS.map((market) => market.address));
+export async function fetchZcashMarketsOnChain(
+  roundId: ZcashRoundId = "zcash",
+): Promise<ZcashMarketOnChain[]> {
+  return fetchMarketsOnChain(ZCASH_ROUNDS[roundId].markets.map((market) => market.address));
 }
+
+/** Zcash Grants Round 2 (Q4 2026), for callers that take a fetcher with no arguments. */
+export const fetchZcashQ4MarketsOnChain = () => fetchZcashMarketsOnChain("zcash-q4");

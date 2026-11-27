@@ -11,7 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import { canonicalAddress, readOwnerMap } from "./executorOwners";
 import type { MarketOnChain } from "./marketView";
 import { fetchOriginalityR3V3MarketsOnChain } from "./originalityR3OnChain";
-import { fetchZcashMarketsOnChain } from "./zcashOnChain";
+import { fetchZcashMarketsOnChain, fetchZcashQ4MarketsOnChain } from "./zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./zcashNu7OnChain";
 
 const supabase = createClient(process.env.SUPABASE_PROJECT_URL!, process.env.SUPABASE_API_KEY!);
@@ -111,7 +111,8 @@ export async function writeSubmission(submission: StoredSubmission): Promise<voi
  */
 const MARKET_FETCHERS: Record<SubmissionContestId, () => Promise<MarketOnChain[]>> = {
   round3: fetchOriginalityR3V3MarketsOnChain,
-  zcash: fetchZcashMarketsOnChain,
+  zcash: () => fetchZcashMarketsOnChain(),
+  "zcash-q4": fetchZcashQ4MarketsOnChain,
   "zcash-nu7": fetchZcashNu7MarketsOnChain,
 };
 

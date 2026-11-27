@@ -16,6 +16,7 @@ import {
   ORIGINALITY_R3_V3_MARKET_IDS,
   ZCASH_MARKET_IDS,
   ZCASH_NU7_MARKET_IDS,
+  ZCASH_Q4_MARKET_IDS,
 } from "./constants";
 
 /**
@@ -72,6 +73,14 @@ export const DEEP_CONTESTS = [
     // would stay empty. So the 98 repo markets are listed as the contest's own roots. The parent
     // is `ORIGINALITY_R3_V3_PARENT_MARKET_ID` — see `originalityR3V3Markets.ts`.
     marketIds: ORIGINALITY_R3_V3_MARKET_IDS,
+    finished: false,
+  },
+  {
+    // The Q4 2026 grants ballot: 55 independent Yes/No markets, created and seeded 2026-11-27.
+    // "Round 2" is Seer's second grants set, not the program's round number (it is its fourth).
+    id: "zcash-q4",
+    label: "Zcash · Grants Round 2",
+    marketIds: ZCASH_Q4_MARKET_IDS,
     finished: false,
   },
   {

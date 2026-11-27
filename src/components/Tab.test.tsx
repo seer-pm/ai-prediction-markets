@@ -7,7 +7,10 @@ vi.mock("./tabs/AiMarkets", () => ({ AiMarkets: () => <div>panel:round1</div> })
 vi.mock("./tabs/L1Markets", () => ({ L1Markets: () => <div>panel:round2-l1</div> }));
 vi.mock("./tabs/L2Markets", () => ({ L2Markets: () => <div>panel:round2-l2</div> }));
 vi.mock("./tabs/OctantMarkets", () => ({ OctantMarkets: () => <div>panel:octant</div> }));
-vi.mock("./tabs/ZcashMarkets", () => ({ ZcashMarkets: () => <div>panel:zcash</div> }));
+vi.mock("./tabs/ZcashMarkets", () => ({
+  ZcashMarkets: () => <div>panel:zcash</div>,
+  ZcashQ4Markets: () => <div>panel:zcash-q4</div>,
+}));
 vi.mock("./tabs/ZcashNu7Markets", () => ({ ZcashNu7Markets: () => <div>panel:zcash-nu7</div> }));
 vi.mock("./tabs/OriginalityMarkets", () => ({
   OriginalityMarkets: () => <div>panel:round2</div>,
@@ -44,6 +47,7 @@ describe("Tab", () => {
       .filter((button) => (button.textContent ?? "").endsWith("Live"));
     expect(live.map((button) => button.textContent)).toEqual([
       "Round 3 · OriginalityLive",
+      "Zcash · Grants Round 2Live",
     ]);
   });
 

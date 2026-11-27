@@ -3,7 +3,7 @@ import type { ZcashNu7Row } from "@/types";
 /**
  * A sample NU7 predictions file, for the "Sample CSV" button on the upload dialog.
  *
- * Unlike `sampleZcashPredictions`, whose whole point is shipping the exact proposal titles, this one
+ * Unlike the grants sample (`sampleZcashRoundPredictions`), whose whole point is shipping the exact proposal titles, this one
  * cannot teach the labels: outcome strings live on chain and appear in no static file here (see the
  * header of `./zcashNu7Markets`). So it teaches the *shape* instead — how the two index columns
  * work, and that a file may be partial.

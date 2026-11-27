@@ -1,5 +1,6 @@
 import { PoolInfo } from "@/types";
 import { fetchAppJson } from "@/utils/common";
+import type { ZcashRoundId } from "@/utils/zcashRounds";
 import { MarketStatus } from "@seer-pm/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { Address } from "viem";
@@ -28,10 +29,14 @@ interface GetZcashMarketsDataApiResult {
   }[];
 }
 
-const fetchZcashMarketsData = () =>
-  fetchAppJson<GetZcashMarketsDataApiResult>("get-zcash-markets-data");
+// Q3 is asked for without a parameter, as it always was, so a cached edge response stays valid.
+const fetchZcashMarketsData = (roundId: ZcashRoundId) =>
+  fetchAppJson<GetZcashMarketsDataApiResult>(
+    "get-zcash-markets-data",
+    roundId === "zcash" ? undefined : { round: roundId },
+  );
 
-export const useZcashMarketsData = () => {
+export const useZcashMarketsData = (roundId: ZcashRoundId) => {
   return useQuery({
     retry: false,
     refetchOnWindowFocus: false,
@@ -43,7 +48,7 @@ export const useZcashMarketsData = () => {
     refetchInterval: false,
     staleTime: 30 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    queryKey: ["fetchZcashMarketsData"],
-    queryFn: fetchZcashMarketsData,
+    queryKey: ["fetchZcashMarketsData", roundId],
+    queryFn: () => fetchZcashMarketsData(roundId),
   });
 };

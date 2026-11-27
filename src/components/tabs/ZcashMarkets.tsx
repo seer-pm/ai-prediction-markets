@@ -3,6 +3,7 @@ import { FigureLabel } from "@/components/contest/FigureLabel";
 import { ContestChart } from "@/components/contest/ContestChart";
 import { useContest } from "@/components/contest/contestState";
 import { PredictionDropzone } from "@/components/predictions/PredictionDropzone";
+import { SubmitPredictionsButton } from "@/components/predictions/SubmitPredictionsButton";
 import { ZcashTradingInterface } from "@/components/trade/ZcashTradingInterface";
 import { Button, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import { ZcashMarketTable } from "@/components/ZcashMarketTable";
@@ -10,6 +11,7 @@ import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { chartLiquidity, chartVolume, liveSeries, useMarketCharts } from "@/hooks/useMarketCharts";
 import { useProcessZcashPredictions } from "@/hooks/useProcessZcashPredictions";
 import { useRedeemZcash } from "@/hooks/useRedeemZcash";
+import type { LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
 import { useSellZcashToCollateral } from "@/hooks/useSellZcashToCollateral";
 import { useTokensBalances } from "@/hooks/useTokensBalances";
 import { useTradeWalletStatus } from "@/hooks/useTradeWalletStatus";
@@ -17,13 +19,14 @@ import { useZcashMarketsData } from "@/hooks/useZcashMarketsData";
 import { ZcashRow } from "@/types";
 import { downloadCsv, isUndefined } from "@/utils/common";
 import { tradeDisabledReason } from "@/utils/contest";
+import { getContest } from "@/utils/contests";
 import { parseZcashCSV } from "@/utils/csvParser";
 
 import { balancesResolved, redeemAvailability } from "@/utils/redeem";
 import { TOP_LEVEL_WITHDRAW_PHASES, mergeFirstSellCopy } from "@/utils/txPhases";
 import { isZcashRowFundable } from "@/utils/zcashBudget";
-import { sampleZcashPredictions } from "@/utils/sampleZcashPredictions";
 import { YES_INDEX } from "@/utils/zcashMarkets";
+import { sampleZcashRoundPredictions, ZCASH_ROUNDS, type ZcashRoundId } from "@/utils/zcashRounds";
 import { MarketStatus } from "@seer-pm/sdk";
 import { startTransition, useCallback, useMemo, useState } from "react";
 import { Address } from "viem";
@@ -32,15 +35,19 @@ import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
 
-const ZCASH_CSV_FORMAT: CSVFormatInfo = {
-  headers: "project,probability",
-  exampleRows: ["Zcash Grants Hub,0.82", "ZODL Q1 2026 Core Protocol Development,0.15"],
-  description:
-    "One row per proposal, and how likely you think coinholders are to fund it — a number between 0 and 1, so 0.82 means 82%.",
-  valueColumn: "probability",
+/** The first and last proposal on the ballot, as the upload dialog's example rows. */
+const csvFormatOf = (roundId: ZcashRoundId): CSVFormatInfo => {
+  const { markets } = ZCASH_ROUNDS[roundId];
+  return {
+    headers: "project,probability",
+    exampleRows: [`${markets[0].title},0.82`, `${markets[markets.length - 1].title},0.15`],
+    description:
+      "One row per proposal, and how likely you think coinholders are to fund it — a number between 0 and 1, so 0.82 means 82%.",
+    valueColumn: "probability",
+  };
 };
 
-const ZCASH_SAMPLE_CONFIG: SampleCsvConfig = {
+const sampleConfigOf = (roundId: ZcashRoundId): SampleCsvConfig => ({
   columns: [
     { key: "project", title: "project" },
     { key: "probability", title: "probability" },
@@ -49,12 +56,22 @@ const ZCASH_SAMPLE_CONFIG: SampleCsvConfig = {
     project: row.project,
     probability: row.probability,
   }),
-  sampleData: sampleZcashPredictions,
-  filename: "zcash-predictions",
-};
+  sampleData: sampleZcashRoundPredictions(roundId),
+  filename: ZCASH_ROUNDS[roundId].sampleFilename,
+});
 
-export const ZcashMarkets = () => {
-  const [predictions, setPredictions] = useLocalStorage<ZcashRow[]>("zcash-probability", []);
+/** Zcash Grants, Q3 2026: 37 proposals. */
+export const ZcashMarkets = () => <ZcashGrantsMarkets roundId="zcash" />;
+
+/** Zcash Grants Round 2, Q4 2026: 55 proposals. */
+export const ZcashQ4Markets = () => <ZcashGrantsMarkets roundId="zcash-q4" />;
+
+const ZcashGrantsMarkets = ({ roundId }: { roundId: ZcashRoundId }) => {
+  const round = ZCASH_ROUNDS[roundId];
+  const csvFormat = useMemo(() => csvFormatOf(roundId), [roundId]);
+  const sampleConfig = useMemo(() => sampleConfigOf(roundId), [roundId]);
+  const parseCsv = useCallback((text: string) => parseZcashCSV(text, roundId), [roundId]);
+  const [predictions, setPredictions] = useLocalStorage<ZcashRow[]>(round.storageKey, []);
   const { finished } = useContest();
   const { account, tradeExecutor, canTrade } = useTradeWalletStatus();
 
@@ -69,9 +86,9 @@ export const ZcashMarkets = () => {
     isLoadingBalances,
     error,
     marketIdToProject,
-  } = useProcessZcashPredictions(predictions);
+  } = useProcessZcashPredictions(predictions, roundId);
 
-  // 37 proposals share one chart, so they are fetched together rather than 37 times over.
+  // Every proposal shares one chart, so they are fetched together rather than once each.
   const chartMarketIds = useMemo(() => Object.keys(marketIdToProject), [marketIdToProject]);
   const {
     data: charts,
@@ -80,7 +97,7 @@ export const ZcashMarkets = () => {
   } = useMarketCharts(chartMarketIds);
 
   // Raw market data for redeem scope (React Query dedupes with useProcessZcashPredictions).
-  const { data: zcashMarketData } = useZcashMarketsData();
+  const { data: zcashMarketData } = useZcashMarketsData(roundId);
 
   const sellAll = useSellZcashToCollateral();
   const redeem = useRedeemZcash();
@@ -93,8 +110,9 @@ export const ZcashMarkets = () => {
     [zcashMarketData?.markets],
   );
 
-  // Every outcome token of every closed market, Invalid included — on this set a withdrawn
-  // proposal resolves Invalid, so that token can be the only one worth redeeming.
+  // Every outcome token of every closed market, Invalid included — a proposal that resolves Invalid
+  // (withdrawn, in Q3; one that cannot be matched to a ballot item, in both rounds) leaves that
+  // token as the only one worth redeeming.
   const closedTokens = useMemo(
     () => closedMarkets.flatMap((market) => market.wrappedTokens),
     [closedMarkets],
@@ -146,6 +164,28 @@ export const ZcashMarkets = () => {
     [tableData],
   );
 
+  // What this round sends to the leaderboard — from the trade dialog's "Leaderboard submit" and
+  // from "Submit predictions" alike, so the two always send the same numbers. Only this contest's
+  // own markets, which is also what the write endpoint accepts.
+  const leaderboardSubmission = useMemo<LeaderboardSubmission>(() => {
+    const allowed = new Set((getContest(roundId)?.marketIds ?? []).map((id) => id.toLowerCase()));
+    return {
+      contest: roundId,
+      legs: (tableData ?? [])
+        .filter(
+          (row) =>
+            row.predictedProbability !== null &&
+            !!row.marketId &&
+            allowed.has(row.marketId.toLowerCase()),
+        )
+        .map((row) => ({
+          marketId: row.marketId,
+          outcomeIndex: YES_INDEX,
+          prediction: row.predictedProbability as number,
+        })),
+    };
+  }, [roundId, tableData]);
+
   const hasRedeemable = useMemo(() => (closedBalances ?? []).some((b) => b > 0n), [closedBalances]);
 
   // Only a *confident* "nothing to claim" hides the button — see `@/utils/redeem`.
@@ -193,9 +233,9 @@ export const ZcashMarkets = () => {
         project: row.project,
         probability: Number((row.yesPrice ?? 0).toFixed(4)),
       })),
-      "zcash-market-view",
+      round.exportFilename,
     );
-  }, [tableData]);
+  }, [tableData, round.exportFilename]);
 
   // Memoised: the tables are React.memo'd, and a freshly built element
   // here would re-render every row each time a dialog opens.
@@ -206,16 +246,16 @@ export const ZcashMarkets = () => {
         description="Upload a file giving each proposal a probability between 0 and 1. It sits next to the market price so you can see where you disagree."
       >
         <PredictionDropzone
-          storageKey={"zcash-probability"}
+          storageKey={round.storageKey}
           loadedCount={0}
           className="w-full max-w-lg"
           compact
-          parseFn={parseZcashCSV}
+          parseFn={parseCsv}
           onDataParsed={setPredictions}
         />
       </EmptyState>
     ),
-    [setPredictions],
+    [setPredictions, round.storageKey, parseCsv],
   );
 
   if (error) {
@@ -237,7 +277,7 @@ export const ZcashMarkets = () => {
         data={isUndefined(chartData) ? undefined : chartData}
         isLoading={isLoadingCharts}
         error={chartsError}
-        eyebrow="Zcash · Q3 2026"
+        eyebrow={`Zcash · ${round.poll}`}
         title="Approval odds over time"
         description="Each line is one proposal's YES price — the market's estimate of its chance of being approved."
         volume={volumeLabel}
@@ -248,8 +288,8 @@ export const ZcashMarkets = () => {
       {/* Pools can be pulled after resolution; on a settled contest that is not "not tradable yet". */}
       {hasNoLiquidity && !finished && (
         <Panel tone="info" title="Not tradable yet">
-          All 37 markets are live on Optimism, but no liquidity has been seeded, so there are no
-          pools to price them. Predictions can be uploaded now. Prices and trading turn on once the
+          All {round.markets.length} markets are live on Optimism, but no liquidity has been
+          seeded, so there are no pools to price them. Predictions can be uploaded now. Prices and trading turn on once the
           pools exist.
         </Panel>
       )}
@@ -259,7 +299,15 @@ export const ZcashMarkets = () => {
         onUpload={() => startTransition(() => setIsCsvDialogOpen(true))}
         onClear={() => startTransition(() => setPredictions([]))}
         actions={
-          canTrade && (
+          <>
+            {/* Outside `canTrade`: submitting needs a signature, not a trade wallet. */}
+            {!finished && (
+              <SubmitPredictionsButton
+                submission={leaderboardSubmission}
+                hasPredictions={predictions.length > 0}
+              />
+            )}
+            {canTrade && (
             <>
               {/* Trading stops with the contest; claiming what you already hold does not. */}
               {!finished && (
@@ -294,11 +342,13 @@ export const ZcashMarkets = () => {
                 </Button>
               )}
             </>
-          )
+            )}
+          </>
         }
       />
 
       <ZcashMarketTable
+        roundId={roundId}
         markets={tableData || []}
         isLoading={isLoading}
         isLoadingBalances={isLoadingBalances}
@@ -308,18 +358,19 @@ export const ZcashMarkets = () => {
       />
 
       <GenericCSVUpload<ZcashRow>
-        storageKey={"zcash-probability"}
+        storageKey={round.storageKey}
         loadedCount={predictions.length}
         open={isCsvDialogOpen}
         onOpenChange={setIsCsvDialogOpen}
         onDataParsed={setPredictions}
-        parseFn={parseZcashCSV}
-        formatInfo={ZCASH_CSV_FORMAT}
-        sampleConfig={ZCASH_SAMPLE_CONFIG}
+        parseFn={parseCsv}
+        formatInfo={csvFormat}
+        sampleConfig={sampleConfig}
       />
 
       {tradeExecutor && tableData && (
         <ZcashTradingInterface
+          roundId={roundId}
           open={isTradeDialogOpen}
           onOpenChange={setIsTradeDialogOpen}
           tradeExecutor={tradeExecutor}
