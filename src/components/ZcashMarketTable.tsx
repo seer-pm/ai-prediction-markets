@@ -27,12 +27,13 @@ import {
   maxAbs,
   preciseValue,
 } from "@/utils/format";
-import { ZCASH_FORUM_URL } from "@/utils/zcashMarkets";
+import { ZCASH_ROUNDS, type ZcashRoundId } from "@/utils/zcashRounds";
 import React, { useMemo, type ReactNode } from "react";
 
 type SortColumn = "project" | "price" | "difference";
 
 interface MarketTableProps {
+  roundId: ZcashRoundId;
   markets: ZcashTableData[];
   isLoading: boolean;
   isLoadingBalances: boolean;
@@ -42,6 +43,7 @@ interface MarketTableProps {
 }
 
 const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
+  roundId,
   markets,
   isLoading,
   isLoadingBalances,
@@ -75,13 +77,13 @@ const ZcashMarketTableInner: React.FC<MarketTableProps> = ({
   return (
     <Card flush>
       <CardHeader
-        eyebrow="Zcash · Q3 2026"
+        eyebrow={`Zcash · ${ZCASH_ROUNDS[roundId].poll}`}
         title="Predicted approval odds"
         description={
           <>
-            One row per proposal on the Q3 grants ballot.{" "}
+            One row per proposal on the {ZCASH_ROUNDS[roundId].poll} grants ballot.{" "}
             <a
-              href={ZCASH_FORUM_URL}
+              href={ZCASH_ROUNDS[roundId].forumUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 font-semibold text-primary transition-colors hover:text-primary-hover"

@@ -24,7 +24,7 @@ import { sha256, stringToBytes } from "viem";
  * `netlify/functions/utils/predictionSubmissions.ts` — the compiler asks for it — and a
  * `leaderboardSubmission` passed from the contest's trade dialog plus a `SubmitPredictionsButton`.
  */
-export const SUBMISSION_CONTESTS = ["round3", "zcash-nu7", "zcash"] as const;
+export const SUBMISSION_CONTESTS = ["round3", "zcash-q4", "zcash-nu7", "zcash"] as const;
 export type SubmissionContestId = (typeof SUBMISSION_CONTESTS)[number];
 
 export function isSubmissionContest(id: string): id is SubmissionContestId {
@@ -40,8 +40,8 @@ export interface PredictionLeg {
 }
 
 /**
- * 98 Originality repos × 1 leg, 37 grants markets × 1 leg, or 5 ballot questions × ≤3 legs —
- * headroom over all three.
+ * 98 Originality repos × 1 leg, 37 or 55 grants markets × 1 leg, or 5 ballot questions × ≤3 legs —
+ * headroom over all of them.
  */
 export const MAX_SUBMISSION_LEGS = 200;
 

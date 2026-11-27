@@ -17,7 +17,7 @@ import {
   fetchOriginalityR3MarketsOnChain,
   fetchOriginalityR3V3MarketsOnChain,
 } from "./utils/originalityR3OnChain";
-import { fetchZcashMarketsOnChain } from "./utils/zcashOnChain";
+import { fetchZcashMarketsOnChain, fetchZcashQ4MarketsOnChain } from "./utils/zcashOnChain";
 import { fetchZcashNu7MarketsOnChain } from "./utils/zcashNu7OnChain";
 import {
   getPoolVolumes,
@@ -600,7 +600,8 @@ export default async () => {
   // these are 42 `getMarket` calls across two multicalls, not something to pay for twice.
   const onChainContests: { label: string; markets: MarketOnChain[] }[] = [];
   for (const [label, fetchMarkets] of [
-    ["zcash", fetchZcashMarketsOnChain],
+    ["zcash", () => fetchZcashMarketsOnChain()],
+    ["zcash-q4", fetchZcashQ4MarketsOnChain],
     ["zcash-nu7", fetchZcashNu7MarketsOnChain],
     ["originality-r3", fetchOriginalityR3MarketsOnChain],
     ["originality-r3-v3", fetchOriginalityR3V3MarketsOnChain],

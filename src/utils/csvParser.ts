@@ -1,5 +1,5 @@
 import { L2Row, OctantRow, OriginalityRow, PredictionRow, ZcashNu7Row, ZcashRow } from "@/types";
-import { getZcashMarketByTitle } from "@/utils/zcashMarkets";
+import { getZcashRoundMarketByTitle, ZCASH_ROUNDS, type ZcashRoundId } from "@/utils/zcashRounds";
 import { ZCASH_NU7_MARKETS } from "@/utils/zcashNu7Markets";
 
 /**
@@ -13,7 +13,7 @@ import { ZCASH_NU7_MARKETS } from "@/utils/zcashNu7Markets";
  * a real mistake and still throws.
  */
 const rowCells = (line: string, columnCount: number, rowNumber: number): string[] => {
-  const values = line.split(",").map((v) => v.trim());
+  const values = splitCsvLine(line).map((v) => v.trim());
 
   if (values.length > columnCount) {
     throw new Error(`Row ${rowNumber}: Expected ${columnCount} columns, found ${values.length}`);
@@ -22,6 +22,40 @@ const rowCells = (line: string, columnCount: number, rowNumber: number): string[
   while (values.length < columnCount) values.push("");
 
   return values;
+};
+
+/**
+ * One CSV line into its cells, honouring double quotes: `"a, b",0.5` is two cells, and `""`
+ * inside quotes is one quote. `downloadCsv` quotes any value with a comma, and Zcash Round 2 has
+ * proposal titles with commas in them, so an exported file has to read back in.
+ */
+export const splitCsvLine = (line: string): string[] => {
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (quoted) {
+      if (char === '"' && line[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"' && cell.trim() === "") {
+      quoted = true;
+      cell = "";
+    } else if (char === ",") {
+      cells.push(cell);
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell);
+  return cells;
 };
 
 export const parseCSV = (csvText: string): PredictionRow[] => {
@@ -319,10 +353,10 @@ const LEGACY_YES_NO_VALUES = new Set([
  * traded, which is how you say "no view" without inventing a number. A cleared cell is checked
  * before the title is, so skipping a proposal never requires spelling it right.
  *
- * The project name is validated against the ballot (`ZCASH_MARKETS`) rather than being matched
+ * The project name is validated against the round's ballot (`ZCASH_ROUNDS`) rather than being matched
  * loosely later — a typo here would otherwise surface as a silently untraded row.
  */
-export const parseZcashCSV = (csvText: string): ZcashRow[] => {
+export const parseZcashCSV = (csvText: string, roundId: ZcashRoundId = "zcash"): ZcashRow[] => {
   const lines = csvText.trim().split("\n");
 
   if (lines.length < 2) {
@@ -359,10 +393,10 @@ export const parseZcashCSV = (csvText: string): ZcashRow[] => {
       throw new Error(`Row ${i + 1}: Missing project. Leave the probability blank to skip a row.`);
     }
 
-    const market = getZcashMarketByTitle(project);
+    const market = getZcashRoundMarketByTitle(roundId, project);
     if (!market) {
       throw new Error(
-        `Row ${i + 1}: "${project}" is not a proposal in the Q3 2026 ballot. Download the sample CSV for the exact titles.`,
+        `Row ${i + 1}: "${project}" is not a proposal in the ${ZCASH_ROUNDS[roundId].poll} ballot. Download the sample CSV for the exact titles.`,
       );
     }
 

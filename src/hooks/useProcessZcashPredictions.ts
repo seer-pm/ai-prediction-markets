@@ -1,6 +1,7 @@
 import { ZcashRow, ZcashTableData } from "@/types";
 import { ARB_SUM_THRESHOLD, MIN_PRICE } from "@/utils/constants";
-import { getZcashMarketByTitle, NO_INDEX, YES_INDEX } from "@/utils/zcashMarkets";
+import { NO_INDEX, YES_INDEX } from "@/utils/zcashMarkets";
+import { getZcashRoundMarketByTitle, type ZcashRoundId } from "@/utils/zcashRounds";
 import { useMemo } from "react";
 import { zeroAddress } from "viem";
 import { useAccount } from "wagmi";
@@ -21,10 +22,10 @@ import { useZcashMarketsData } from "./useZcashMarketsData";
  * legitimately sit above one pool and below the other, and both differences can share a sign when
  * YES+NO is away from 1. `getZcashQuote` is what decides which shape that is.
  */
-export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
+export const useProcessZcashPredictions = (predictions: ZcashRow[], roundId: ZcashRoundId) => {
   const { address: account } = useAccount();
   const { data: checkResult } = useCheckTradeExecutorCreated(account);
-  const { data, isLoading, isFetching, error } = useZcashMarketsData();
+  const { data, isLoading, isFetching, error } = useZcashMarketsData(roundId);
   const tokens = useMemo(
     () => data?.markets?.map((market) => market.wrappedTokens)?.flat(),
     [data?.markets],
@@ -80,7 +81,7 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
       const prediction = projectToPredictionMapping[project.toLowerCase()];
       const { id: marketId, yesPrice, noPrice, yesPool, noPool } = marketPoolData;
       const market = data.markets.find((market) => market.id === marketId);
-      const ballot = getZcashMarketByTitle(project);
+      const ballot = getZcashRoundMarketByTitle(roundId, project);
 
       // Prediction-independent arbitrage bounds: when YES+NO>1 we can mint a
       // complete set and sell both sides until each pool reaches its
@@ -169,7 +170,7 @@ export const useProcessZcashPredictions = (predictions: ZcashRow[]) => {
         volumeUntilNoPrice,
       };
     });
-  }, [data, projectToPredictionMapping, balanceMapping]);
+  }, [data, projectToPredictionMapping, balanceMapping, roundId]);
 
   if (!data || !Object.keys(data.marketsData ?? {}).length) {
     return {

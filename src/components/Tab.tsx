@@ -13,7 +13,7 @@ import { L1Markets } from "./tabs/L1Markets";
 import { L2Markets } from "./tabs/L2Markets";
 import { OctantMarkets } from "./tabs/OctantMarkets";
 import { OriginalityMarkets, OriginalityR3Markets } from "./tabs/OriginalityMarkets";
-import { ZcashMarkets } from "./tabs/ZcashMarkets";
+import { ZcashMarkets, ZcashQ4Markets } from "./tabs/ZcashMarkets";
 import { ZcashNu7Markets } from "./tabs/ZcashNu7Markets";
 import { SeerPromo } from "./SeerPromo";
 
@@ -24,6 +24,7 @@ import { SeerPromo } from "./SeerPromo";
  */
 const CONTEST_COMPONENTS: Record<string, ComponentType> = {
   round3: OriginalityR3Markets,
+  "zcash-q4": ZcashQ4Markets,
   "zcash-nu7": ZcashNu7Markets,
   zcash: ZcashMarkets,
   octant: OctantMarkets,

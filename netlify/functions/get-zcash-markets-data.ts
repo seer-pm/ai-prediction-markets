@@ -2,7 +2,8 @@ import { UniswapGraphQLClient } from "@/config/apollo";
 import { GetPoolsDocument, GetPoolsQuery, GetPoolsQueryVariables } from "@/gql/graphql";
 import { PoolInfo } from "@/types";
 import { getToken0Token1, isTwoStringsEqual, tickToTokenPrices } from "@/utils/common";
-import { NO_INDEX, YES_INDEX, ZCASH_MARKETS } from "@/utils/zcashMarkets";
+import { NO_INDEX, YES_INDEX } from "@/utils/zcashMarkets";
+import { isZcashRoundId, ZCASH_ROUNDS } from "@/utils/zcashRounds";
 import { Address } from "viem";
 import { EDGE_CACHE_HEADERS } from "./utils/cacheHeaders";
 import { getCorsHeaders, handleCorsPreflight } from "./utils/cors";
@@ -13,7 +14,16 @@ export default async (req: Request) => {
   if (preflight) return preflight;
   const corsHeaders = getCorsHeaders(req);
   try {
-    const markets = await fetchZcashMarketsOnChain();
+    // `?round=zcash-q4` for Grants Round 2; no parameter is Q3, as before rounds existed.
+    const roundParam = new URL(req.url).searchParams.get("round") ?? "zcash";
+    if (!isZcashRoundId(roundParam)) {
+      return new Response(JSON.stringify({ error: `Unknown Zcash round "${roundParam}"` }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    const ballot = ZCASH_ROUNDS[roundParam].markets;
+    const markets = await fetchZcashMarketsOnChain(roundParam);
 
     const queryResult = await UniswapGraphQLClient.query<GetPoolsQuery, GetPoolsQueryVariables>({
       query: GetPoolsDocument,
@@ -67,12 +77,12 @@ export default async (req: Request) => {
     };
 
     // Keyed by proposal title, which is what the predictions CSV joins on. The order of
-    // `ZCASH_MARKETS` and of `markets` match because the multicall preserves input order.
+    // the round's `markets` and of `markets` match because the multicall preserves input order.
     const projectToPriceMapping = markets.reduce(
       (mapping, market, index) => {
         const yesPool = getPoolByTokenPair(market.wrappedTokens[YES_INDEX], market.collateralToken);
         const noPool = getPoolByTokenPair(market.wrappedTokens[NO_INDEX], market.collateralToken);
-        mapping[ZCASH_MARKETS[index].title] = {
+        mapping[ballot[index].title] = {
           id: market.id,
           yesPrice: yesPool?.price ?? null,
           yesPool,

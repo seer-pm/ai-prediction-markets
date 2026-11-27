@@ -1,8 +1,7 @@
 import { useExecuteZcashStrategy } from "@/hooks/useExecuteZcashStrategy";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { isZcashRowFundable, zcashShareOf } from "@/utils/zcashBudget";
-import { YES_INDEX } from "@/utils/zcashMarkets";
-import type { PredictionLeg } from "@/utils/predictionSubmission";
+import type { LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
 import { ZcashTableData } from "@/types";
 import { collateral } from "@/utils/constants";
 import { formatAmount } from "@/utils/format";
@@ -11,6 +10,8 @@ import { Address } from "viem";
 import { StrategyDialog } from "./StrategyDialog";
 
 interface TradingInterfaceProps {
+  /** Built by the tab, so this dialog and its "Submit predictions" button send the same legs. */
+  leaderboardSubmission: LeaderboardSubmission;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   markets: ZcashTableData[];
@@ -19,6 +20,7 @@ interface TradingInterfaceProps {
 }
 
 export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
+  leaderboardSubmission,
   open,
   onOpenChange,
   tradeExecutor,
@@ -59,24 +61,12 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
 
   // Every market given a number, traded or not — the prediction is what gets scored. The CSV's
   // probability is the YES price, so it is submitted against the YES outcome.
-  const leaderboardLegs = useMemo<PredictionLeg[]>(
-    () =>
-      markets
-        .filter((market) => market.predictedProbability !== null && market.marketId)
-        .map((market) => ({
-          marketId: market.marketId,
-          outcomeIndex: YES_INDEX,
-          prediction: market.predictedProbability as number,
-        })),
-    [markets],
-  );
-
   return (
     <StrategyDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Start trading"
-      leaderboardSubmission={{ contest: "zcash", legs: leaderboardLegs }}
+      leaderboardSubmission={leaderboardSubmission}
       stats={[
         { label: "Markets", value: String(fundableCount) },
         { label: "Above market", value: String(aboveCount), tone: "long" },
