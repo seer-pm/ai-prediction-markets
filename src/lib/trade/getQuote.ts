@@ -27,6 +27,7 @@ import { l2MarketOutcomes, l2OutcomeTokens } from "@/utils/l2MarketOutcomes";
 import pLimit from "p-limit";
 import { Address, encodeFunctionData, formatUnits, parseUnits, zeroAddress } from "viem";
 import { getUniswapQuoteFast } from "./getQuoteFast";
+import { settleWithRetry, type QuoteFailure } from "./settleWithRetry";
 
 export const getUniswapQuote: QuoteTradeFn = getUniswapQuoteFast;
 
@@ -787,6 +788,8 @@ const dualSellOriginalityQuotes = async ({
 // UP+DOWN>1 arbitrage: mint a complete set and sell both sides until each pool
 // reaches its proportional share of 1. Ignores the user's prediction. Existing
 // token balances are sold first (free), so we only mint the symmetric remainder.
+// A sell that fails to quote fails the row (retried, then named) rather than
+// selling one side alone.
 const arbSellOriginalityQuotes = async ({
   account,
   row,
@@ -822,7 +825,7 @@ const arbSellOriginalityQuotes = async ({
           { address: token, symbol, decimals: DECIMALS },
           { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
           "sell",
-        ).catch(() => null);
+        );
 
   const [upSell, downSell] = await Promise.all([
     sellQuote(upToken, "UP", sellUp),
@@ -935,25 +938,23 @@ export const getSellFromBalanceQuotes = async ({
   account: Address;
   tableData: OriginalityTableData[];
 }) => {
-  const promises: Promise<UniswapQuoteTradeResult | null>[] = [];
+  const legs: { row: OriginalityTableData; side: "UP" | "DOWN" }[] = [];
 
   for (const row of tableData) {
     if (!row.upDifference || !row.downDifference) continue;
-
-    promises.push(
-      getSellFromBalanceForSide({ account, row, side: "UP" }),
-      getSellFromBalanceForSide({ account, row, side: "DOWN" }),
-    );
+    legs.push({ row, side: "UP" }, { row, side: "DOWN" });
   }
 
-  const results = await Promise.allSettled(promises);
+  const { done, failed } = await settleWithRetry(legs, ({ row, side }) =>
+    getSellFromBalanceForSide({ account, row, side }),
+  );
 
-  return results
-    .filter(
-      (r): r is PromiseFulfilledResult<UniswapQuoteTradeResult | null> =>
-        r.status === "fulfilled" && !!r.value,
-    )
-    .map((r) => r.value as UniswapQuoteTradeResult);
+  return {
+    quotes: done
+      .map(({ value }) => value)
+      .filter((quote): quote is UniswapQuoteTradeResult => !!quote),
+    failed: failed.map(({ item, error }): QuoteFailure<OriginalityTableData> => ({ row: item.row, error })),
+  };
 };
 
 export const getSellAllQuotes = async ({
@@ -963,45 +964,31 @@ export const getSellAllQuotes = async ({
   account: Address;
   tableData: OriginalityTableData[];
 }) => {
-  const chainId = CHAIN_ID;
-  const sellPromises = tableData.reduce((promises, row) => {
-    // sell from token to collateral
-    if (row.upBalance) {
-      promises.push(
-        getUniswapQuote(
-          chainId,
-          account,
-          formatUnits(row.upBalance, DECIMALS),
-          { address: row.wrappedTokens[1], symbol: "UP", decimals: DECIMALS },
-          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-          "sell",
-        ),
-      );
-    }
+  const legs: { row: OriginalityTableData; side: TradeSide; balance: bigint; token: Address }[] = [];
+  for (const row of tableData) {
+    if (row.upBalance) legs.push({ row, side: "UP", balance: row.upBalance, token: row.wrappedTokens[1] });
     if (row.downBalance) {
-      promises.push(
-        getUniswapQuote(
-          chainId,
-          account,
-          formatUnits(row.downBalance, DECIMALS),
-          { address: row.wrappedTokens[0], symbol: "DOWN", decimals: DECIMALS },
-          { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
-          "sell",
-        ),
-      );
+      legs.push({ row, side: "DOWN", balance: row.downBalance, token: row.wrappedTokens[0] });
     }
-    return promises;
-  }, [] as Promise<UniswapQuoteTradeResult>[]);
+  }
 
-  const sellQuoteResults = await Promise.allSettled(sellPromises);
-  const sellQuotes = sellQuoteResults.reduce((quotes, result) => {
-    if (result.status === "fulfilled") {
-      quotes.push(result.value);
-    }
-    return quotes;
-  }, [] as UniswapQuoteTradeResult[]);
+  // A sell that fails to quote is retried, then reported: dropped, it left that position unsold
+  // under a finished ledger.
+  const { done, failed } = await settleWithRetry(legs, ({ row, side, balance, token }) =>
+    getUniswapQuote(
+      CHAIN_ID,
+      account,
+      formatUnits(balance, DECIMALS),
+      { address: token, symbol: side, decimals: DECIMALS },
+      { address: row.collateralToken, symbol: row.repo, decimals: DECIMALS },
+      "sell",
+    ),
+  );
 
-  return sellQuotes;
+  return {
+    quotes: done.map(({ value }) => value),
+    failed: failed.map(({ item, error }): QuoteFailure<OriginalityTableData> => ({ row: item.row, error })),
+  };
 };
 
 export const getOriginalityQuotes = async ({
@@ -1009,38 +996,25 @@ export const getOriginalityQuotes = async ({
   tableData,
   onProgress,
 }: OriginalityQuoteProps & { onProgress?: ProgressCallback }) => {
-  let currentProgress = 0;
-  const quotePromises = tableData.map((row) =>
-    compareOriginalityQuotes({ account, row })
-      .then((result) => {
-        currentProgress++;
-        onProgress?.(currentProgress);
-        return result;
-      })
-      .catch((e) => {
-        currentProgress++;
-        onProgress?.(currentProgress);
-        throw e;
-      }),
-  );
-  if (!quotePromises.length) {
+  if (!tableData.length) {
     throw new Error("Quote Error: Amount too small");
   }
-  const quoteResults = await Promise.allSettled(quotePromises);
-  const quotes = quoteResults.reduce(
-    (quotes, result) => {
-      if (result.status === "fulfilled" && result.value) {
-        quotes.push(result.value);
-      }
-      return quotes;
-    },
-    [] as OriginalityQuoteResult[],
+  // Counts repositories priced; one that fails every attempt is counted once it is given up on.
+  let priced = 0;
+  const { done, failed } = await settleWithRetry(tableData, (row) =>
+    compareOriginalityQuotes({ account, row }).then((result) => {
+      onProgress?.(++priced);
+      return result;
+    }),
   );
+  if (failed.length) onProgress?.(priced + failed.length);
 
-  if (!quotes) {
-    throw new Error("Quote Error: Cannot execute strategy");
-  }
-  return quotes;
+  return {
+    results: done
+      .map(({ value }) => value)
+      .filter((result): result is OriginalityQuoteResult => !!result),
+    failed: failed.map(({ item, error }): QuoteFailure<OriginalityTableData> => ({ row: item, error })),
+  };
 };
 
 export const getSellAllL1Quotes = async ({

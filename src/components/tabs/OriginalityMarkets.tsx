@@ -39,6 +39,7 @@ import { GenericCSVUpload } from "../GenericCSVUpload";
 import type { CSVFormatInfo, SampleCsvConfig } from "../GenericCSVUpload";
 import { RedeemL2Interface } from "../trade/RedeemL2Interface";
 import { SellAllTokensInterface } from "../trade/SellAllTokensInterface";
+import { SkippedMarketsNotice } from "../trade/SkippedMarketsNotice";
 
 const ORIGINALITY_CSV_FORMAT: CSVFormatInfo = {
   headers: "repo,originality",
@@ -386,6 +387,15 @@ export const OriginalityMarkets = ({ round = ORIGINALITY_ROUND_2 }: { round?: Or
       onSellAll={handleSellAll}
       isLoading={isLoadingSellBalances || isLoading || isLoadingBalances}
       hasTokens={hasSellTokens}
+      runNotice={
+        sellAll.data && (
+          <SkippedMarketsNotice
+            markets={sellAll.data.skippedMarkets}
+            prunedCalls={sellAll.data.prunedCalls}
+            retry="Those positions are still in your wallet, and part of the merge back to sUSDS waits on them. Run Sell all again to finish."
+          />
+        )
+      }
     />
   );
 

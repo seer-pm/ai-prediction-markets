@@ -4,6 +4,7 @@ import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess, UNWIND_MIN_PERMISSION_SECONDS } from "@/lib/toastify";
 import { getOriginalityQuotes, getSellFromBalanceQuotes } from "@/lib/trade/getQuote";
+import { QUOTE_ATTEMPTS, skippedNames } from "@/lib/trade/settleWithRetry";
 import { BatchTxError, CallBatchesInput, OriginalityQuoteResult, OriginalityTradeProps, TxStateChange } from "@/types";
 import { TradeError } from "@/utils/errors";
 import { getUnwindMintCalls } from "./useExecuteL2Strategy";
@@ -165,10 +166,11 @@ const executeOriginalityStrategy = async ({
     throw new Error("No prediction data");
   }
 
-  const sellFromBalanceQuotes = await getSellFromBalanceQuotes({
+  const { quotes: sellFromBalanceQuotes, failed: presaleFailed } = await getSellFromBalanceQuotes({
     account: tradeExecutor,
     tableData,
   });
+  let prunedCalls = 0;
 
   const sellTokenMapping = sellFromBalanceQuotes.reduce(
     (acc, result) => {
@@ -201,6 +203,7 @@ const executeOriginalityStrategy = async ({
       await withdrawFundSessionKey();
       throw sellResult.error;
     }
+    prunedCalls += sellResult.prunedCalls;
   }
   const didMint = Number(amount) > 0;
   const mintValue = safeParseUnits(amount, DECIMALS);
@@ -263,14 +266,23 @@ const executeOriginalityStrategy = async ({
     ...row,
     amount: formatUnits(budgets[index], DECIMALS),
   }));
-  const originalityQuoteResults = await getOriginalityQuotes({
+  const { results: originalityQuoteResults, failed } = await getOriginalityQuotes({
     account: tradeExecutor,
     tableData: newTableData,
   });
+  const skippedMarkets = skippedNames([...presaleFailed, ...failed], (row) => row.repo);
   // A dual sell whose sides both came back unquoted still carries a result, and on its own would
   // only split the row's budget into pairs it never sells.
   const tradeableQuoteResults = originalityQuoteResults.filter(({ quotes }) => quotes.length > 0);
   if (!tradeableQuoteResults.length) {
+    // Every repository that had something to do failed to price: that, not the amount, is the
+    // cause. Nothing has been minted yet.
+    if (failed.length) {
+      throw new TradeError(
+        `${failed.length} repositor${failed.length === 1 ? "y" : "ies"} could not be priced, and nothing else had a trade to make.`,
+        `Their quotes failed ${QUOTE_ATTEMPTS} times each, usually a network problem rather than the pools. Nothing was minted; try again in a minute.`,
+      );
+    }
     throw new Error(NO_TRADE_MESSAGE);
   }
   const tradeExecutorCalls = getTradeExecutorCalls({
@@ -397,10 +409,17 @@ const executeOriginalityStrategy = async ({
     );
   }
 
+  prunedCalls += result.prunedCalls;
+
   onStateChange({ phase: "settle", label: "Returning unused gas" });
   await withdrawFundSessionKey();
-  toastSuccess({ title: "Strategy executed" });
-  return result;
+  toastSuccess({
+    title: "Strategy executed",
+    subtitle: skippedMarkets.length
+      ? `${skippedMarkets.length} repositor${skippedMarkets.length === 1 ? "y was" : "ies were"} not traded. See the dialog.`
+      : "",
+  });
+  return { ...result, prunedCalls, skippedMarkets };
 };
 
 export const useExecuteOriginalityStrategy = (onSuccess?: () => unknown) => {

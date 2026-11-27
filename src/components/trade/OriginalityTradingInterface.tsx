@@ -7,6 +7,7 @@ import { formatWeight } from "@/utils/format";
 import React, { useMemo } from "react";
 import { Address } from "viem";
 import { OriginalityMiddleMarket } from "@/utils/originalityRounds";
+import { SkippedMarketsNotice } from "./SkippedMarketsNotice";
 import { StrategyDialog } from "./StrategyDialog";
 
 interface TradingInterfaceProps {
@@ -79,6 +80,15 @@ export const OriginalityTradingInterface: React.FC<TradingInterfaceProps> = ({
       balancesLoading={isLoadingBalances}
       hasPositions={hasPositions}
       mutation={executeTradeMutation}
+      runNotice={
+        executeTradeMutation.data && (
+          <SkippedMarketsNotice
+            markets={executeTradeMutation.data.skippedMarkets}
+            prunedCalls={executeTradeMutation.data.prunedCalls}
+            retry="Their share of the amount is still in your wallet as their tokens. Run the strategy again to retry them."
+          />
+        )
+      }
       blockedReason={
         repoCount === 0
           ? "Every prediction already matches the market — there is nothing to trade."
