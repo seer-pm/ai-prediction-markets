@@ -2,7 +2,7 @@ import { Button, Dialog, EmptyState, ErrorPanel, Panel } from "@/components/ui";
 import type { TxProgressState } from "@/hooks/useTxProgress";
 import type { TxPhase } from "@/types";
 import { SELL_ALL_PHASES, runStatus } from "@/utils/txPhases";
-import React, { useEffect } from "react";
+import React, { useEffect, type ReactNode } from "react";
 import { RunLedger } from "./RunLedger";
 
 export interface SellAllTokensInterfaceProps {
@@ -27,6 +27,8 @@ export interface SellAllTokensInterfaceProps {
   isLoading: boolean;
   /** True if there are tokens to sell */
   hasTokens: boolean;
+  /** Shown once the run has gone through: what it left out, when it left anything out. */
+  runNotice?: ReactNode;
 }
 
 export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
@@ -46,6 +48,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
   onSellAll,
   isLoading,
   hasTokens,
+  runNotice,
 }) => {
   const status = runStatus({ isPending, isSuccess, isError });
 
@@ -95,6 +98,7 @@ export const SellAllTokensInterface: React.FC<SellAllTokensInterfaceProps> = ({
     >
       <div className="space-y-4">
         {isError && <ErrorPanel title="The sell run stopped" error={error} onDismiss={reset} />}
+        {status === "succeeded" && runNotice}
 
         {status !== "idle" && (
           <RunLedger

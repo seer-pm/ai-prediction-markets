@@ -93,6 +93,8 @@ export interface StrategyDialogProps {
    * Omit on contests that take no submissions.
    */
   leaderboardSubmission?: LeaderboardSubmission;
+  /** Shown under "Strategy executed": what the run left out, when it left anything out. */
+  runNotice?: ReactNode;
 }
 
 interface FormValues {
@@ -134,6 +136,7 @@ export function StrategyDialog({
   minAmount,
   phases = STRATEGY_PHASES,
   leaderboardSubmission,
+  runNotice,
 }: StrategyDialogProps) {
   const {
     register,
@@ -258,6 +261,7 @@ export function StrategyDialog({
             Your positions now reflect the predictions you uploaded. Balances refresh in a moment.
           </Panel>
         )}
+        {status === "succeeded" && runNotice}
 
         {status !== "idle" && (
           <RunLedger

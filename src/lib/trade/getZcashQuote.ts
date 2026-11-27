@@ -37,12 +37,61 @@ import { getUniswapQuote } from "./getQuote";
 
 type TradeAction = "buy" | "sell";
 
+/** How many times a market is priced before it is reported as skipped. */
+export const ZCASH_QUOTE_ATTEMPTS = 3;
+/** Pause before each retry, multiplied by the attempt number. */
+const RETRY_DELAY_MS = 1000;
+
+/** A market the run could not price, after every attempt. */
+export interface ZcashQuoteFailure {
+  row: ZcashTableData;
+  error: unknown;
+}
+
+/**
+ * Run `task` over every item and retry the ones that threw, up to `ZCASH_QUOTE_ATTEMPTS` in all.
+ *
+ * Quotes for a whole ballot go out at once, several eth_calls per leg, and a few of them fail on a
+ * busy RPC. Before this, a failed leg was turned into "no trade" on the spot, so on 2026-11-27 three
+ * of 55 Round 2 markets were left out of a run without a word; their pools quoted normally a minute
+ * later. A retry goes out with only the failures, so it is far lighter than the first pass.
+ *
+ * Results keep the order of `items`.
+ */
+const settleWithRetry = async <T, R>(
+  items: T[],
+  task: (item: T) => Promise<R>,
+): Promise<{ done: { item: T; value: R }[]; failed: { item: T; error: unknown }[] }> => {
+  const values = new Map<number, R>();
+  let pending = items.map((item, index) => ({ item, index }));
+  let failed: { item: T; index: number; error: unknown }[] = [];
+
+  for (let attempt = 0; attempt < ZCASH_QUOTE_ATTEMPTS && pending.length; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+    const results = await Promise.allSettled(pending.map(({ item }) => task(item)));
+    failed = [];
+    results.forEach((result, i) => {
+      if (result.status === "fulfilled") values.set(pending[i].index, result.value);
+      else failed.push({ ...pending[i], error: result.reason });
+    });
+    pending = failed;
+  }
+
+  return {
+    done: [...values.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([index, value]) => ({ item: items[index], value })),
+    failed: failed.map(({ item, error }) => ({ item, error })),
+  };
+};
+
 /** Uniswap quotes take a decimal string; 15 places is well inside an 18-decimal token. */
 const toAmount = (value: number) => value.toFixed(15);
 
 /**
  * One leg. `volume` is the swap input: collateral for a buy, outcome tokens for a sell.
- * Returns null (rather than throwing) for a leg too small to be worth a transaction.
+ * Returns null for a leg too small to be worth a transaction. A quote that fails throws: the whole
+ * market is then retried, and reported if it still fails, rather than trading one leg of two.
  */
 const quoteLeg = async ({
   account,
@@ -69,7 +118,7 @@ const quoteLeg = async ({
     { address: token, symbol: side, decimals: DECIMALS },
     { address: row.collateralToken, symbol: row.project, decimals: DECIMALS },
     action,
-  ).catch(() => null);
+  );
 };
 
 /**
@@ -274,26 +323,23 @@ export const getSellFromBalanceZcashQuotes = async ({
   account: Address;
   tableData: ZcashTableData[];
 }) => {
-  const promises: Promise<UniswapQuoteTradeResult | null>[] = [];
+  const legs: { row: ZcashTableData; side: ZcashSide }[] = [];
 
   for (const row of tableData) {
     // Skip rows with no real disagreement: selling a few thousandths of a token costs far more in
     // gas than the position is worth.
     if (!row.hasPrediction || !hasZcashEdge(row)) continue;
-    promises.push(
-      getSellFromBalanceForSide({ account, row, side: "YES" }),
-      getSellFromBalanceForSide({ account, row, side: "NO" }),
-    );
+    legs.push({ row, side: "YES" }, { row, side: "NO" });
   }
 
-  const results = await Promise.allSettled(promises);
+  const { done, failed } = await settleWithRetry(legs, ({ row, side }) =>
+    getSellFromBalanceForSide({ account, row, side }),
+  );
 
-  return results
-    .filter(
-      (r): r is PromiseFulfilledResult<UniswapQuoteTradeResult | null> =>
-        r.status === "fulfilled" && !!r.value,
-    )
-    .map((r) => r.value as UniswapQuoteTradeResult);
+  return {
+    quotes: done.map(({ value }) => value).filter((quote): quote is UniswapQuoteTradeResult => !!quote),
+    failed: failed.map(({ item, error }) => ({ row: item.row, error })),
+  };
 };
 
 /** Unconditional liquidation of every outcome token held, for the "Sell all positions" action. */
@@ -304,37 +350,33 @@ export const getSellAllZcashQuotes = async ({
   account: Address;
   tableData: ZcashTableData[];
 }) => {
-  const sellPromises = tableData.reduce((promises, row) => {
+  const legs: { row: ZcashTableData; side: ZcashSide; balance: bigint; token: Address }[] = [];
+  for (const row of tableData) {
     for (const side of ["YES", "NO"] as ZcashSide[]) {
       const balance = side === "YES" ? row.yesBalance : row.noBalance;
       if (!balance) continue;
       const token = row.wrappedTokens[sideIndex(side)];
       if (!token) continue;
-      promises.push(
-        getUniswapQuote(
-          CHAIN_ID,
-          account,
-          formatUnits(balance, DECIMALS),
-          { address: token, symbol: side, decimals: DECIMALS },
-          {
-            address: row.collateralToken,
-            symbol: row.project,
-            decimals: DECIMALS,
-          },
-          "sell",
-        ),
-      );
+      legs.push({ row, side, balance, token });
     }
-    return promises;
-  }, [] as Promise<UniswapQuoteTradeResult>[]);
+  }
 
-  const sellQuoteResults = await Promise.allSettled(sellPromises);
-  return sellQuoteResults.reduce((quotes, result) => {
-    if (result.status === "fulfilled") {
-      quotes.push(result.value);
-    }
-    return quotes;
-  }, [] as UniswapQuoteTradeResult[]);
+  // A sell that fails to quote is retried, then reported: dropped, it left that position unsold
+  // under a "Sold" ledger.
+  const { done, failed } = await settleWithRetry(legs, ({ row, side, balance, token }) =>
+    getUniswapQuote(
+      CHAIN_ID,
+      account,
+      formatUnits(balance, DECIMALS),
+      { address: token, symbol: side, decimals: DECIMALS },
+      { address: row.collateralToken, symbol: row.project, decimals: DECIMALS },
+      "sell",
+    ),
+  );
+  return {
+    quotes: done.map(({ value }) => value),
+    failed: failed.map(({ item, error }): ZcashQuoteFailure => ({ row: item.row, error })),
+  };
 };
 
 export const getZcashQuotes = async ({
@@ -346,28 +388,23 @@ export const getZcashQuotes = async ({
   tableData: ZcashTableData[];
   onProgress?: (progress: number) => void;
 }) => {
-  let currentProgress = 0;
-  const quotePromises = tableData.map((row) =>
-    compareZcashQuotes({ account, row })
-      .then((result) => {
-        currentProgress++;
-        onProgress?.(currentProgress);
-        return result;
-      })
-      .catch((e) => {
-        currentProgress++;
-        onProgress?.(currentProgress);
-        throw e;
-      }),
-  );
-  if (!quotePromises.length) {
+  if (!tableData.length) {
     throw new Error("Quote Error: Amount too small");
   }
-  const quoteResults = await Promise.allSettled(quotePromises);
-  return quoteResults.reduce((quotes, result) => {
-    if (result.status === "fulfilled" && result.value) {
-      quotes.push(result.value);
-    }
-    return quotes;
-  }, [] as ZcashQuoteResult[]);
+  // Counts markets priced; one that fails every attempt is counted once it is given up on.
+  let priced = 0;
+  const { done, failed } = await settleWithRetry(tableData, (row) =>
+    compareZcashQuotes({ account, row }).then((result) => {
+      onProgress?.(++priced);
+      return result;
+    }),
+  );
+  if (failed.length) onProgress?.(priced + failed.length);
+
+  return {
+    results: done
+      .map(({ value }) => value)
+      .filter((result): result is ZcashQuoteResult => !!result),
+    failed: failed.map(({ item, error }): ZcashQuoteFailure => ({ row: item, error })),
+  };
 };

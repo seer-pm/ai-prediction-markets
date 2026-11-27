@@ -49,10 +49,11 @@ async function sellToCollateral({
   onStateChange({ phase: "requote", label: "Pricing your positions" });
   // Across 37 markets this can be up to 74 sells, so the batching below is load-bearing rather
   // than defensive.
-  const sellAllQuotes = await getSellAllZcashQuotes({
+  const { quotes: sellAllQuotes, failed } = await getSellAllZcashQuotes({
     account: tradeExecutor,
     tableData: rows,
   });
+  const skippedMarkets = [...new Set(failed.map(({ row }) => row.project))];
   const swapCalls = getQuoteTradeCalls(tradeExecutor, sellAllQuotes);
   const BATCH_SIZE = 100;
   const sellInput: CallBatchesInput = [];
@@ -67,7 +68,13 @@ async function sellToCollateral({
     });
   }
   if (!sellInput.length) {
-    onStateChange({ phase: "sell", label: "Nothing left to sell after merging", skipped: true });
+    onStateChange({
+      phase: "sell",
+      label: failed.length
+        ? "No position could be priced to sell"
+        : "Nothing left to sell after merging",
+      skipped: true,
+    });
   }
   const sellResult = await toastifyBatchTxSessionKey(
     tradeExecutor,
@@ -80,7 +87,7 @@ async function sellToCollateral({
     throw sellResult.error;
   }
   await withdrawFundSessionKey();
-  return sellResult;
+  return { ...sellResult, skippedMarkets };
 }
 
 export const useSellZcashToCollateral = (onSuccess?: () => unknown) => {
