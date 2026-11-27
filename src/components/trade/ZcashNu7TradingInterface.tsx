@@ -111,6 +111,8 @@ export const ZcashNu7TradingInterface: React.FC<TradingInterfaceProps> = ({
           ? "Every prediction you gave already matches the market, so there is nothing to trade."
           : undefined
       }
+      // Finished contest, never given a minimum: a too-small amount is caught by the run (`noTradeError`).
+      minAmount={undefined}
       onSubmit={(value) =>
         executeTradeMutation.mutate({
           amount: value,

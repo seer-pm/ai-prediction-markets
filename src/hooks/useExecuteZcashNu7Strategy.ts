@@ -2,7 +2,7 @@ import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { toastifyBatchTxOwner, toastSuccess } from "@/lib/toastify";
 import { getZcashNu7Quotes } from "@/lib/trade/getZcashNu7Quote";
 import { CallBatchesInput, TxStateChange, ZcashNu7QuoteResult, ZcashNu7TradeProps } from "@/types";
-import { CHAIN_ID, DECIMALS, ROUTER_ADDRESSES } from "@/utils/constants";
+import { CHAIN_ID, collateral, DECIMALS, ROUTER_ADDRESSES, VOLUME_MIN } from "@/utils/constants";
 import { safeParseUnits } from "@/utils/format";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { allocateZcashNu7Budget } from "@/utils/zcashNu7Budget";
@@ -10,6 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Address } from "viem";
 import { splitFromRouter } from "./useExecuteL2Strategy";
 import { useTxProgress } from "./useTxProgress";
+import { noTradeError } from "@/utils/errors";
 
 /**
  * Batch size, and the tripwire on the signing choice below.
@@ -93,12 +94,12 @@ const executeZcashNu7Strategy = async ({
 
   const quoteResults = await getZcashNu7Quotes({ account: tradeExecutor, tableData: allocated });
   if (!quoteResults.length) {
-    throw new Error("No quote found");
+    throw noTradeError({ amount, minShare: VOLUME_MIN, symbol: collateral.symbol });
   }
 
   const calls = getTradeExecutorCalls({ quoteResults, tradeExecutor });
   if (!calls.length) {
-    throw new Error("No quote found");
+    throw noTradeError({ amount, minShare: VOLUME_MIN, symbol: collateral.symbol });
   }
 
   // What this run actually contains, so the ledger can report the stages it really walked through.

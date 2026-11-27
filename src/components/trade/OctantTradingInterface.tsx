@@ -84,6 +84,8 @@ export const OctantTradingInterface: React.FC<TradingInterfaceProps> = ({
             ? "No quotes are available for these markets."
             : undefined
       }
+      // Finished contest, never given a minimum: a too-small amount is caught by the run (`noTradeError`).
+      minAmount={undefined}
       onSubmit={(value) =>
         executeTradeMutation.mutate({
           amount: value,

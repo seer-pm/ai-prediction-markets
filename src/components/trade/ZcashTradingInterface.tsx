@@ -1,6 +1,6 @@
 import { useExecuteZcashStrategy } from "@/hooks/useExecuteZcashStrategy";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
-import { isZcashRowFundable, zcashShareOf } from "@/utils/zcashBudget";
+import { getZcashMinMint, isZcashRowFundable, zcashShareOf } from "@/utils/zcashBudget";
 import type { LeaderboardSubmission } from "@/hooks/useSubmitPredictions";
 import { ZcashTableData } from "@/types";
 import { collateral } from "@/utils/constants";
@@ -59,6 +59,10 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
 
   const perMarket = zcashShareOf(amount, fundableCount);
 
+  // Below this the budget, split equally, leaves some markets a share too small to quote, and well
+  // below it none: the dialog refuses the amount as not enough instead of running into nothing.
+  const minMint = useMemo(() => getZcashMinMint(markets), [markets]);
+
   // Every market given a number, traded or not — the prediction is what gets scored. The CSV's
   // probability is the YES price, so it is submitted against the YES outcome.
   return (
@@ -82,6 +86,14 @@ export const ZcashTradingInterface: React.FC<TradingInterfaceProps> = ({
       hasPositions={hasPositions}
       mutation={executeTradeMutation}
       onAmountChange={setAmount}
+      minAmount={
+        minMint === undefined
+          ? undefined
+          : {
+              value: String(minMint),
+              reason: `it is split across ${fundableCount} markets, and each market's share has to be big enough for its pool to quote.`,
+            }
+      }
       blockedReason={
         fundableCount === 0
           ? "Every prediction you gave already matches the market, so there is nothing to trade."

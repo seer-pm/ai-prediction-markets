@@ -2,9 +2,10 @@ import { queryClient, TRADE_RUN_MUTATION_KEY } from "@/config/queryClient";
 import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { toastifyBatchTxSessionKey, toastSuccess } from "@/lib/toastify";
 import { getSellFromBalanceZcashQuotes, getZcashQuotes } from "@/lib/trade/getZcashQuote";
-import { allocateZcashBudget } from "@/utils/zcashBudget";
+import { allocateZcashBudget, getZcashMinMint } from "@/utils/zcashBudget";
 import { CallBatchesInput, TxStateChange, ZcashQuoteResult, ZcashTradeProps } from "@/types";
-import { CHAIN_ID, DECIMALS, ROUTER_ADDRESSES } from "@/utils/constants";
+import { CHAIN_ID, collateral, DECIMALS, ROUTER_ADDRESSES, VOLUME_MIN } from "@/utils/constants";
+import { noTradeError } from "@/utils/errors";
 import { safeParseUnits } from "@/utils/format";
 import { getQuoteTradeCalls } from "@/utils/trade";
 import { NO_INDEX, YES_INDEX } from "@/utils/zcashMarkets";
@@ -135,8 +136,16 @@ const executeZcashStrategy = async ({
     account: tradeExecutor,
     tableData: newTableData,
   });
+  // Nothing to trade: say whether the amount was too small to split, rather than "No quote found".
+  const nothingToTrade = () =>
+    noTradeError({
+      amount,
+      minAmount: getZcashMinMint(tableData),
+      minShare: VOLUME_MIN,
+      symbol: collateral.symbol,
+    });
   if (!zcashQuoteResults.length) {
-    throw new Error("No quote found");
+    throw nothingToTrade();
   }
 
   const tradeExecutorCalls = getTradeExecutorCalls({
@@ -144,7 +153,7 @@ const executeZcashStrategy = async ({
     tradeExecutor,
   });
   if (!tradeExecutorCalls.length) {
-    throw new Error("No quote found");
+    throw nothingToTrade();
   }
 
   const input: CallBatchesInput = [];

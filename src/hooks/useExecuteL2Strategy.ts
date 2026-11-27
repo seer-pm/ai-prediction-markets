@@ -10,6 +10,7 @@ import {
   COLLATERAL_TOKENS,
   L2_PARENT_MARKET_ID,
   ROUTER_ADDRESSES,
+  VOLUME_MIN,
 } from "@/utils/constants";
 import { useMutation } from "@tanstack/react-query";
 import { useTxProgress } from "./useTxProgress";
@@ -19,6 +20,7 @@ import { getL2BuyQuotes } from "@/lib/trade/getQuote";
 import { withdrawFundSessionKey, withRunLock } from "@/lib/on-chain/sessionKey";
 import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
 import { l2MarketOutcomes } from "@/utils/l2MarketOutcomes";
+import { noTradeError } from "@/utils/errors";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -321,7 +323,7 @@ const executeL2StrategyContract = async ({
 }: L2TradeProps & { onStateChange: TxStateChange }) => {
   const filteredTableData = tableData.filter((row) => row.hasPrediction && row.difference);
   if (!getQuotesResults.length) {
-    throw new Error("No quote found");
+    throw noTradeError({ amount, minShare: VOLUME_MIN, symbol: collateral.symbol });
   }
   if (!filteredTableData.length) {
     throw new Error("No token found");

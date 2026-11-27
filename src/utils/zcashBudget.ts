@@ -95,6 +95,100 @@ export const allocateZcashBudget = ({
   });
 };
 
+/**
+ * Whether a row handed `share` sUSDS would put at least one leg in front of the quoter.
+ *
+ * Mirrors `compareZcashQuotes` in `lib/trade/getZcashQuote`: the YES+NO>1 arbitrage is tried first
+ * and, failing that, the prediction's plan; any leg under `VOLUME_MIN` is dropped there before it
+ * is quoted. A paired buy leg is sized off the sell leg's proceeds, which are estimated here at the
+ * pool price, as `planPaired` already does.
+ */
+const zcashRowTradesAt = (row: ZcashTableData, share: number): boolean => {
+  // Held tokens on a side priced above the prediction are sold before anything is minted
+  // (`getSellFromBalanceForSide`), whatever the share.
+  if (row.hasPrediction && hasZcashEdge(row)) {
+    for (const side of ["YES", "NO"] as ZcashSide[]) {
+      const difference = sideDifference(row, side);
+      if (difference == null || difference >= 0) continue;
+      if (Math.min(sideBalance(row, side), sideVolume(row, side)) >= VOLUME_MIN) return true;
+    }
+  }
+
+  const volYesEq = row.volumeUntilYesEqual;
+  const volNoEq = row.volumeUntilNoEqual;
+  if (volYesEq >= VOLUME_MIN || volNoEq >= VOLUME_MIN) {
+    const yesBalance = sideBalance(row, "YES");
+    const noBalance = sideBalance(row, "NO");
+    const mint = Math.max(0, Math.min(volYesEq - yesBalance, volNoEq - noBalance, share));
+    if (
+      Math.min(volYesEq, yesBalance + mint) >= VOLUME_MIN ||
+      Math.min(volNoEq, noBalance + mint) >= VOLUME_MIN
+    ) {
+      return true;
+    }
+  }
+
+  if (!row.hasPrediction) return false;
+  const plan = planZcashLegs({ ...row, amount: share.toFixed(18) });
+  if (!plan) return false;
+
+  switch (plan.kind) {
+    case "dual-buy":
+    case "dual-sell":
+      return plan.yesVolume >= VOLUME_MIN || plan.noVolume >= VOLUME_MIN;
+    case "paired": {
+      const proceeds = plan.sellVolume * sidePrice(row, plan.sellSide);
+      const buyVolume = Math.min(plan.buyCeiling, plan.cashAfterMint + proceeds);
+      return plan.sellVolume >= VOLUME_MIN || buyVolume >= VOLUME_MIN;
+    }
+  }
+};
+
+/**
+ * The smallest slice of the mint budget that gets this row a trade, or `undefined` when no slice
+ * would (its pools cannot move far enough to clear `VOLUME_MIN`).
+ *
+ * Every plan's legs grow with the share until the full move is funded, so the threshold is found
+ * by bisection between 0 and a share that funds the whole move.
+ */
+export const zcashMinShare = (row: ZcashTableData): number | undefined => {
+  if (zcashRowTradesAt(row, 0)) return 0;
+
+  // Enough to fund the full move on both pools whatever the plan, so `scale` is 1 at this share.
+  let high = 2 * (row.volumeUntilYesPrice + row.volumeUntilNoPrice) + 2 * VOLUME_MIN;
+  if (!zcashRowTradesAt(row, high)) return undefined;
+
+  let low = 0;
+  for (let i = 0; i < 60 && high - low > 1e-9; i++) {
+    const mid = (low + high) / 2;
+    if (zcashRowTradesAt(row, mid)) high = mid;
+    else low = mid;
+  }
+  return high;
+};
+
+/**
+ * The smallest mint amount, in sUSDS, at which every market the budget is split across gets a
+ * trade, rounded up to the cent. `undefined` when no fundable market can trade at any amount.
+ *
+ * The budget is split equally (`allocateZcashBudget`), so the binding market is the one that needs
+ * the largest slice. Below this, markets whose slice is under the quote minimum are dropped from
+ * the run without a word; far enough below it, every market is, and the run used to die on a bare
+ * "No quote found".
+ *
+ * An estimate off the pool state the table was built from: the run itself still reports, in plain
+ * words, when nothing came back (`noTradeError`).
+ */
+export const getZcashMinMint = (tableData: ZcashTableData[]): number | undefined => {
+  const fundable = tableData.filter(isZcashRowFundable);
+  const shares = fundable
+    .map(zcashMinShare)
+    .filter((share): share is number => share !== undefined);
+  if (!shares.length) return undefined;
+  const needed = Math.max(...shares) * fundable.length;
+  return Math.max(0.01, Math.ceil(needed * 100) / 100);
+};
+
 /** What one market's slice works out to, for the trade dialog's preflight stats. */
 export const zcashShareOf = (amount: string, fundableCount: number) => {
   const mintValue = amount && Number(amount) > 0 ? parseUnits(amount, DECIMALS) : 0n;

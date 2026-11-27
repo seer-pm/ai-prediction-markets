@@ -68,11 +68,17 @@ export interface StrategyDialogProps {
   /** Extra reason the run can't start, beyond the built-in ones. */
   blockedReason?: string;
   /**
-   * The smallest mint that can produce a trade, when a contest has one: below it every market's
-   * share of the budget is under the quote minimum and the run dies on "No quote found". Shown in
-   * the hint and enforced on a non-empty amount — an empty one still trades held tokens.
+   * The smallest mint at which every market the budget is split across gets a trade. Below it a
+   * market's share falls under the quote minimum and the market is dropped; far enough below, every
+   * market is, and the run finds nothing to trade. Shown in the hint, and a non-empty amount under
+   * it is refused with "not enough to trade" before anything runs. An empty amount still trades held
+   * tokens.
+   *
+   * Required, so a new contest has to work its minimum out (see `getZcashMinMint`,
+   * `getOriginalityMinMint`). `undefined` only where there is none to give: nothing to trade yet,
+   * or a finished contest that was never given one.
    */
-  minAmount?: { value: string; reason: string };
+  minAmount: { value: string; reason: string } | undefined;
   /**
    * The stages this contest's run actually walks through. Defaults to `STRATEGY_PHASES`.
    *
@@ -348,7 +354,7 @@ export function StrategyDialog({
                   return `That is more than the trade wallet's ${available} ${collateral.symbol}.`;
                 }
                 if (minAmount && parsed < safeParseUnits(minAmount.value, balance?.decimals ?? 18)) {
-                  return `Enter at least ${minAmount.value} ${collateral.symbol} — ${minAmount.reason}`;
+                  return `Not enough to trade. Enter at least ${minAmount.value} ${collateral.symbol}: ${minAmount.reason}`;
                 }
                 return true;
               },
