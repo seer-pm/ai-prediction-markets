@@ -22,6 +22,42 @@ export class TradeError extends Error {
   }
 }
 
+/**
+ * The run found nothing to trade. Thrown by every strategy hook in place of a bare
+ * "No quote found", which read like a broken pool when the usual cause is an amount too small to
+ * split: each market's share has to reach `minShare` before its pool is asked for a quote.
+ *
+ * `minAmount` is the contest's own estimate of the smallest amount that trades (what its dialog
+ * enforces); when the amount is under it, the error says the amount is not enough and names the
+ * figure. Otherwise it cannot tell a small amount from a failed or empty pool, and says both.
+ */
+export function noTradeError({
+  amount,
+  minAmount,
+  minShare,
+  symbol,
+}: {
+  amount: string | undefined;
+  minAmount?: number;
+  minShare: number;
+  symbol: string;
+}): TradeError {
+  const value = Number(amount);
+  const entered = amount?.trim() && value > 0;
+  if (entered && minAmount !== undefined && value < minAmount) {
+    return new TradeError(
+      `${amount} ${symbol} is not enough to trade.`,
+      `The amount is split across the markets you predicted, and each market's share has to reach ${minShare} ${symbol} before its pool will quote it. Enter at least ${minAmount} ${symbol}.`,
+    );
+  }
+  return new TradeError(
+    "None of your markets got a quote.",
+    entered
+      ? `If the amount is small, it may not be enough: each market's share has to reach ${minShare} ${symbol} before its pool will quote it, so try a larger amount. Otherwise the quotes failed or the pools have no liquidity at your targets — reopen the dialog and try again.`
+      : "Reopen the dialog so fresh quotes are fetched. If it persists, the pools may have no liquidity at your targets.",
+  );
+}
+
 export interface DescribedError {
   /** One sentence, plain language. Safe to show as a panel or toast title. */
   headline: string;

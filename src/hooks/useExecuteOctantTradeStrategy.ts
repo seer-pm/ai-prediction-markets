@@ -8,6 +8,7 @@ import {
   COLLATERAL_TOKENS,
   OCTANT_MARKET_ID,
   ROUTER_ADDRESSES,
+  VOLUME_MIN,
 } from "@/utils/constants";
 import { describeSellFailure, getQuoteTradeCalls } from "@/utils/trade";
 import { useMutation } from "@tanstack/react-query";
@@ -16,6 +17,7 @@ import { Address, parseUnits } from "viem";
 import { Execution } from "./useCheck7702Support";
 import { getUnwindMintCalls, mergeFromRouter, splitFromRouter } from "./useExecuteL2Strategy";
 import { fetchTokensBalancesOrThrow } from "./useTokensBalances";
+import { noTradeError } from "@/utils/errors";
 
 const collateral = COLLATERAL_TOKENS[CHAIN_ID].primary;
 
@@ -96,7 +98,7 @@ const executeTradeStrategyContract = async ({
   onStateChange,
 }: OctantTradeProps & { onStateChange: TxStateChange }) => {
   if (!getQuotesResult?.quotes || !getQuotesResult.quotes.length) {
-    throw new Error("No quote found");
+    throw noTradeError({ amount, minShare: VOLUME_MIN, symbol: collateral.symbol });
   }
   if (!tableData.length) {
     throw new Error("No token found");
