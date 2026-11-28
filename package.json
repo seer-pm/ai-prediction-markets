@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run codegen && tsc -b && vite build",
+    "build": "npm run codegen && npm run check:quotes && tsc -b && vite build",
+    "check:quotes": "node scripts/checkQuoteDrops.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck:functions": "tsc --noEmit -p tsconfig.netlifycheck.json",
